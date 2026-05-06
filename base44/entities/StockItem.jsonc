@@ -1,0 +1,85 @@
+{
+  "name": "StockItem",
+  "type": "object",
+  "properties": {
+    "branch_id": {
+      "type": "string",
+      "title": "Branch ID"
+    },
+    "nombre": {
+      "type": "string",
+      "title": "Nombre"
+    },
+    "unidad": {
+      "type": "string",
+      "title": "Unidad",
+      "default": "kg"
+    },
+    "actual": {
+      "type": "number",
+      "title": "Stock actual",
+      "default": 0
+    },
+    "minimo": {
+      "type": "number",
+      "title": "Stock m\u00ednimo",
+      "default": 0
+    }
+  },
+  "required": [
+    "branch_id",
+    "nombre"
+  ],
+  "rls": {
+    "create": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "read": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    }
+  }
+}
+
+

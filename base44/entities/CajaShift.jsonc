@@ -1,0 +1,118 @@
+{
+  "name": "CajaShift",
+  "type": "object",
+  "properties": {
+    "branch_id": {
+      "type": "string",
+      "title": "Branch ID"
+    },
+    "tipo_turno": {
+      "type": "string",
+      "title": "Tipo de turno",
+      "enum": [
+        "manana",
+        "tarde",
+        "noche",
+        "general"
+      ]
+    },
+    "nombre_turno": {
+      "type": "string",
+      "title": "Nombre del turno"
+    },
+    "fondo_inicial": {
+      "type": "number",
+      "title": "Fondo inicial",
+      "default": 0
+    },
+    "abierto_at": {
+      "type": "number",
+      "title": "Abierto en (timestamp)"
+    },
+    "cerrado_at": {
+      "type": "number",
+      "title": "Cerrado en (timestamp)"
+    },
+    "status": {
+      "type": "string",
+      "title": "Status",
+      "enum": [
+        "abierto",
+        "cerrado"
+      ],
+      "default": "abierto"
+    },
+    "retiros": {
+      "type": "string",
+      "title": "Retiros (JSON)",
+      "default": "[]"
+    },
+    "arqueo_efectivo": {
+      "type": "number",
+      "title": "Arqueo efectivo"
+    },
+    "diferencia_caja": {
+      "type": "number",
+      "title": "Diferencia de caja"
+    },
+    "motivo_diferencia": {
+      "type": "string",
+      "title": "Motivo de diferencia"
+    },
+    "total_facturado_turno": {
+      "type": "number",
+      "title": "Total facturado del turno",
+      "default": 0
+    }
+  },
+  "required": [
+    "branch_id",
+    "abierto_at",
+    "status"
+  ],
+  "rls": {
+    "create": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "read": {
+      "user_condition": {
+        "role": "user"
+      }
+    },
+    "update": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    }
+  }
+}
+
+

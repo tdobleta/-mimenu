@@ -1,0 +1,82 @@
+{
+  "name": "Restaurant",
+  "type": "object",
+  "properties": {
+    "nombre": {
+      "type": "string",
+      "title": "Nombre"
+    },
+    "direccion": {
+      "type": "string",
+      "title": "Direcci\u00f3n"
+    },
+    "telefono": {
+      "type": "string",
+      "title": "Tel\u00e9fono"
+    },
+    "owner_email": {
+      "type": "string",
+      "title": "Email del due\u00f1o"
+    },
+    "onboarding_completado": {
+      "type": "boolean",
+      "title": "Onboarding completado",
+      "default": false
+    }
+  },
+  "required": [
+    "nombre"
+  ],
+  "rls": {
+    "create": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "read": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    }
+  }
+}
+
+

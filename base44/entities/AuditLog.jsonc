@@ -1,0 +1,99 @@
+{
+  "name": "AuditLog",
+  "type": "object",
+  "properties": {
+    "restaurant_id": {
+      "type": "string",
+      "title": "Restaurant ID"
+    },
+    "branch_id": {
+      "type": "string",
+      "title": "Branch ID"
+    },
+    "usuario_email": {
+      "type": "string",
+      "title": "Usuario email"
+    },
+    "usuario_rol": {
+      "type": "string",
+      "title": "Usuario rol"
+    },
+    "categoria": {
+      "type": "string",
+      "title": "Categor\u00eda"
+    },
+    "accion": {
+      "type": "string",
+      "title": "Acci\u00f3n"
+    },
+    "detalle": {
+      "type": "string",
+      "title": "Detalle"
+    },
+    "sucursal_nombre": {
+      "type": "string",
+      "title": "Sucursal"
+    },
+    "ts": {
+      "type": "number",
+      "title": "Timestamp"
+    }
+  },
+  "required": [
+    "restaurant_id",
+    "accion",
+    "ts"
+  ],
+  "rls": {
+    "create": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "read": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    }
+  }
+}
+
+

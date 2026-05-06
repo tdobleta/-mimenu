@@ -1,0 +1,80 @@
+{
+  "name": "TurnItem",
+  "type": "object",
+  "properties": {
+    "turn_id": {
+      "type": "string",
+      "title": "Turn ID"
+    },
+    "branch_id": {
+      "type": "string",
+      "title": "Branch ID"
+    },
+    "menu_item_id": {
+      "type": "string",
+      "title": "Menu Item ID"
+    },
+    "menu_item_name": {
+      "type": "string",
+      "title": "Nombre producto"
+    },
+    "cantidad": {
+      "type": "number",
+      "title": "Cantidad"
+    },
+    "precio": {
+      "type": "number",
+      "title": "Precio unitario"
+    }
+  },
+  "required": [
+    "turn_id",
+    "branch_id",
+    "cantidad"
+  ],
+  "rls": {
+    "create": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "read": {
+      "user_condition": {
+        "role": "user"
+      }
+    },
+    "update": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    }
+  }
+}
+
+

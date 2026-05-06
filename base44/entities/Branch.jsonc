@@ -1,0 +1,106 @@
+{
+  "name": "Branch",
+  "type": "object",
+  "properties": {
+    "restaurant_id": {
+      "type": "string",
+      "title": "Restaurant ID"
+    },
+    "nombre": {
+      "type": "string",
+      "title": "Nombre"
+    },
+    "direccion": {
+      "type": "string",
+      "title": "Direcci\u00f3n"
+    },
+    "metodo_conexion": {
+      "type": "string",
+      "title": "M\u00e9todo de conexi\u00f3n",
+      "enum": [
+        "fudo",
+        "mercadopago",
+        "manual",
+        "ninguno"
+      ],
+      "default": "ninguno"
+    },
+    "fudo_api_key": {
+      "type": "string",
+      "title": "Fudo API Key"
+    },
+    "fudo_api_secret": {
+      "type": "string",
+      "title": "Fudo API Secret"
+    },
+    "mp_access_token": {
+      "type": "string",
+      "title": "MercadoPago Access Token"
+    },
+    "mp_account_name": {
+      "type": "string",
+      "title": "MP Account Name"
+    },
+    "acepta_reservas_online": {
+      "type": "boolean",
+      "title": "Acepta reservas online",
+      "default": true
+    }
+  },
+  "required": [
+    "restaurant_id",
+    "nombre"
+  ],
+  "rls": {
+    "create": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "read": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    }
+  }
+}
+
+

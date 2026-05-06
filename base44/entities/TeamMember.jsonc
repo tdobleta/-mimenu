@@ -1,0 +1,78 @@
+{
+  "name": "TeamMember",
+  "type": "object",
+  "properties": {
+    "restaurant_id": {
+      "type": "string",
+      "title": "Restaurant ID"
+    },
+    "email": {
+      "type": "string",
+      "title": "Email"
+    },
+    "nombre": {
+      "type": "string",
+      "title": "Nombre"
+    },
+    "rol": {
+      "type": "string",
+      "title": "Rol",
+      "enum": [
+        "Dueno",
+        "Encargado",
+        "Mozo",
+        "Cocinero"
+      ]
+    }
+  },
+  "required": [
+    "restaurant_id",
+    "email",
+    "rol"
+  ],
+  "rls": {
+    "create": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "read": {
+      "user_condition": {
+        "role": "user"
+      }
+    },
+    "update": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    }
+  }
+}
+
+

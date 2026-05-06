@@ -1,0 +1,126 @@
+{
+  "name": "Turn",
+  "type": "object",
+  "properties": {
+    "branch_id": {
+      "type": "string",
+      "title": "Branch ID"
+    },
+    "caja_shift_id": {
+      "type": "string",
+      "title": "ID del turno de caja"
+    },
+    "propina": {
+      "type": "number",
+      "title": "Propina",
+      "default": 0
+    },
+    "mesa_num": {
+      "type": "number",
+      "title": "N\u00famero de mesa"
+    },
+    "mozo": {
+      "type": "string",
+      "title": "Mozo"
+    },
+    "status": {
+      "type": "string",
+      "title": "Estado",
+      "enum": [
+        "abierta",
+        "cerrada",
+        "anulada"
+      ]
+    },
+    "opened_at": {
+      "type": "number",
+      "title": "Abierta en (timestamp)"
+    },
+    "closed_at": {
+      "type": "number",
+      "title": "Cerrada en (timestamp)"
+    },
+    "total_facturado": {
+      "type": "number",
+      "title": "Total facturado"
+    },
+    "metodo_pago": {
+      "type": "string",
+      "title": "M\u00e9todo de pago"
+    },
+    "descuento": {
+      "type": "number",
+      "title": "Descuento aplicado"
+    },
+    "motivo_anulacion": {
+      "type": "string",
+      "title": "Motivo de anulaci\u00f3n"
+    },
+    "anulado_at": {
+      "type": "number",
+      "title": "Anulado en (timestamp)"
+    },
+    "enviado_cocina": {
+      "type": "boolean",
+      "title": "Enviado a cocina",
+      "default": false
+    },
+    "comanda_lista": {
+      "type": "boolean",
+      "title": "Comanda lista para servir",
+      "default": false
+    }
+  },
+  "required": [
+    "branch_id",
+    "mesa_num",
+    "status",
+    "opened_at",
+    "total_facturado"
+  ],
+  "rls": {
+    "create": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "read": {
+      "user_condition": {
+        "role": "user"
+      }
+    },
+    "update": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    }
+  }
+}
+
+

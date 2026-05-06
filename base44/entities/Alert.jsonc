@@ -1,0 +1,90 @@
+{
+  "name": "Alert",
+  "type": "object",
+  "properties": {
+    "branch_id": {
+      "type": "string",
+      "title": "Branch ID"
+    },
+    "restaurant_id": {
+      "type": "string",
+      "title": "Restaurant ID"
+    },
+    "tipo": {
+      "type": "string",
+      "title": "Tipo",
+      "enum": [
+        "facturacion_baja",
+        "ticket_bajo",
+        "dia_sin_ventas"
+      ]
+    },
+    "mensaje": {
+      "type": "string",
+      "title": "Mensaje"
+    },
+    "leida": {
+      "type": "boolean",
+      "title": "Le\u00edda",
+      "default": false
+    }
+  },
+  "required": [
+    "branch_id",
+    "restaurant_id",
+    "tipo",
+    "mensaje"
+  ],
+  "rls": {
+    "create": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "read": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    }
+  }
+}
+
+

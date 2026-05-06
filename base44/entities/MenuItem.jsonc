@@ -1,0 +1,81 @@
+{
+  "name": "MenuItem",
+  "type": "object",
+  "properties": {
+    "branch_id": {
+      "type": "string",
+      "title": "Branch ID"
+    },
+    "nombre": {
+      "type": "string",
+      "title": "Nombre"
+    },
+    "descripcion": {
+      "type": "string",
+      "title": "Descripcion"
+    },
+    "categoria": {
+      "type": "string",
+      "title": "Categor\u00eda"
+    },
+    "precio": {
+      "type": "number",
+      "title": "Precio",
+      "default": 0
+    },
+    "activo": {
+      "type": "boolean",
+      "title": "Activo",
+      "default": true
+    }
+  },
+  "required": [
+    "branch_id",
+    "nombre"
+  ],
+  "rls": {
+    "create": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "read": {
+      "user_condition": {
+        "role": "user"
+      }
+    },
+    "update": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    }
+  }
+}
+
+

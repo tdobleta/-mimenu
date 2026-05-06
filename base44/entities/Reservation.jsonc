@@ -1,0 +1,101 @@
+{
+  "name": "Reservation",
+  "type": "object",
+  "properties": {
+    "branch_id": {
+      "type": "string",
+      "title": "Branch ID"
+    },
+    "hora": {
+      "type": "string",
+      "title": "Hora"
+    },
+    "nombre": {
+      "type": "string",
+      "title": "Nombre"
+    },
+    "telefono": {
+      "type": "string",
+      "title": "Tel\u00e9fono"
+    },
+    "email": {
+      "type": "string",
+      "title": "Email"
+    },
+    "personas": {
+      "type": "number",
+      "title": "Personas"
+    },
+    "mesa": {
+      "type": "string",
+      "title": "Mesa"
+    },
+    "canal": {
+      "type": "string",
+      "title": "Canal"
+    },
+    "estado": {
+      "type": "string",
+      "title": "Estado"
+    },
+    "fecha": {
+      "type": "string",
+      "title": "Fecha"
+    },
+    "notas": {
+      "type": "string",
+      "title": "Notas"
+    }
+  },
+  "required": [
+    "branch_id",
+    "nombre",
+    "fecha",
+    "hora"
+  ],
+  "rls": {
+    "create": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "read": {
+      "user_condition": {
+        "role": "user"
+      }
+    },
+    "update": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    }
+  }
+}
+
+
