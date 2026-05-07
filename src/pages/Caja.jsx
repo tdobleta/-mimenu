@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useStore } from '@/lib/store';
 import { money } from '@/lib/fmt';
@@ -22,11 +23,37 @@ function fmtTime(ts) {
 function normalizeMethod(m) {
   const s = (m||'').toLowerCase();
   if (s.includes('efectivo')) return 'Efectivo';
+  if (s.includes('tarjeta') || s.includes('déb') || s.includes('deb') || s.includes('créd') || s.includes('cred')) return 'Tarjeta';
   if (s.includes('mercado')) return 'MercadoPago';
-  if (s.includes('déb') || s.includes('deb')) return 'Débito';
-  if (s.includes('créd') || s.includes('cred')) return 'Crédito';
   if (s.includes('trans')) return 'Transferencia';
   return m || 'Otro';
+}
+
+function parsePagos(t) {
+  // 1. Intentar t.pagos como JSON (POSView lo guarda en Supabase directo)
+  if (t.pagos) {
+    try {
+      const arr = Array.isArray(t.pagos) ? t.pagos : JSON.parse(t.pagos);
+      if (Array.isArray(arr) && arr.length > 0) return arr;
+    } catch {}
+  }
+  const m = t.metodo_pago || '';
+  // 2. Pago simple (no mixto)
+  if (!m.toLowerCase().startsWith('mixto')) {
+    return [{ metodo: m, monto: t.total_facturado || 0 }];
+  }
+  // 3. Parsear string "Mixto (Efectivo $10.000 + Tarjeta $5.000)"
+  // En es-AR el punto es separador de miles (10.000 = diez mil)
+  const inner = m.match(/\((.+)\)/)?.[1];
+  if (!inner) return [{ metodo: m, monto: t.total_facturado || 0 }];
+  const parts = inner.split('+').map(part => {
+    const trimmed = part.trim();
+    const match = trimmed.match(/^(.+?)\s+\$([\d.,]+)$/);
+    if (!match) return null;
+    const montoStr = match[2].replace(/\./g, '').replace(',', '.');
+    return { metodo: match[1].trim(), monto: Number(montoStr) };
+  }).filter(Boolean);
+  return parts.length > 0 ? parts : [{ metodo: m, monto: t.total_facturado || 0 }];
 }
 
 export default function Caja() {
@@ -38,6 +65,7 @@ export default function Caja() {
   const [turnos, setTurnos] = useState([]);
   const [, setTick] = useState(0);
 
+  const navigate = useNavigate();
   const turnoActivo = store.turnoActivo;
   const branchId = store.branchId !== 'todas' ? store.branchId : store.sucursales[0]?.id;
 
@@ -73,15 +101,25 @@ export default function Caja() {
   }, [turnoActivo]);
 
   const ventasPorMetodo = useMemo(() => {
-    const map = {};
-    turnos.forEach(t => {
+  const map = {};
+  turnos.forEach(t => {
+    const pagosArr = parsePagos(t);
+    if (pagosArr.length > 1) {
+      pagosArr.forEach(p => {
+        const m = normalizeMethod(p.metodo);
+        if (!map[m]) map[m] = { mesas:0, total:0 };
+        map[m].mesas += 1;
+        map[m].total += Number(p.monto) || 0;
+      });
+    } else {
       const m = normalizeMethod(t.metodo_pago);
       if (!map[m]) map[m] = { mesas:0, total:0 };
       map[m].mesas += 1;
       map[m].total += t.total_facturado || 0;
-    });
-    return map;
-  }, [turnos]);
+    }
+  });
+  return map;
+}, [turnos]);
 
   const totalVentas = turnos.reduce((a,t) => a + (t.total_facturado||0), 0);
   const ventasEfectivo = ventasPorMetodo['Efectivo']?.total || 0;
@@ -133,6 +171,14 @@ export default function Caja() {
               <span style={{ fontSize:12, color:'#6B7280' }}>{TIPO_LABEL[turnoActivo.tipoTurno]} · hace <strong>{fmtElapsed(elapsed)}</strong></span>
             </div>
             <div style={{ display:'flex', gap:8 }}>
+              <button onClick={() => navigate('/pos')} style={{
+                padding:'7px 18px', border:'none', borderRadius:7, fontSize:13,
+                color:'white', backgroundColor:'#1D9E75', cursor:'pointer', fontWeight:600,
+                display:'flex', alignItems:'center', gap:6, boxShadow:'0 4px 12px rgba(29,158,117,0.25)',
+              }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+                Abrir POS
+              </button>
               <button onClick={()=>setShowRetiro(true)}
                 style={{ padding:'7px 14px', border:'0.5px solid rgba(0,0,0,0.12)', borderRadius:7, fontSize:13, color:'#374151', backgroundColor:'white', cursor:'pointer' }}>
                 Registrar retiro
@@ -188,6 +234,14 @@ export default function Caja() {
           <div style={{ backgroundColor:'white', border:'0.5px solid rgba(0,0,0,0.08)', borderRadius:10, overflow:'hidden' }}>
             <div style={{ padding:'14px 18px', display:'flex', alignItems:'center', justifyContent:'space-between', borderBottom:'0.5px solid rgba(0,0,0,0.06)' }}>
               <span style={{ fontSize:14, fontWeight:600, color:'#111827' }}>Retiros registrados</span>
+              <button onClick={() => navigate('/pos')} style={{
+                padding:'7px 18px', border:'none', borderRadius:7, fontSize:13,
+                color:'white', backgroundColor:'#1D9E75', cursor:'pointer', fontWeight:600,
+                display:'flex', alignItems:'center', gap:6, boxShadow:'0 4px 12px rgba(29,158,117,0.25)',
+              }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+                Abrir POS
+              </button>
               <button onClick={()=>setShowRetiro(true)} style={{ padding:'5px 12px', border:'none', borderRadius:7, fontSize:12, color:'white', backgroundColor:'#1D9E75', cursor:'pointer', fontWeight:500 }}>+ Registrar retiro</button>
             </div>
             {retiros.length === 0 ? (
@@ -211,6 +265,12 @@ export default function Caja() {
             )}
           </div>
 
+          {/* Reservas de hoy */}
+          <ReservasHoy reservas={store.getReservas ? store.getReservas() : []} />
+
+          {/* Actividad reciente */}
+          <ActividadReciente activity={store.getActivity ? store.getActivity() : []} />
+
           {showRetiro && <AddRetiroModal onClose={()=>setShowRetiro(false)} />}
           {showClose && (() => {
             const mesasAbiertas = (store.tables[store.branchId] || []).filter(t => t.status === 'ocupada' || t.status === 'demorada').length;
@@ -232,6 +292,59 @@ export default function Caja() {
       )}
 
       {tab === 'actual' && !turnoActivo && showOpen && <OpenShiftModal onClose={()=>setShowOpen(false)} />}
+    </div>
+  );
+}
+
+function ReservasHoy({ reservas }) {
+  const todayStr = new Date().toISOString().split('T')[0];
+  const hoy = reservas.filter(r => r.fecha === todayStr);
+  const badgeStyle = (estado) => {
+    const s = { confirmada:{bg:'#E8F7F2',c:'#1D9E75'}, 'en espera':{bg:'#FEF9C3',c:'#CA8A04'}, cancelada:{bg:'#FEE2E2',c:'#EF4444'} }[estado] || {bg:'#F3F4F6',c:'#6B7280'};
+    return { backgroundColor:s.bg, color:s.c, padding:'2px 8px', borderRadius:99, fontSize:11, fontWeight:600 };
+  };
+  return (
+    <div style={{ backgroundColor:'white', border:'0.5px solid rgba(0,0,0,0.08)', borderRadius:10, overflow:'hidden' }}>
+      <div style={{ padding:'14px 18px', fontSize:14, fontWeight:600, color:'#111827', borderBottom:'0.5px solid rgba(0,0,0,0.06)' }}>Reservas de hoy</div>
+      {hoy.length === 0
+        ? <div style={{ padding:'24px 20px', textAlign:'center', fontSize:13, color:'#9CA3AF' }}>No hay reservas para hoy</div>
+        : <div style={{ padding:'10px 18px', display:'flex', flexDirection:'column', gap:10 }}>
+            {hoy.map(r => (
+              <div key={r.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 0', borderBottom:'0.5px solid rgba(0,0,0,0.05)' }}>
+                <span style={{ fontSize:13, fontWeight:700, color:'#1D9E75', minWidth:44 }}>{r.hora}</span>
+                <span style={{ fontSize:13, color:'#111827', fontWeight:500, flex:1 }}>{r.nombre}</span>
+                <span style={{ fontSize:12, color:'#6B7280' }}>{r.personas} personas</span>
+                <span style={badgeStyle(r.estado)}>{r.estado}</span>
+              </div>
+            ))}
+          </div>
+      }
+    </div>
+  );
+}
+
+function ActividadReciente({ activity }) {
+  function fmtElapsedLocal(ms) {
+    const m = Math.max(0, Math.floor(ms/60000));
+    return m < 60 ? `hace ${m}m` : `hace ${Math.floor(m/60)}h`;
+  }
+  return (
+    <div style={{ backgroundColor:'white', border:'0.5px solid rgba(0,0,0,0.08)', borderRadius:10, overflow:'hidden' }}>
+      <div style={{ padding:'14px 18px', fontSize:14, fontWeight:600, color:'#111827', borderBottom:'0.5px solid rgba(0,0,0,0.06)' }}>Actividad reciente</div>
+      {activity.length === 0
+        ? <div style={{ padding:'24px 20px', textAlign:'center', fontSize:13, color:'#9CA3AF' }}>Sin actividad reciente</div>
+        : <div style={{ padding:'10px 18px', display:'flex', flexDirection:'column', gap:10 }}>
+            {activity.slice(0,8).map(a => (
+              <div key={a.id} style={{ display:'flex', gap:10, alignItems:'flex-start', padding:'4px 0', borderBottom:'0.5px solid rgba(0,0,0,0.04)' }}>
+                <span style={{ width:8, height:8, borderRadius:'50%', backgroundColor:a.color, flexShrink:0, marginTop:4 }} />
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:13, color:'#374151' }}>{a.texto}</div>
+                  <div style={{ fontSize:11, color:'#9CA3AF', marginTop:2 }}>{fmtElapsedLocal(Date.now() - a.ts)}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+      }
     </div>
   );
 }

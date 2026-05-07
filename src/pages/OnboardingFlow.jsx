@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import GuidedTour from '@/components/GuidedTour';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useStore } from '@/lib/store';
@@ -17,6 +18,7 @@ export default function OnboardingFlow() {
   const navigate = useNavigate();
   const store = useStore();
   const [step, setStep] = useState(1);
+  const [showTour, setShowTour] = useState(false);
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState(null);
   const [form1, setForm1] = useState({ nombre:'', telefono:'', direccion:'' });
@@ -107,8 +109,10 @@ export default function OnboardingFlow() {
   function finish() {
     store.completeOnboarding();
     if (store.refreshCharts) store.refreshCharts();
-    navigate('/salon');
+    setShowTour(true);
   }
+
+  if (showTour) return <GuidedTour onFinish={() => { setShowTour(false); navigate('/salon'); }} />;
 
   return (
     <div style={{ minHeight:'100vh', display:'flex', backgroundColor:'#0D1117', flexDirection: window.innerWidth < 768 ? 'column' : 'row' }}>
@@ -182,6 +186,9 @@ export default function OnboardingFlow() {
       </div>
     </div>
   );
+
+  if (showTour) return <GuidedTour onFinish={() => { setShowTour(false); navigate('/'); }} />;
+
 }
 
 const inputStyle = { width:'100%', padding:'11px 14px', border:'1px solid rgba(0,0,0,0.12)', borderRadius:8, fontSize:14, backgroundColor:'white', boxSizing:'border-box', outline:'none' };
@@ -214,6 +221,9 @@ function Step1({ form1, setForm1, errorMsg, saving, onContinue }) {
       <button onClick={onContinue} disabled={disabled} style={primaryBtn(disabled)}>{saving ? 'Guardando...' : 'Continuar →'}</button>
     </div>
   );
+
+  if (showTour) return <GuidedTour onFinish={() => { setShowTour(false); navigate('/'); }} />;
+
 }
 
 function Step2({ numMesas, setNumMesas, errorMsg, saving, onBack, onContinue }) {
@@ -244,7 +254,9 @@ function Step2({ numMesas, setNumMesas, errorMsg, saving, onBack, onContinue }) 
           placeholder="0"
           value={MESAS_OPCIONES.includes(numMesas) ? '' : (numMesas || '')}
           onChange={e => {
-            const v = Number(e.target.value);
+            const raw = e.target.value;
+            if (raw === '' || raw === '0') { setNumMesas(''); return; }
+            const v = Number(raw);
             if (v > 0 && v < 100) setNumMesas(v);
           }}
           style={{ width:120, padding:'10px 14px', border:'1.5px solid rgba(0,0,0,0.12)', borderRadius:8, fontSize:20, fontWeight:700, textAlign:'center', boxSizing:'border-box', outline:'none' }}
@@ -265,6 +277,9 @@ function Step2({ numMesas, setNumMesas, errorMsg, saving, onBack, onContinue }) 
       </div>
     </div>
   );
+
+  if (showTour) return <GuidedTour onFinish={() => { setShowTour(false); navigate('/'); }} />;
+
 }
 
 function Step3({ productos, setProductos, prodForm, setProdForm, prodError, addProducto, errorMsg, saving, onBack, onContinue, onSkip }) {
@@ -317,6 +332,9 @@ function Step3({ productos, setProductos, prodForm, setProdForm, prodError, addP
       </div>
     </div>
   );
+
+  if (showTour) return <GuidedTour onFinish={() => { setShowTour(false); navigate('/'); }} />;
+
 }
 
 function Step4({ store, numMesas, productosCount, onFinish }) {
@@ -348,6 +366,9 @@ function Step4({ store, numMesas, productosCount, onFinish }) {
       </button>
     </div>
   );
+
+  if (showTour) return <GuidedTour onFinish={() => { setShowTour(false); navigate('/'); }} />;
+
 }
 
 function Field({ label, required, children }) {
@@ -357,6 +378,9 @@ function Field({ label, required, children }) {
       {children}
     </div>
   );
+
+  if (showTour) return <GuidedTour onFinish={() => { setShowTour(false); navigate('/'); }} />;
+
 }
 
 

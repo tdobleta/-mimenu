@@ -4,31 +4,50 @@ import SucursalesTab from '../components/config/SucursalesTab';
 import MenuTab from '../components/config/MenuTab';
 import EquipoTab from '../components/config/EquipoTab';
 import AuditoriaTab from '../components/config/AuditoriaTab';
+import PrinterSetup from '../components/printer/PrinterSetup';
+import FacturacionSetup from '../components/facturacion/FacturacionSetup';
+import { G, fontDisplay } from '@/lib/glass';
 
-const TABS = [['restaurante','Mi restaurante'],['sucursales','Sucursales'],['menu','Menú'],['equipo','Equipo'],['auditoria','Auditoría']];
+const TABS = [
+  ['restaurante', 'Mi restaurante'],
+  ['sucursales',  'Sucursales'],
+  ['menu',        'Menú'],
+  ['equipo',      'Equipo'],
+  ['impresora',   'Impresora'],
+  ['facturacion', 'Facturación AFIP'],
+  ['auditoria',   'Auditoría'],
+];
 
 export default function Configuracion() {
   const [tab, setTab] = useState('restaurante');
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
-      <h1 style={{ fontSize:20, fontWeight:600, color:'#111827', margin:0 }}>Configuración</h1>
-      <div style={{ display:'flex', borderBottom:'0.5px solid rgba(0,0,0,0.08)', overflowX:'auto' }}>
+      <h1 style={{ fontSize:22, fontWeight:700, color:G.text, margin:0, fontFamily:fontDisplay, letterSpacing:'-0.02em' }}>
+        Configuración
+      </h1>
+      <div style={{ display:'flex', gap:4, overflowX:'auto', paddingBottom:2 }}>
         {TABS.map(([k,l]) => (
-          <button key={k} onClick={()=>setTab(k)}
-            style={{ padding:'8px 16px', fontSize:13, border:'none', background:'none', cursor:'pointer', whiteSpace:'nowrap', marginBottom:-1, fontWeight:tab===k?500:400, color:tab===k?'#1D9E75':'#9CA3AF', borderBottom:tab===k?'2px solid #1D9E75':'2px solid transparent', transition:'all .15s' }}>
+          <button key={k} onClick={() => setTab(k)} style={{
+            padding:'7px 16px', fontSize:13, fontWeight: tab===k ? 700 : 500,
+            cursor:'pointer', borderRadius:12, border:'none', transition:'all .15s',
+            whiteSpace:'nowrap',
+            background: tab===k ? 'rgba(255,255,255,0.75)' : 'transparent',
+            color: tab===k ? G.teal : G.textFaint,
+            boxShadow: tab===k ? '0 2px 12px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.9)' : 'none',
+          }}>
             {l}
           </button>
         ))}
       </div>
-      <div style={{ paddingTop:8 }}>
-        {tab==='restaurante' && <RestauranteTab />}
-        {tab==='sucursales'  && <SucursalesTab />}
-        {tab==='menu'        && <MenuTab />}
-        {tab==='equipo'      && <EquipoTab />}
-        {tab==='auditoria'   && <AuditoriaTab />}
+      <div style={{ paddingTop:4 }}>
+        {tab === 'restaurante' && <RestauranteTab />}
+        {tab === 'sucursales'  && <SucursalesTab />}
+        {tab === 'menu'        && <MenuTab />}
+        {tab === 'equipo'      && <EquipoTab />}
+        {tab === 'impresora'   && <PrinterSetup />}
+        {tab === 'facturacion' && <FacturacionSetup />}
+        {tab === 'auditoria'   && <AuditoriaTab />}
       </div>
     </div>
   );
 }
-
-

@@ -1,10 +1,11 @@
 import { elapsedMin, fmtTableTime, tableTotal, money } from '@/lib/fmt';
+import { G } from '@/lib/glass';
 
 const S = {
-  libre:    { bg:'white',    border:'#E5E7EB', numColor:'#9CA3AF', dot:null      },
-  ocupada:  { bg:'#E8F7F2',  border:'#1D9E75', numColor:'#1D9E75', dot:'#1D9E75' },
-  demorada: { bg:'#FEF2F2',  border:'#EF4444', numColor:'#EF4444', dot:'#EF4444' },
-  reservada:{ bg:'#EFF6FF',  border:'#3B82F6', numColor:'#3B82F6', dot:'#3B82F6' },
+  libre:    { bg:'rgba(255,255,255,0.6)', border:'rgba(209,213,219,0.8)', numColor:'#9CA3AF', dot:null,    shadow:'none' },
+  ocupada:  { bg:'rgba(29,158,117,0.10)', border:G.teal,                  numColor:G.teal,   dot:G.teal,  shadow:`0 4px 16px rgba(29,158,117,0.18)` },
+  demorada: { bg:'rgba(226,75,74,0.09)',  border:G.red,                   numColor:G.red,    dot:G.red,   shadow:`0 4px 16px rgba(226,75,74,0.18)` },
+  reservada:{ bg:'rgba(55,138,221,0.09)', border:G.blue,                  numColor:G.blue,   dot:G.blue,  shadow:`0 4px 16px rgba(55,138,221,0.18)` },
 };
 
 export default function TableCard({ table, isSelected, onClick, onComandaListaClick, loading = false }) {
@@ -16,56 +17,70 @@ export default function TableCard({ table, isSelected, onClick, onComandaListaCl
   return (
     <button onClick={onClick} disabled={loading}
       style={{
-        width:'100%', position:'relative', borderRadius:10, padding:'10px 8px', textAlign:'left', cursor:'pointer', transition:'all .15s',
-        backgroundColor: s.bg,
-        border: `1px solid ${isSelected ? '#0A7A5A' : s.border}`,
-        outline: isSelected ? '2px solid #1D9E75' : 'none',
-        outlineOffset: 2,
+        width: '100%',
+        position: 'relative',
+        borderRadius: 16,
+        padding: '12px 10px',
+        textAlign: 'left',
+        cursor: loading ? 'wait' : 'pointer',
+        transition: 'all .18s',
         height: 140,
+        background: s.bg,
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
+        border: `1.5px solid ${isSelected ? G.teal : s.border}`,
+        outline: isSelected ? `3px solid rgba(29,158,117,0.25)` : 'none',
+        outlineOffset: 2,
+        boxShadow: isSelected ? `0 0 0 3px rgba(29,158,117,0.15), ${s.shadow}` : s.shadow,
       }}>
 
-      {/* Punto de estado normal */}
+      {/* Dot estado normal */}
       {s.dot && !showYellow && (
-        <span style={{ position:'absolute', top:8, right:8, width:8, height:8, borderRadius:'50%', backgroundColor:s.dot }} />
+        <span style={{ position:'absolute', top:10, right:10, width:9, height:9, borderRadius:'50%', background:s.dot, boxShadow:`0 0 6px ${s.dot}60` }} />
       )}
 
-      {/* Punto amarillo — comanda lista */}
+      {/* Dot amarillo — comanda lista */}
       {showYellow && (
         <button
-          onClick={e => { e.stopPropagation(); onComandaListaClick && onComandaListaClick(); }}
+          onClick={e => { e.stopPropagation(); onComandaListaClick?.(); }}
           title="Marcar como entregado"
           style={{
-            position:'absolute', top:6, right:6,
-            width:20, height:20, borderRadius:'50%',
-            backgroundColor:'#FBBF24',
+            position:'absolute', top:8, right:8,
+            width:22, height:22, borderRadius:'50%',
+            background:'#FBBF24',
             border:'2px solid #F59E0B',
             cursor:'pointer',
-            boxShadow:'0 0 0 3px rgba(251,191,36,0.3)',
+            boxShadow:'0 0 0 4px rgba(251,191,36,0.25)',
             animation:'yellowpulse 1.2s ease-in-out infinite',
-            display:'flex', alignItems:'center', justifyContent:'center',
-            padding:0,
+            display:'flex', alignItems:'center', justifyContent:'center', padding:0,
           }}>
-          <style>{`@keyframes yellowpulse { 0%,100%{box-shadow:0 0 0 3px rgba(251,191,36,0.3)} 50%{box-shadow:0 0 0 6px rgba(251,191,36,0.1)} }`}</style>
+          <style>{`@keyframes yellowpulse{0%,100%{box-shadow:0 0 0 4px rgba(251,191,36,0.25)}50%{box-shadow:0 0 0 8px rgba(251,191,36,0.08)}}`}</style>
         </button>
       )}
 
-      <div style={{ fontSize:22, fontWeight:700, color:s.numColor, lineHeight:1 }}>{table.num}</div>
+      <div style={{ fontSize:24, fontWeight:800, color:s.numColor, lineHeight:1, fontFamily:"'Playfair Display', Georgia, serif" }}>
+        {table.num}
+      </div>
+
       {table.status !== 'libre' && (
-        <div style={{ marginTop:4 }}>
-          {table.openedAt && <div style={{ fontSize:12, fontWeight:600, color:s.numColor, marginTop:3 }}>{fmtTableTime(elapsed)}</div>}
-          {total > 0     && <div style={{ fontSize:13, fontWeight:700, color:s.numColor }}>{money(total)}</div>}
-          {table.clientName && <div style={{ fontSize:11, color:s.numColor, fontWeight:500, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{table.clientName}</div>}
+        <div style={{ marginTop:5 }}>
+          {table.openedAt && <div style={{ fontSize:12, fontWeight:700, color:s.numColor, opacity:0.85 }}>{fmtTableTime(elapsed)}</div>}
+          {total > 0      && <div style={{ fontSize:13, fontWeight:800, color:s.numColor, marginTop:1 }}>{money(total)}</div>}
+          {table.clientName && <div style={{ fontSize:11, color:s.numColor, fontWeight:500, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', opacity:0.7 }}>{table.clientName}</div>}
         </div>
       )}
-      <div style={{ fontSize:11, color:'#9CA3AF', marginTop: table.status === 'libre' ? 12 : 3 }}>{table.sillas} sillas</div>
+
+      <div style={{ fontSize:10, color:G.textFaint, marginTop: table.status === 'libre' ? 14 : 4, fontWeight:500 }}>
+        {table.sillas} sillas
+      </div>
+
+      {/* Loading overlay */}
       {loading && (
-        <div style={{ position:'absolute', inset:0, borderRadius:10, backgroundColor:'rgba(255,255,255,0.7)', display:'flex', alignItems:'center', justifyContent:'center' }}>
-          <div style={{ width:16, height:16, border:'2px solid #E5E7EB', borderTop:'2px solid #1D9E75', borderRadius:'50%', animation:'tcspin 0.8s linear infinite' }} />
-          <style>{`@keyframes tcspin { to { transform: rotate(360deg); } }`}</style>
+        <div style={{ position:'absolute', inset:0, borderRadius:16, background:'rgba(255,255,255,0.65)', backdropFilter:'blur(4px)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+          <div style={{ width:18, height:18, border:`2.5px solid rgba(29,158,117,0.2)`, borderTop:`2.5px solid ${G.teal}`, borderRadius:'50%', animation:'tcspin 0.7s linear infinite' }} />
+          <style>{`@keyframes tcspin{to{transform:rotate(360deg)}}`}</style>
         </div>
       )}
     </button>
   );
 }
-
-

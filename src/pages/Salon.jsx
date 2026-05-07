@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useStore } from '@/lib/store';
 import { useToast } from '@/lib/toast';
 import TableCard from '../components/salon/TableCard';
@@ -9,39 +9,38 @@ import { dbLoadActiveTurns } from '@/lib/posApi';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import useUserRole from '@/lib/useUserRole';
+import { G, glass, glassDeep, glassLight, fontDisplay } from '@/lib/glass';
 
 export default function Salon() {
   const store = useStore();
   const { addToast } = useToast();
   const { user } = useAuth();
   const userRole = useUserRole();
+  const navigate = useNavigate();
   const [selectedTable, setSelectedTable] = useState(null);
   const [showEditor, setShowEditor] = useState(false);
   const [activeBranchTab, setActiveBranchTab] = useState(null);
   const [abriendo, setAbriendo] = useState(null);
 
   useEffect(() => {
-    if (!activeBranchTab && store.sucursales.length > 0) {
-      setActiveBranchTab(store.sucursales[0].id);
-    }
+    if (!activeBranchTab && store.sucursales.length > 0) setActiveBranchTab(store.sucursales[0].id);
   }, [store.sucursales]);
 
   const displayBranch = store.branchId === 'todas'
     ? (activeBranchTab || store.sucursales[0]?.id)
     : store.branchId;
-  const tables = store.getTables(displayBranch);
-  const grid = store.gridConfig[displayBranch] || { cols:4, rows:2 };
-  const ocupadas = tables.filter(t => t.status === 'ocupada' || t.status === 'demorada').length;
-  const libres   = tables.filter(t => t.status === 'libre').length;
-  const selTable = selectedTable ? tables.find(t => t.id === selectedTable) : null;
+
+  const tables  = store.getTables(displayBranch);
+  const grid    = store.gridConfig[displayBranch] || { cols:4, rows:2 };
+  const ocupadas= tables.filter(t => t.status === 'ocupada' || t.status === 'demorada').length;
+  const libres  = tables.filter(t => t.status === 'libre').length;
+  const selTable= selectedTable ? tables.find(t => t.id === selectedTable) : null;
 
   useEffect(() => {
     dbLoadActiveTurns(displayBranch).then(turns => {
       turns.forEach(t => {
         const existing = store.getTables(displayBranch).find(tb => tb.num === t.mesa_num);
-        if (existing && existing.status === 'libre') {
-          store.openTableWithTurn(displayBranch, existing.id, t.id, t.mozo, t.opened_at);
-        }
+        if (existing && existing.status === 'libre') store.openTableWithTurn(displayBranch, existing.id, t.id, t.mozo, t.opened_at);
       });
     }).catch(() => {});
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -55,14 +54,7 @@ export default function Salon() {
       store.openTable(displayBranch, table.id, openedAt);
       addToast(`Mesa ${table.num} abierta`, 'success');
       const mozoNombre = store.teamMembers?.find(m => m.email === user?.email)?.nombre || user?.email || '';
-      base44.entities.Turn.create({
-        branch_id: displayBranch,
-        mesa_num: table.num,
-        status: 'abierta',
-        opened_at: openedAt,
-        total_facturado: 0,
-        mozo: mozoNombre,
-      })
+      base44.entities.Turn.create({ branch_id:displayBranch, mesa_num:table.num, status:'abierta', opened_at:openedAt, total_facturado:0, mozo:mozoNombre })
         .then(turn => store.setTableTurnId(displayBranch, table.id, turn.id))
         .catch(() => {})
         .finally(() => setAbriendo(null));
@@ -74,30 +66,32 @@ export default function Salon() {
   return (
     <div style={{ display:'flex', gap:16, minHeight:0 }}>
       <div style={{ flex:1, minWidth:0, display:'flex', flexDirection:'column', gap:16 }}>
+
         {/* Header */}
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:10 }}>
-          <div style={{ display:'flex', alignItems:'center', gap:16 }}>
-            <h1 style={{ fontSize:20, fontWeight:600, color:'#111827', margin:0 }}>Salón</h1>
-            <span style={{ fontSize:13, color:'#1D9E75', fontWeight:500 }}>{ocupadas} ocupada{ocupadas!==1?'s':''}</span>
-            <span style={{ fontSize:13, color:'#9CA3AF' }}>{libres} libre{libres!==1?'s':''}</span>
-          </div>
           <div style={{ display:'flex', alignItems:'center', gap:14 }}>
+            <h1 style={{ fontSize:22, fontWeight:700, color:G.text, margin:0, fontFamily:fontDisplay, letterSpacing:'-0.02em' }}>Salón</h1>
+            <span style={{ ...glassLight({ padding:'3px 12px', borderRadius:99, fontSize:12, fontWeight:700, color:G.teal }) }}>
+              {ocupadas} ocupada{ocupadas!==1?'s':''}
+            </span>
+            <span style={{ fontSize:12, color:G.textFaint }}>{libres} libre{libres!==1?'s':''}</span>
+          </div>
+          <div style={{ display:'flex', alignItems:'center', gap:10 }}>
             <Legend />
             <ShiftIndicator />
-            <button onClick={() => setShowEditor(true)}
-              style={{ display:'flex', alignItems:'center', gap:6, padding:'6px 12px', border:'0.5px solid rgba(0,0,0,0.12)', borderRadius:7, fontSize:13, color:'#374151', backgroundColor:'white', cursor:'pointer', transition:'all .15s' }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+            <button onClick={() => setShowEditor(true)} style={{ ...glassLight({ display:'flex', alignItems:'center', gap:6, padding:'7px 14px', borderRadius:12, fontSize:13, color:G.textMid, cursor:'pointer', border:'1px solid rgba(255,255,255,0.8)' }) }}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
               Editar layout
             </button>
           </div>
         </div>
 
-        {/* Branch tab when "todas" */}
+        {/* Branch tabs */}
         {store.branchId === 'todas' && (
           <div style={{ display:'flex', gap:6 }}>
             {store.sucursales.map(s => (
               <button key={s.id} onClick={() => { setActiveBranchTab(s.id); setSelectedTable(null); }}
-                style={{ padding:'5px 14px', borderRadius:7, fontSize:13, cursor:'pointer', transition:'all .15s', border: activeBranchTab===s.id ? 'none' : '0.5px solid rgba(0,0,0,0.08)', backgroundColor: activeBranchTab===s.id ? '#1D9E75' : 'white', color: activeBranchTab===s.id ? 'white' : '#6B7280' }}>
+                style={{ padding:'6px 16px', borderRadius:10, fontSize:13, fontWeight:600, cursor:'pointer', transition:'all .15s', border:'none', background: activeBranchTab===s.id ? G.teal : 'rgba(255,255,255,0.55)', color: activeBranchTab===s.id ? 'white' : G.textMuted, boxShadow: activeBranchTab===s.id ? `0 4px 12px rgba(29,158,117,0.25)` : 'none' }}>
                 {s.nombre}
               </button>
             ))}
@@ -105,8 +99,8 @@ export default function Salon() {
         )}
 
         {/* Table grid */}
-        <div style={{ backgroundColor:'white', border:'0.5px solid rgba(0,0,0,0.08)', borderRadius:10, padding:20, position:'relative' }}>
-          <div style={{ display:'grid', gridTemplateColumns:`repeat(${grid.cols}, 1fr)`, gridTemplateRows:`repeat(${grid.rows}, auto)`, gap:12 }}>
+        <div style={{ ...glassDeep({ padding:20, position:'relative', flex:1 }) }}>
+          <div style={{ display:'grid', gridTemplateColumns:`repeat(${grid.cols}, 1fr)`, gridTemplateRows:`repeat(${grid.rows}, auto)`, gap:14 }}>
             {tables.map(t => (
               <div key={t.id} style={{ gridColumn:t.gridCol, gridRow:t.gridRow }}>
                 <TableCard
@@ -116,7 +110,7 @@ export default function Salon() {
                   onClick={() => handleClick(t)}
                   onComandaListaClick={() => {
                     if (t.turnId) {
-                      base44.entities.Turn.update(t.turnId, { comanda_lista: false }).catch(() => {});
+                      base44.entities.Turn.update(t.turnId, { comanda_lista:false }).catch(() => {});
                       store.setTableComandaLista(displayBranch, t.id, false);
                     }
                   }}
@@ -124,7 +118,7 @@ export default function Salon() {
               </div>
             ))}
           </div>
-          <div style={{ textAlign:'center', marginTop:16, fontSize:11, color:'#E5E7EB', letterSpacing:'1.5px', fontWeight:600 }}>ENTRADA</div>
+          <div style={{ textAlign:'center', marginTop:18, fontSize:10, color:'rgba(155,163,184,0.5)', letterSpacing:'2px', fontWeight:700 }}>ENTRADA</div>
         </div>
       </div>
 
@@ -135,6 +129,7 @@ export default function Salon() {
           branchId={displayBranch}
           onClose={() => setSelectedTable(null)}
           addToast={addToast}
+          onOpenPOS={() => navigate(`/pos?table=${selTable.id}&branch=${displayBranch}`)}
         />
       )}
 
@@ -152,32 +147,34 @@ function ShiftIndicator() {
     const h = Math.floor(mins/60), m = mins%60;
     const elapsed = h > 0 ? `${h}h ${m}m` : `${m}m`;
     return (
-      <Link to="/caja" style={{ display:'flex', alignItems:'center', gap:6, padding:'4px 10px', backgroundColor:'#E8F7F2', color:'#1D9E75', borderRadius:99, fontSize:11, fontWeight:600, textDecoration:'none' }}>
-        <span style={{ width:6, height:6, borderRadius:'50%', backgroundColor:'#1D9E75' }} />
+      <Link to="/caja" style={{ display:'flex', alignItems:'center', gap:6, background:'rgba(29,158,117,0.12)', color:G.teal, border:'1px solid rgba(29,158,117,0.22)', borderRadius:99, padding:'4px 12px', fontSize:11, fontWeight:700, textDecoration:'none' }}>
+        <span style={{ width:6, height:6, borderRadius:'50%', background:G.teal, boxShadow:`0 0 5px ${G.teal}` }} />
         Turno abierto · {elapsed}
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="9 18 15 12 9 6"/></svg>
       </Link>
     );
   }
   return (
-    <Link to="/caja" style={{ display:'flex', alignItems:'center', gap:6, padding:'4px 10px', backgroundColor:'#F3F4F6', color:'#6B7280', borderRadius:99, fontSize:11, fontWeight:500, textDecoration:'none' }}>
-      Sin turno
-      <span style={{ color:'#1D9E75', fontWeight:600, marginLeft:2 }}>Abrir →</span>
+    <Link to="/caja" style={{ display:'flex', alignItems:'center', gap:6, background:'rgba(0,0,0,0.05)', color:G.textMuted, borderRadius:99, padding:'4px 12px', fontSize:11, fontWeight:500, textDecoration:'none', border:'1px solid rgba(0,0,0,0.08)' }}>
+      Sin turno · <span style={{ color:G.teal, fontWeight:700 }}>Abrir →</span>
     </Link>
   );
 }
 
 function Legend() {
   return (
-    <div className="hidden sm:flex" style={{ gap:12 }}>
-      {[['#E5E7EB','Libre'],['#1D9E75','Ocupada'],['#EF4444','Demorada'],['#3B82F6','Reservada']].map(([c,l])=>(
+    <div className="hidden sm:flex" style={{ gap:12, alignItems:'center' }}>
+      {[
+        ['#D1D5DB', G.textFaint, 'Libre'],
+        [G.teal,    G.teal,      'Ocupada'],
+        [G.red,     G.red,       'Demorada'],
+        [G.blue,    G.blue,      'Reservada'],
+      ].map(([c,,l]) => (
         <div key={l} style={{ display:'flex', alignItems:'center', gap:5 }}>
-          <span style={{ width:12,height:12,borderRadius:'50%',border:`2px solid ${c}`,display:'inline-block' }} />
-          <span style={{ fontSize:12, color:'#9CA3AF' }}>{l}</span>
+          <span style={{ width:10, height:10, borderRadius:'50%', border:`2px solid ${c}`, background:`${c}22`, display:'inline-block' }} />
+          <span style={{ fontSize:11, color:G.textFaint }}>{l}</span>
         </div>
       ))}
     </div>
   );
 }
-
-
