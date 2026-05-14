@@ -8,7 +8,7 @@ import AddRetiroModal from '../components/caja/AddRetiroModal';
 import CloseShiftModal from '../components/caja/CloseShiftModal';
 import ShiftHistory from '../components/caja/ShiftHistory';
 
-const TIPO_LABEL = { manana:'Mañana', tarde:'Tarde', noche:'Noche', general:'General' };
+const TIPO_LABEL = { manana:'MaÃ±ana', tarde:'Tarde', noche:'Noche', general:'General' };
 
 function fmtElapsed(ms) {
   const mins = Math.max(0, Math.floor(ms / 60000));
@@ -23,7 +23,7 @@ function fmtTime(ts) {
 function normalizeMethod(m) {
   const s = (m||'').toLowerCase();
   if (s.includes('efectivo')) return 'Efectivo';
-  if (s.includes('tarjeta') || s.includes('déb') || s.includes('deb') || s.includes('créd') || s.includes('cred')) return 'Tarjeta';
+  if (s.includes('tarjeta') || s.includes('dÃ©b') || s.includes('deb') || s.includes('crÃ©d') || s.includes('cred')) return 'Tarjeta';
   if (s.includes('mercado')) return 'MercadoPago';
   if (s.includes('trans')) return 'Transferencia';
   return m || 'Otro';
@@ -145,7 +145,7 @@ export default function Caja() {
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#1D9E75" strokeWidth="1.8"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4z"/></svg>
           </div>
           <div style={{ fontSize:22, fontWeight:700, color:'#111827', marginBottom:6 }}>No hay turno abierto</div>
-          <div style={{ fontSize:14, color:'#6B7280', marginBottom:22, maxWidth:380 }}>Abrí el turno para empezar a registrar las ventas del servicio</div>
+          <div style={{ fontSize:14, color:'#6B7280', marginBottom:22, maxWidth:380 }}>AbrÃ­ el turno para empezar a registrar las ventas del servicio</div>
           <button onClick={()=>setShowOpen(true)}
             style={{ padding:'12px 28px', border:'none', borderRadius:8, fontSize:14, fontWeight:600, color:'white', backgroundColor:'#1D9E75', cursor:'pointer' }}>
             Abrir turno
@@ -167,8 +167,16 @@ export default function Caja() {
           {/* Header del turno */}
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:10 }}>
             <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
-              <span style={{ backgroundColor:'#E8F7F2', color:'#1D9E75', padding:'4px 12px', borderRadius:99, fontSize:12, fontWeight:600 }}>● Turno abierto</span>
-              <span style={{ fontSize:12, color:'#6B7280' }}>{TIPO_LABEL[turnoActivo.tipoTurno]} · hace <strong>{fmtElapsed(elapsed)}</strong></span>
+              <span style={{ backgroundColor:'#E8F7F2', color:'#1D9E75', padding:'4px 12px', borderRadius:99, fontSize:12, fontWeight:600 }}>â— Turno abierto</span>
+              <span style={{ fontSize:12, color:'#6B7280' }}>{TIPO_LABEL[turnoActivo.tipoTurno]} Â· hace <strong>{fmtElapsed(elapsed)}</strong></span>
+              {(() => {
+                const hoy = new Date(); hoy.setHours(0,0,0,0);
+                const apertura = new Date(turnoActivo.abiertaAt); apertura.setHours(0,0,0,0);
+                if (apertura.getTime() < hoy.getTime()) {
+                  return <span style={{ backgroundColor:'#FEF3C7', color:'#92600A', padding:'4px 10px', borderRadius:99, fontSize:11, fontWeight:600 }}>âš  Turno de ayer â€” cerrÃ¡ y abrÃ­ uno nuevo</span>;
+                }
+                return null;
+              })()}
             </div>
             <div style={{ display:'flex', gap:8 }}>
               <button onClick={() => navigate('/pos')} style={{
@@ -198,16 +206,16 @@ export default function Caja() {
             <Kpi label="Total retirado" value={money(retirosTotales)} valueColor={retirosTotales>0?'#F97316':'#111827'} />
           </div>
 
-          {/* Ventas por método */}
+          {/* Ventas por mÃ©todo */}
           <div style={{ backgroundColor:'white', border:'0.5px solid rgba(0,0,0,0.08)', borderRadius:10, overflow:'hidden' }}>
-            <div style={{ padding:'14px 18px', fontSize:14, fontWeight:600, color:'#111827', borderBottom:'0.5px solid rgba(0,0,0,0.06)' }}>Ventas por método de pago</div>
+            <div style={{ padding:'14px 18px', fontSize:14, fontWeight:600, color:'#111827', borderBottom:'0.5px solid rgba(0,0,0,0.06)' }}>Ventas por mÃ©todo de pago</div>
             {turnos.length === 0 ? (
               <div style={{ padding:'30px 20px', textAlign:'center', fontSize:13, color:'#9CA3AF' }}>Sin ventas registradas en este turno</div>
             ) : (
               <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
                 <thead style={{ backgroundColor:'#F9FAFB' }}>
                   <tr>
-                    {['Método de pago','Cantidad de mesas','Total'].map(h => (
+                    {['MÃ©todo de pago','Cantidad de mesas','Total'].map(h => (
                       <th key={h} style={{ textAlign:'left', padding:'10px 18px', fontSize:11, fontWeight:600, color:'#9CA3AF', textTransform:'uppercase', letterSpacing:'0.4px' }}>{h}</th>
                     ))}
                   </tr>
@@ -274,6 +282,24 @@ export default function Caja() {
           {showRetiro && <AddRetiroModal onClose={()=>setShowRetiro(false)} />}
           {showClose && (() => {
             const mesasAbiertas = (store.tables[store.branchId] || []).filter(t => t.status === 'ocupada' || t.status === 'demorada').length;
+            if (mesasAbiertas > 0) {
+              return (
+                <div style={{position:'fixed',inset:0,zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(15,15,35,0.5)',backdropFilter:'blur(4px)'}}>
+                  <div style={{background:'white',borderRadius:18,padding:28,width:380,maxWidth:'95vw',fontFamily:"'DM Sans',system-ui,sans-serif",boxShadow:'0 24px 48px rgba(0,0,0,0.15)'}}>
+                    <div style={{width:48,height:48,borderRadius:'50%',background:'rgba(239,159,39,0.12)',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 16px'}}>
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#EF9F27" strokeWidth="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                    </div>
+                    <div style={{fontSize:17,fontWeight:700,color:'#111827',textAlign:'center',marginBottom:8}}>Hay {mesasAbiertas} mesa{mesasAbiertas!==1?'s':''} abierta{mesasAbiertas!==1?'s':''}</div>
+                    <div style={{fontSize:13,color:'#6B7280',textAlign:'center',lineHeight:1.6,marginBottom:20}}>
+                      CerrÃ¡ todas las mesas antes de cerrar el turno. Las ventas sin cerrar no quedarÃ¡n registradas en este turno.
+                    </div>
+                    <div style={{display:'flex',gap:10}}>
+                      <button onClick={()=>setShowClose(false)} style={{flex:1,padding:'10px',border:'1px solid rgba(0,0,0,0.10)',borderRadius:10,fontSize:13,color:'#374151',background:'white',cursor:'pointer'}}>Volver</button>
+                    </div>
+                  </div>
+                </div>
+              );
+            }
             return (
               <CloseShiftModal
                 ventasPorMetodo={ventasMetodoPlain}
@@ -373,5 +399,4 @@ function Kpi({ label, value, valueColor }) {
     </div>
   );
 }
-
 

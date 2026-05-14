@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { base44 } from '@/api/base44Client';
+import { supabase } from '@/api/supabaseClient';
 import { useStore } from '@/lib/store';
 import { useToast } from '@/lib/toast';
 import { money } from '@/lib/fmt';
 import { useAuth } from '@/lib/AuthContext';
 import useUserRole from '@/lib/useUserRole';
-
-const CATS = ['Entradas','Principales','Postres','Bebidas'];
+import { CATEGORY_NAMES as CATS, DEFAULT_CATEGORY, getCategoryColor, getCategoryBg } from '@/lib/menuCategories';
 
 export default function MenuTab() {
   const store = useStore();
@@ -26,19 +26,40 @@ export default function MenuTab() {
         id: item.id,
         nombre: item.nombre || '',
         precio: item.precio || 0,
-        categoria: item.categoria || 'Principales',
+        categoria: item.categoria || DEFAULT_CATEGORY,
         disponible: item.activo !== false,
       })));
     } catch(e) {}
   }
   const { addToast } = useToast();
   const [modal, setModal] = useState(null);
-  const [form, setForm] = useState({ nombre:'', precio:'', categoria:'Principales', disponible:true });
+  const [form, setForm] = useState({ nombre:'', precio:'', categoria: DEFAULT_CATEGORY, disponible:true, imagen_url:'' });
   const [delConfirm, setDelConfirm] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [uploadingImg, setUploadingImg] = useState(false);
 
-  function openAdd() { setModal('add'); setForm({ nombre:'', precio:'', categoria:'Principales', disponible:true }); }
-  function openEdit(it) { setModal(it); setForm({ nombre:it.nombre, precio:it.precio, categoria:it.categoria, disponible:it.disponible }); }
+  async function uploadImage(file) {
+    if (!file) return null;
+    setUploadingImg(true);
+    try {
+      const ext = file.name.split('.').pop();
+      const path = `${activeBid}/${Date.now()}.${ext}`;
+      const { error } = await supabase.storage
+        .from('menu-images')
+        .upload(path, file, { upsert: true });
+      if (error) throw error;
+      const { data } = supabase.storage.from('menu-images').getPublicUrl(path);
+      return data.publicUrl;
+    } catch(e) {
+      addToast('Error al subir imagen', 'error');
+      return null;
+    } finally {
+      setUploadingImg(false);
+    }
+  }
+
+  function openAdd() { setModal('add'); setForm({ nombre:'', precio:'', categoria: DEFAULT_CATEGORY, disponible:true, imagen_url:'' }); }
+  function openEdit(it) { setModal(it); setForm({ nombre:it.nombre, precio:it.precio, categoria:it.categoria, disponible:it.disponible, imagen_url:it.imagen_url||'' }); }
 
   async function save() {
     if (!form.nombre.trim() || !form.precio) return;
@@ -52,14 +73,15 @@ export default function MenuTab() {
           precio: Number(form.precio),
           categoria: form.categoria,
           activo: form.disponible,
+          imagen_url: form.imagen_url || null,
         });
-        addMenuItem(activeBid, { id: created.id, nombre: created.nombre, precio: created.precio, categoria: created.categoria, disponible: created.activo !== false });
+        addMenuItem(activeBid, { id: created.id, nombre: created.nombre, precio: created.precio, categoria: created.categoria, disponible: created.activo !== false, imagen_url: created.imagen_url || null });
         addToast('Plato agregado', 'success');
         await reloadMenu();
         store.logAccion({ usuario: user?.email || 'Sistema', rol: userRole, categoria: 'Menú', accion: 'Plato agregado', detalle: form.nombre + ' · $' + form.precio, sucursal: sucursalNombre });
       } else {
-        await base44.entities.MenuItem.update(modal.id, { nombre: form.nombre, precio: Number(form.precio), categoria: form.categoria, activo: form.disponible });
-        updateMenuItem(activeBid, modal.id, { ...form, precio: Number(form.precio) });
+        await base44.entities.MenuItem.update(modal.id, { nombre: form.nombre, precio: Number(form.precio), categoria: form.categoria, activo: form.disponible, imagen_url: form.imagen_url || null });
+        updateMenuItem(activeBid, modal.id, { ...form, precio: Number(form.precio), imagen_url: form.imagen_url || null });
         addToast('Plato actualizado', 'success');
         await reloadMenu();
         store.logAccion({ usuario: user?.email || 'Sistema', rol: userRole, categoria: 'Menú', accion: 'Plato editado', detalle: form.nombre + ' · $' + form.precio, sucursal: sucursalNombre });
@@ -146,6 +168,24 @@ export default function MenuTab() {
                 <div><div style={{ fontSize:12, color:'#6B7280', marginBottom:4 }}>Categoría</div>
                   <select value={form.categoria} onChange={e=>setForm(f=>({...f,categoria:e.target.value}))} style={{ width:'100%', padding:'7px 10px', border:'0.5px solid rgba(0,0,0,0.12)', borderRadius:7, fontSize:13, backgroundColor:'white' }}>
                     {CATS.map(c=><option key={c}>{c}</option>)}</select></div>
+              </div>
+              <div>
+                <div style={{ fontSize:12, color:'#6B7280', marginBottom:6 }}>Imagen del plato (opcional)</div>
+                {form.imagen_url && (
+                  <div style={{ position:'relative', marginBottom:8 }}>
+                    <img src={form.imagen_url} alt="preview" style={{ width:'100%', height:120, objectFit:'cover', borderRadius:8, border:'0.5px solid rgba(0,0,0,0.1)' }} />
+                    <button onClick={()=>setForm(f=>({...f,imagen_url:''}))} style={{ position:'absolute', top:6, right:6, background:'rgba(0,0,0,0.5)', border:'none', borderRadius:'50%', width:22, height:22, color:'white', cursor:'pointer', fontSize:13, display:'flex', alignItems:'center', justifyContent:'center' }}>×</button>
+                  </div>
+                )}
+                <label style={{ display:'flex', alignItems:'center', gap:8, padding:'7px 12px', border:'0.5px dashed rgba(0,0,0,0.2)', borderRadius:7, cursor:'pointer', fontSize:12, color:'#6B7280' }}>
+                  {uploadingImg ? 'Subiendo...' : '+ Seleccionar imagen'}
+                  <input type="file" accept="image/*" style={{ display:'none' }} disabled={uploadingImg} onChange={async e => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    const url = await uploadImage(file);
+                    if (url) setForm(f => ({...f, imagen_url: url}));
+                  }} />
+                </label>
               </div>
               <label style={{ display:'flex', alignItems:'center', gap:8, cursor:'pointer', fontSize:13 }}>
                 <input type="checkbox" checked={form.disponible} onChange={e=>setForm(f=>({...f,disponible:e.target.checked}))} />

@@ -10,15 +10,49 @@ import useUserRole from '@/lib/useUserRole';
 import { G, glass, glassLight, fontDisplay } from '@/lib/glass';
 import FacturaModal from '../facturacion/FacturaModal';
 import { getAfipConfig } from '@/lib/afip';
+import { base44 as _base44 } from '@/api/base44Client'; // para stock descuento
+import { MENU_CATEGORIES, DEFAULT_CATEGORY, getCategoryColor } from '@/lib/menuCategories';
+import { fetchRecetas, addEgreso as dbAddEgreso } from '@/lib/stockApi';
 
-const CATS = ['Entradas','Principales','Postres','Bebidas'];
+// ── Descuento automático de stock al cerrar mesa ──────────────────────────────
+async function descontarStockPorMesa(order, branchId, store) {
+  try {
+    const recetas = await fetchRecetas(branchId);
+    if (!recetas || Object.keys(recetas).length === 0) return;
+    const stock = store.getStock ? store.getStock() : (store.stock[branchId] || []);
+    for (const item of order) {
+      const rec = recetas[item.itemId || item.id];
+      if (!rec || rec.length === 0) continue;
+      for (const r of rec) {
+        const ing = stock.find(s => s.id === r.ingredienteId);
+        if (!ing) continue;
+        const cantidad = Number(r.cantidad) * (item.qty || 1);
+        const nuevoStock = Math.max(0, Number(ing.actual) - cantidad);
+        try {
+          await _base44.entities.StockItem.update(ing.id, { actual: nuevoStock });
+          store.updateStockItem(branchId, ing.id, { actual: nuevoStock });
+          await dbAddEgreso(branchId, {
+            ingredienteId: ing.id,
+            ingredienteNombre: ing.nombre,
+            cantidad,
+            unidad: ing.unidad,
+            motivo: `Mesa ${item.mesa || ''} (automático)`,
+            origen: 'automatico',
+          });
+        } catch(e) {}
+      }
+    }
+  } catch(e) {}
+}
 
-const CAT_COLOR = {
-  Entradas:   G.blue,
-  Principales:G.teal,
-  Postres:    G.violet,
-  Bebidas:    G.amber,
-};
+// Colores para categorías extra no definidas en MENU_CATEGORIES
+const EXTRA_COLORS = [G.teal, G.violet, G.blue, G.amber, '#F97316', '#EC4899', '#6366F1', '#14B8A6'];
+function getCatColor(cat, allCats) {
+  const fromConstants = getCategoryColor(cat);
+  if (fromConstants !== '#8B5CF6') return fromConstants; // encontró en constants
+  const idx = allCats.indexOf(cat) % EXTRA_COLORS.length;
+  return EXTRA_COLORS[idx];
+}
 
 const STATUS_BADGE = {
   ocupada:  { bg:'rgba(29,158,117,0.12)',  c:G.teal },
@@ -30,7 +64,7 @@ export default function ComandaPanel({ table, branchId, onClose, addToast }) {
   const store = useStore();
   const { user } = useAuth();
   const userRole = useUserRole();
-  const [cat, setCat] = useState('Principales');
+  const [cat, setCat] = useState(DEFAULT_CATEGORY);
   const [showClose, setShowClose] = useState(false);
   const [freeMode, setFreeMode] = useState(false);
   const [freeForm, setFreeForm] = useState({ nombre:'', precio:'', qty:1 });
@@ -97,12 +131,19 @@ const [facturaDatos, setFacturaDatos] = useState(null);
     }
   }
 
-  const menuItems = store.getMenuItems(branchId).filter(i => i.categoria === cat && i.disponible);
+  const allItems = store.getMenuItems(branchId).filter(i => i.disponible !== false);
+  // Categorías únicas del menú real (no hardcodeadas)
+  const CATS = [...new Set(allItems.map(i => i.categoria).filter(Boolean))];
+  // Si no hay categorías custom, usar las por defecto para evitar pantalla vacía
+  const cats = CATS.length > 0 ? CATS : MENU_CATEGORIES.map(c => c.nombre);
+  // Asegurar que la cat seleccionada es válida
+  const activeCat = cats.includes(cat) ? cat : cats[0] || 'Principales';
+  const menuItems = allItems.filter(i => i.categoria === activeCat);
   const order = table.order || [];
   const total = tableTotal(order);
   const elapsed = table.openedAt ? elapsedMin(table.openedAt) : 0;
   const badge = STATUS_BADGE[table.status] || { bg:'rgba(0,0,0,0.06)', c:G.textMuted };
-  const accentColor = CAT_COLOR[cat] || G.teal;
+  const accentColor = getCatColor(activeCat, cats);
 
   function addItem(item) {
     const ex = order.find(i => i.itemId === item.id && !i.libre);
@@ -110,15 +151,21 @@ const [facturaDatos, setFacturaDatos] = useState(null);
       ? order.map(i => (i.itemId === item.id && !i.libre) ? { ...i, qty:i.qty+1 } : i)
       : [...order, { itemId:item.id, nombre:item.nombre, precio:item.precio, qty:1 }];
     store.updateTableOrder(branchId, table.id, next);
-    const onDbError = () => addToast('Ítem agregado pero no guardado en servidor. Revisá conexión.', 'warning');
     if (table.turnId) {
       if (ex) {
         const updated = next.find(i => i.itemId === item.id && !i.libre);
-        if (ex.turnItemId) dbUpdateTurnItem(ex.turnItemId, updated.qty).catch(onDbError);
+        if (ex.turnItemId) dbUpdateTurnItem(ex.turnItemId, updated.qty).catch(() => {
+          addToast('No se actualizó la cantidad en el servidor. Revisá conexión.', 'warning');
+        });
       } else {
-        dbAddTurnItem({ turnId:table.turnId, branchId, menuItemId:item.id, nombre:item.nombre, precio:item.precio, qty:1 })
+        // Intentar 2 veces antes de mostrar error
+        const tryAdd = (retries) => dbAddTurnItem({ turnId:table.turnId, branchId, menuItemId:item.id, nombre:item.nombre, precio:item.precio, qty:1 })
           .then(ti => store.setOrderItemTurnItemId(branchId, table.id, item.id, ti.id))
-          .catch(onDbError);
+          .catch(err => {
+            if (retries > 0) setTimeout(() => tryAdd(retries - 1), 1500);
+            else addToast('Ítem en pedido local pero no guardado. Revisá conexión.', 'warning');
+          });
+        tryAdd(1);
       }
     }
   }
@@ -158,7 +205,7 @@ const [facturaDatos, setFacturaDatos] = useState(null);
     return (
       <div style={panelStyle}>
         <div style={{ padding:'12px 16px', borderBottom:'1px solid rgba(255,255,255,0.55)', flexShrink:0 }}>
-          <button onClick={() => setShowPreCuenta(false)} style={{ fontSize:12, color:G.textFaint, background:'none', border:'none', cursor:'pointer', padding:0, marginBottom:8 }}> Volver</button>
+          <button onClick={() => setShowPreCuenta(false)} style={{ fontSize:12, color:G.textFaint, background:'none', border:'none', cursor:'pointer', padding:0, marginBottom:8 }}>← Volver</button>
           <div style={{ textAlign:'center' }}>
             <div style={{ fontSize:16, fontWeight:700, color:G.text, fontFamily:fontDisplay }}>Pre-cuenta</div>
             <div style={{ fontSize:13, color:G.textFaint, marginTop:2 }}>Mesa {table.num}</div>
@@ -218,14 +265,14 @@ const [facturaDatos, setFacturaDatos] = useState(null);
         <>
           {/* Category tabs */}
           <div style={{ display:'flex', gap:2, padding:'8px 10px', flexShrink:0, borderBottom:'1px solid rgba(255,255,255,0.45)' }}>
-            {CATS.map(c => {
-              const cc = CAT_COLOR[c] || G.teal;
+            {cats.map(c => {
+              const cc = getCatColor(c, cats);
               return (
                 <button key={c} onClick={() => setCat(c)} style={{
                   flex:1, padding:'6px 2px', fontSize:11, fontWeight:700, cursor:'pointer', border:'none', borderRadius:9, transition:'all .15s',
-                  background: cat===c ? `${cc}18` : 'transparent',
-                  color: cat===c ? cc : G.textFaint,
-                  boxShadow: cat===c ? `inset 0 0 0 1px ${cc}30` : 'none',
+                  background: activeCat===c ? `${cc}18` : 'transparent',
+                  color: activeCat===c ? cc : G.textFaint,
+                  boxShadow: activeCat===c ? `inset 0 0 0 1px ${cc}30` : 'none',
                 }}>{c}</button>
               );
             })}
@@ -356,7 +403,7 @@ const [facturaDatos, setFacturaDatos] = useState(null);
             cursor: enviandoCocina ? 'not-allowed' : 'pointer',
             opacity: enviandoCocina ? 0.6 : 1,
           }}>
-            {enviandoCocina ? 'Enviando...' : (yaEnviado ? 'OK Cocina' : '> Cocina')}
+            {enviandoCocina ? 'Enviando...' : (yaEnviado ? '✓ En cocina' : '→ Cocina')}
           </button>
           {order.length > 0 && (
             <button onClick={() => setShowPreCuenta(true)} disabled={cerrando} style={{ flex:1, padding:'8px 0', border:'1px solid rgba(255,255,255,0.7)', borderRadius:10, fontSize:12, color:G.textMid, background:'rgba(255,255,255,0.55)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:4 }}>
@@ -390,6 +437,8 @@ const [facturaDatos, setFacturaDatos] = useState(null);
                 await Promise.all((table.order||[]).map(item => base44.entities.TurnItem.create({ turn_id:turn.id, branch_id:branchId, menu_item_name:item.nombre, menu_item_id:item.itemId, cantidad:item.qty, precio:item.precio })));
               }
               store.closeTable(branchId, table.id);
+              // Descontar stock automáticamente según recetas configuradas
+              descontarStockPorMesa(table.order || [], branchId, store).catch(() => {});
               try {
                 const turnsActualizados = await base44.entities.Turn.filter({ caja_shift_id:cajaShiftId, status:'cerrada' }).catch(() => []);
                 const nuevoTotal = (turnsActualizados||[]).reduce((a,t) => a+(t.total_facturado||0)+(t.propina||0), 0);

@@ -1,21 +1,27 @@
-import { createContext, useContext, useState, useCallback } from 'react';
+// lib/toast.jsx
+// Sistema de toast unificado usando Sonner.
+// Mantiene la misma API (useToast + addToast) para no romper
+// ningún componente existente.
+import { createContext, useContext, useCallback } from 'react';
+import { toast } from 'sonner';
 
 const ToastCtx = createContext(null);
 
 export function ToastProvider({ children }) {
-  const [toasts, setToasts] = useState([]);
-
   const addToast = useCallback((message, type = 'success') => {
-    const id = Date.now() + Math.random();
-    setToasts(prev => [...prev.slice(-2), { id, message, type }]);
-    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 3000);
+    switch (type) {
+      case 'error':   toast.error(message);   break;
+      case 'warning': toast.warning(message); break;
+      case 'info':    toast.info(message);    break;
+      default:        toast.success(message); break;
+    }
   }, []);
 
-  const remove = useCallback((id) => setToasts(prev => prev.filter(t => t.id !== id)), []);
-
-  return <ToastCtx.Provider value={{ toasts, addToast, remove }}>{children}</ToastCtx.Provider>;
+  return (
+    <ToastCtx.Provider value={{ addToast }}>
+      {children}
+    </ToastCtx.Provider>
+  );
 }
 
 export const useToast = () => useContext(ToastCtx);
-
-

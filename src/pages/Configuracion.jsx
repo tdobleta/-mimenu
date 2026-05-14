@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import RestauranteTab from '../components/config/RestauranteTab';
 import SucursalesTab from '../components/config/SucursalesTab';
-import MenuTab from '../components/config/MenuTab';
 import EquipoTab from '../components/config/EquipoTab';
 import AuditoriaTab from '../components/config/AuditoriaTab';
 import PrinterSetup from '../components/printer/PrinterSetup';
@@ -11,7 +10,6 @@ import { G, fontDisplay } from '@/lib/glass';
 const TABS = [
   ['restaurante', 'Mi restaurante'],
   ['sucursales',  'Sucursales'],
-  ['menu',        'Menú'],
   ['equipo',      'Equipo'],
   ['impresora',   'Impresora'],
   ['facturacion', 'Facturación AFIP'],
@@ -42,7 +40,6 @@ export default function Configuracion() {
       <div style={{ paddingTop:4 }}>
         {tab === 'restaurante' && <RestauranteTab />}
         {tab === 'sucursales'  && <SucursalesTab />}
-        {tab === 'menu'        && <MenuTab />}
         {tab === 'equipo'      && <EquipoTab />}
         {tab === 'impresora'   && <PrinterSetup />}
         {tab === 'facturacion' && <FacturacionSetup />}

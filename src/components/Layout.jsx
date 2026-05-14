@@ -3,6 +3,7 @@ import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
 import { APP_BG } from '@/lib/glass';
+import MimenuChatbot from './MimenuChatbot';
 
 export default function Layout() {
   const [mob, setMob] = useState(false);
@@ -10,7 +11,7 @@ export default function Layout() {
     <div style={{
       display: 'flex',
       height: '100vh',
-      overflow: 'hidden',
+      overflow: 'clip',
       background: APP_BG,
       fontFamily: "'DM Sans', sans-serif",
       position: 'relative',
@@ -43,6 +44,7 @@ export default function Layout() {
           <Outlet />
         </main>
       </div>
+      <MimenuChatbot />
     </div>
   );
 }

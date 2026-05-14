@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { money } from '@/lib/fmt';
+import { CATEGORY_NAMES as CATEGORIES } from '@/lib/menuCategories';
 
 const PAY_COLORS = {
   'Efectivo':'#1D9E75',
@@ -10,7 +11,6 @@ const PAY_COLORS = {
   'Transferencia':'#8B5CF6',
   'Otro':'#9CA3AF',
 };
-const CATEGORIES = ['Entradas','Principales','Postres','Bebidas'];
 
 function normalizeMethod(m) {
   const s = (m||'').toLowerCase();

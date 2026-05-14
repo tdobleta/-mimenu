@@ -330,6 +330,9 @@ function buildComandaHtml({ config, mesa, mozo, items, fecha, copia = 1, total =
  */
 export async function printReceipt(data, configOverride = null) {
   const config = configOverride || getPrinterConfig();
+  if (!config.method) {
+    throw new Error('Impresora no configurada. Andá a Configuración → Impresora y elegí un método.');
+  }
   const fecha = data.fecha || new Date().toLocaleString('es-AR', { day:'2-digit', month:'2-digit', year:'2-digit', hour:'2-digit', minute:'2-digit' });
   const payload = { config, fecha, ...data };
 
@@ -349,6 +352,9 @@ export async function printReceipt(data, configOverride = null) {
  */
 export async function printComanda(data, configOverride = null) {
   const config = configOverride || getPrinterConfig();
+  if (!config.method) {
+    throw new Error('Impresora no configurada. Andá a Configuración → Impresora y elegí un método.');
+  }
   const fecha = data.fecha || new Date().toLocaleTimeString('es-AR', { hour:'2-digit', minute:'2-digit' });
   const copias = config.copiasComanda || 1;
 

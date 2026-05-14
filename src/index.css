@@ -1,5 +1,4 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');
 
 @tailwind base;
@@ -86,17 +85,72 @@
   }
 }
 
-
-
 @layer base {
   * {
     @apply border-border outline-ring/50;
+    /* Previene selección accidental de texto al tocar en tablet */
+    -webkit-tap-highlight-color: transparent;
   }
 
   body {
     @apply bg-background text-foreground;
     font-family: 'DM Sans', sans-serif;
+    /* Previene rubber-band scroll en iOS */
+    overscroll-behavior: none;
+    /* Mejora rendering de fuentes en tablet */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Touch targets mínimo 44px para accesibilidad en tablet */
+  button, a, [role="button"] {
+    min-height: 44px;
+    min-width: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    /* Feedback táctil inmediato */
+    touch-action: manipulation;
+  }
+
+  /* Inputs sin zoom en iOS/iPad al hacer focus */
+  input, select, textarea {
+    font-size: 16px !important;
+    touch-action: manipulation;
+  }
+
+  /* Scroll suave en toda la app */
+  * {
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Previene doble tap zoom en elementos interactivos */
+  button, a {
+    touch-action: manipulation;
   }
 }
 
+/* ── Utilidades tablet ─────────────────────────────────────── */
 
+/* Clase para botones grandes del POS */
+.btn-pos {
+  min-height: 56px !important;
+  font-size: 15px !important;
+}
+
+/* Ocultar scrollbar pero mantener funcionalidad */
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Estado activo visible en touch */
+.touch-active:active {
+  opacity: 0.75;
+  transform: scale(0.97);
+}

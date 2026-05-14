@@ -46,10 +46,18 @@ function parsePagos(t) {
 function clasificarMetodo(metodo, monto, row) {
   const m = (metodo || '').toLowerCase();
   if (m.includes('efectivo'))                                                                      row.efectivo      += monto;
-  else if (m.includes('tarjeta')||m.includes('déb')||m.includes('deb')||m.includes('créd')||m.includes('cred')) row.tarjeta += monto;
+  else if (m.includes('tarjeta')||m.includes('dÃ©b')||m.includes('deb')||m.includes('crÃ©d')||m.includes('cred')) row.tarjeta += monto;
   else if (m.includes('mercado'))                                                                  row.mp            += monto;
   else if (m.includes('trans'))                                                                    row.transferencia += monto;
   else                                                                                             row.efectivo      += monto;
+}
+
+// ── Normalizar timestamps de base44 (puede venir como ms, segundos o ISO string)
+function normTs(ts) {
+  if (!ts) return 0;
+  if (typeof ts === 'string') { const d = new Date(ts); return isNaN(d.getTime()) ? 0 : d.getTime(); }
+  const n = Number(ts);
+  return n < 9_000_000_000 ? n * 1000 : n;
 }
 
 export default function Reportes() {
@@ -63,7 +71,7 @@ export default function Reportes() {
   useEffect(() => { if (store.refreshCharts) store.refreshCharts(); }, [store.branchId]); // eslint-disable-line
 
   const periodStart = getPeriodStart(period);
-  const periodTurns = useMemo(() => (dbTurns||[]).filter(t => t.closed_at && t.closed_at >= periodStart), [dbTurns, periodStart]);
+  const periodTurns = useMemo(() => (dbTurns||[]).filter(t => t.closed_at && normTs(t.closed_at) >= periodStart), [dbTurns, periodStart]);
 
   const VENTAS_DATA = useMemo(() => {
     if (periodTurns.length === 0) return [];
@@ -116,7 +124,7 @@ export default function Reportes() {
   function exportVentas()    { downloadCSV('ventas.csv',   ['Fecha','Mesas','Total','Efectivo','Tarjeta','MercadoPago','Transferencia','Propinas'], VENTAS_DATA.map(r=>[r.fecha,r.mesas,r.total,r.efectivo,r.tarjeta,r.mp,r.transferencia,r.propinas])); }
   function exportProductos() { downloadCSV('productos.csv',['Producto','Unidades','Total','%'], products.map(p=>[p.nombre,p.unidades,p.monto,p.pct])); }
   function exportMozos()     { downloadCSV('mozos.csv',    ['Mozo','Mesas','Total','Ticket','%'], MOZOS_DATA.map(m=>[m.mozo,m.mesas,m.total,m.ticket,m.pct])); }
-  function exportReservas()  { downloadCSV('reservas.csv', ['Métrica','Valor'], [['Total',RESERVAS_DATA.total],['Confirmadas',RESERVAS_DATA.confirmadas],['Canceladas',RESERVAS_DATA.canceladas],['No-shows',RESERVAS_DATA.noShows],['Online',RESERVAS_DATA.online]]); }
+  function exportReservas()  { downloadCSV('reservas.csv', ['MÃ©trica','Valor'], [['Total',RESERVAS_DATA.total],['Confirmadas',RESERVAS_DATA.confirmadas],['Canceladas',RESERVAS_DATA.canceladas],['No-shows',RESERVAS_DATA.noShows],['Online',RESERVAS_DATA.online]]); }
 
   const BtnExport = ({ onClick }) => (
     <button onClick={onClick} style={{ ...glassLight({ display:'flex', alignItems:'center', gap:6, padding:'6px 14px', borderRadius:10, fontSize:12, color:G.textMid, cursor:'pointer', border:'1px solid rgba(255,255,255,0.8)' }) }}>
@@ -143,7 +151,7 @@ export default function Reportes() {
         <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
           <AnalyticsActions resetLabel="Reiniciar reportes" editLabel="Editar reportes" />
           <div style={{ display:'flex', gap:4 }}>
-            {[['today','Hoy'],['week','Esta semana'],['month','Este mes'],['year','Este año']].map(([k,l])=>(
+            {[['today','Hoy'],['week','Esta semana'],['month','Este mes'],['year','Este aÃ±o']].map(([k,l])=>(
               <button key={k} onClick={()=>setPeriod(k)} style={{ padding:'6px 14px', borderRadius:10, fontSize:12, fontWeight:600, cursor:'pointer', border:'none', transition:'all .15s', background:period===k?G.teal:'rgba(255,255,255,0.55)', color:period===k?'white':G.textMuted, boxShadow:period===k?`0 4px 12px rgba(29,158,117,0.25)`:'none' }}>{l}</button>
             ))}
           </div>
@@ -157,19 +165,19 @@ export default function Reportes() {
         ))}
       </div>
 
-      {/* VENTAS vacío */}
+      {/* VENTAS vacÃ­o */}
       {tab==='ventas' && VENTAS_DATA.length===0 && (
         <div style={{ ...glass({ padding:'40px 20px', textAlign:'center' }) }}>
-          <div style={{ fontSize:14, color:G.textMid, marginBottom:6, fontWeight:600 }}>No hay ventas cerradas en este período</div>
-          <div style={{ fontSize:12, color:G.textFaint, marginBottom:18 }}>Cerrá tu primera mesa para empezar a ver datos.</div>
-          <Link to="/salon" style={{ display:'inline-block', padding:'9px 20px', background:G.teal, color:'white', textDecoration:'none', borderRadius:10, fontSize:13, fontWeight:600, boxShadow:`0 4px 14px rgba(29,158,117,0.3)` }}>Ir al Salón</Link>
+          <div style={{ fontSize:14, color:G.textMid, marginBottom:6, fontWeight:600 }}>No hay ventas cerradas en este perÃ­odo</div>
+          <div style={{ fontSize:12, color:G.textFaint, marginBottom:18 }}>CerrÃ¡ tu primera mesa para empezar a ver datos.</div>
+          <Link to="/salon" style={{ display:'inline-block', padding:'9px 20px', background:G.teal, color:'white', textDecoration:'none', borderRadius:10, fontSize:13, fontWeight:600, boxShadow:`0 4px 14px rgba(29,158,117,0.3)` }}>Ir al SalÃ³n</Link>
         </div>
       )}
 
       {/* VENTAS con datos */}
       {tab==='ventas' && VENTAS_DATA.length>0 && (
         <div style={{ ...glassDeep({ overflow:'hidden', padding:0 }) }}>
-          {/* Resumen métodos de pago */}
+          {/* Resumen mÃ©todos de pago */}
           <div style={{ display:'flex', flexWrap:'wrap', gap:0, padding:'18px 20px', borderBottom:'1px solid rgba(255,255,255,0.4)', alignItems:'center' }}>
             {[
               { label:'Efectivo',    val:totalVentas.efectivo,      color:G.teal },
@@ -223,7 +231,7 @@ export default function Reportes() {
         <div style={{ ...glassDeep({ padding:'20px 24px' }) }}>
           <div style={{ display:'flex', justifyContent:'flex-end', marginBottom:18 }}><BtnExport onClick={exportProductos}/></div>
           {products.length===0
-            ? <div style={{ textAlign:'center', fontSize:13, color:G.textFaint, padding:'30px 0' }}>No hay productos vendidos en este período.</div>
+            ? <div style={{ textAlign:'center', fontSize:13, color:G.textFaint, padding:'30px 0' }}>No hay productos vendidos en este perÃ­odo.</div>
             : <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
                 {products.map((p,i)=>(
                   <div key={p.nombre} style={{ display:'flex', alignItems:'center', gap:14 }}>
@@ -249,7 +257,7 @@ export default function Reportes() {
         <div style={{ ...glassDeep({ overflow:'hidden', padding:0 }) }}>
           <div style={{ display:'flex', justifyContent:'flex-end', padding:'14px 20px', borderBottom:'1px solid rgba(255,255,255,0.4)' }}><BtnExport onClick={exportMozos}/></div>
           {MOZOS_DATA.length===0
-            ? <div style={{ textAlign:'center', fontSize:13, color:G.textFaint, padding:'30px 0' }}>No hay datos de mozos en este período.</div>
+            ? <div style={{ textAlign:'center', fontSize:13, color:G.textFaint, padding:'30px 0' }}>No hay datos de mozos en este perÃ­odo.</div>
             : <table style={{ width:'100%', borderCollapse:'collapse' }}>
                 <thead><tr>{['Mozo','Mesas','Total facturado','Ticket promedio','% del total'].map(h=><th key={h} style={thStyle}>{h}</th>)}</tr></thead>
                 <tbody>

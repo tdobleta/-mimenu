@@ -33,6 +33,8 @@ export const AuthProvider = ({ children }) => {
       } else if (event === 'SIGNED_OUT') {
         setUser(null);
         setAuthError({ type: 'auth_required', message: 'Autenticación requerida' });
+        // Limpiar cache de React Query para que no queden datos del usuario anterior
+        try { window.__queryClient__?.clear(); } catch {}
       } else if (event === 'TOKEN_REFRESHED' && session?.user) {
         setUser(normalizeUser(session.user));
       }
@@ -44,6 +46,7 @@ export const AuthProvider = ({ children }) => {
   const logout = (shouldRedirect = true) => {
     supabase.auth.signOut().then(() => {
       setUser(null);
+      try { window.__queryClient__?.clear(); } catch {}
       if (shouldRedirect) window.location.href = '/login';
     });
   };

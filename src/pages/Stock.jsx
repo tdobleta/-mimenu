@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useStore } from '@/lib/store';
 import { useToast } from '@/lib/toast';
@@ -6,20 +6,12 @@ import { money, stockStatus } from '@/lib/fmt';
 import { useAuth } from '@/lib/AuthContext';
 import useUserRole from '@/lib/useUserRole';
 import { G, glass, glassDeep, glassLight, labelStyle, fontDisplay } from '@/lib/glass';
-
-// ── Recetas en localStorage ───────────────────────────────────────────────────
-const REC_KEY = 'mimenu_recipes'; // { [menuItemId]: [{ ingredienteId, cantidad }] }
-function getRecetas() {
-  try { return JSON.parse(localStorage.getItem(REC_KEY) || '{}'); } catch { return {}; }
-}
-function saveRecetas(r) { localStorage.setItem(REC_KEY, JSON.stringify(r)); }
-
-// ── Precios mayoristas en localStorage ───────────────────────────────────────
-const PRECIO_KEY = 'mimenu_stock_precios'; // { [stockItemId]: { costo, proveedor } }
-function getPrecios() {
-  try { return JSON.parse(localStorage.getItem(PRECIO_KEY) || '{}'); } catch { return {}; }
-}
-function savePrecios(p) { localStorage.setItem(PRECIO_KEY, JSON.stringify(p)); }
+import MenuTab from '../components/config/MenuTab';
+import {
+  fetchRecetas, saveReceta,
+  fetchPrecios, savePrecio,
+  fetchEgresos, addEgreso as dbAddEgreso,
+} from '@/lib/stockApi';
 
 // ── Colores food cost ─────────────────────────────────────────────────────────
 function foodCostColor(pct) {
@@ -29,7 +21,7 @@ function foodCostColor(pct) {
   return G.red;
 }
 
-const TABS = ['Ingredientes', 'Recetas', 'Food Cost', 'Movimientos'];
+const TABS = ['Menú', 'Ingredientes', 'Recetas', 'Food Cost', 'Movimientos'];
 
 const ST_BADGE = {
   ok:          { bg:'rgba(29,158,117,0.10)', c:G.teal,  label:'OK'        },
@@ -51,7 +43,8 @@ export default function Stock() {
   const { addToast } = useToast();
   const { user } = useAuth();
   const userRole = useUserRole();
-  const [tab, setTab] = useState('Ingredientes');
+  const [tab, setTab] = useState('Menú');
+  const [loadingData, setLoadingData] = useState(true);
 
   // Ingredientes
   const [editId, setEditId]     = useState(null);
@@ -59,24 +52,44 @@ export default function Stock() {
   const [showAdd, setShowAdd]   = useState(false);
   const [newItem, setNewItem]   = useState({ nombre:'', unidad:'kg', actual:'', minimo:'', costo:'', proveedor:'' });
   const [delConfirm, setDelConfirm] = useState(null);
-  const [precios, setPrecios]   = useState(getPrecios());
+  const [precios, setPrecios]   = useState({});
 
   // Egresos
   const [showEgresoModal, setShowEgresoModal] = useState(false);
   const [egresoForm, setEgresoForm] = useState({ ingredienteId:'', cantidad:'', motivo:'Consumo interno', motivoCustom:'' });
   const [egresoUnidad, setEgresoUnidad] = useState('');
   const [egresoSaving, setEgresoSaving] = useState(false);
+  const [egresos, setEgresos] = useState([]);
 
   // Recetas
-  const [recetas, setRecetas]         = useState(getRecetas());
-  const [editRecetaId, setEditRecetaId] = useState(null); // menuItemId seleccionado
-  const [recetaItems, setRecetaItems] = useState([]); // [{ ingredienteId, cantidad }]
+  const [recetas, setRecetas]         = useState({});
+  const [editRecetaId, setEditRecetaId] = useState(null);
+  const [recetaItems, setRecetaItems] = useState([]);
   const [savingReceta, setSavingReceta] = useState(false);
 
   const stock     = store.getStock();
   const charts    = store.getCharts();
   const menuItems = store.getMenuItems(store.branchId !== 'todas' ? store.branchId : store.sucursales[0]?.id);
   const activeBranch = store.branchId !== 'todas' ? store.branchId : store.sucursales[0]?.id;
+
+  // ── Cargar datos desde Supabase al montar ─────────────────────
+  useEffect(() => {
+    if (!activeBranch) return;
+    setLoadingData(true);
+    Promise.all([
+      fetchRecetas(activeBranch),
+      fetchPrecios(activeBranch),
+      fetchEgresos(activeBranch, 100),
+    ]).then(([rec, prec, egr]) => {
+      setRecetas(rec);
+      setPrecios(prec);
+      setEgresos(egr);
+    }).catch(e => {
+      console.error('Error cargando datos de stock:', e);
+    }).finally(() => {
+      setLoadingData(false);
+    });
+  }, [activeBranch]);
 
   function startEdit(it) {
     const p = precios[it.id] || {};
@@ -89,7 +102,8 @@ export default function Stock() {
       await base44.entities.StockItem.update(it.id, { actual:Number(editVals.actual), minimo:Number(editVals.minimo) });
       store.updateStockItem(it.sucursalId||activeBranch, it.id, { actual:Number(editVals.actual), minimo:Number(editVals.minimo) });
       const np = { ...precios, [it.id]: { costo: Number(editVals.costo)||0, proveedor: editVals.proveedor||'' } };
-      savePrecios(np); setPrecios(np);
+      await savePrecio(it.id, activeBranch, { costo: Number(editVals.costo)||0, proveedor: editVals.proveedor||'' });
+      setPrecios(np);
       setEditId(null);
       addToast('Stock actualizado', 'success');
     } catch { addToast('Error al actualizar stock', 'error'); }
@@ -107,8 +121,8 @@ export default function Stock() {
       });
       store.addStockItem(activeBranch, { id:created.id, nombre:created.nombre, unidad:created.unidad, actual:created.actual??0, minimo:created.minimo??0 });
       if (newItem.costo || newItem.proveedor) {
-        const np = { ...precios, [created.id]: { costo:Number(newItem.costo)||0, proveedor:newItem.proveedor||'' } };
-        savePrecios(np); setPrecios(np);
+        await savePrecio(created.id, activeBranch, { costo:Number(newItem.costo)||0, proveedor:newItem.proveedor||'' });
+        setPrecios(prev => ({ ...prev, [created.id]: { costo:Number(newItem.costo)||0, proveedor:newItem.proveedor||'' } }));
       }
       setNewItem({ nombre:'', unidad:'kg', actual:'', minimo:'', costo:'', proveedor:'' });
       setShowAdd(false);
@@ -143,14 +157,19 @@ export default function Stock() {
     setRecetaItems(prev => prev.filter((_, i) => i !== idx));
   }
 
-  function saveReceta() {
+  async function doSaveReceta() {
     setSavingReceta(true);
-    const valid = recetaItems.filter(r => r.ingredienteId && Number(r.cantidad) > 0);
-    const nr = { ...recetas, [editRecetaId]: valid };
-    saveRecetas(nr); setRecetas(nr);
-    setEditRecetaId(null);
-    setSavingReceta(false);
-    addToast('Receta guardada', 'success');
+    try {
+      const valid = recetaItems.filter(r => r.ingredienteId && Number(r.cantidad) > 0);
+      await saveReceta(editRecetaId, activeBranch, valid);
+      setRecetas(prev => ({ ...prev, [editRecetaId]: valid }));
+      setEditRecetaId(null);
+      addToast('Receta guardada', 'success');
+    } catch {
+      addToast('Error al guardar receta', 'error');
+    } finally {
+      setSavingReceta(false);
+    }
   }
 
   // ── Food Cost calculation ─────────────────────────────────────────────────
@@ -176,8 +195,7 @@ export default function Stock() {
   }, [menuItems, recetas, precios, stock]);
 
   // ── Egresos ───────────────────────────────────────────────────────────────
-  const egresosBranch   = (store.egresos && store.egresos[activeBranch]) || [];
-  const egresosOrdenados = [...egresosBranch].sort((a,b) => b.ts - a.ts).slice(0, 20);
+  const egresosOrdenados = [...egresos].sort((a,b) => b.ts - a.ts).slice(0, 50);
   const sobrepasa = (() => {
     const it = stock.find(s => s.id === egresoForm.ingredienteId);
     return it && egresoForm.cantidad && Number(egresoForm.cantidad) > Number(it.actual);
@@ -200,7 +218,15 @@ export default function Stock() {
     try {
       await base44.entities.StockItem.update(it.id, { actual: nuevoStock });
       store.updateStockItem(bid, it.id, { actual: nuevoStock });
-      store.addEgreso(bid, { id:'eg_'+Date.now(), ingredienteId:it.id, ingredienteNombre:it.nombre, cantidad, unidad:egresoUnidad, motivo:motivoFinal, ts:Date.now() });
+      const nuevoEgreso = await dbAddEgreso(bid, {
+        ingredienteId: it.id,
+        ingredienteNombre: it.nombre,
+        cantidad,
+        unidad: egresoUnidad,
+        motivo: motivoFinal,
+        origen: 'manual',
+      });
+      setEgresos(prev => [nuevoEgreso, ...prev]);
       store.logAccion({ usuario:user?.email||'Sistema', rol:userRole, categoria:'Stock', accion:'Egreso registrado', detalle:`-${cantidad} ${egresoUnidad} de ${it.nombre} · ${motivoFinal}`, sucursal:store.sucursales.find(s=>s.id===bid)?.nombre||'' });
       addToast(`Egreso: -${cantidad} ${egresoUnidad} de ${it.nombre}`, 'success');
       setShowEgresoModal(false);
@@ -258,6 +284,9 @@ export default function Stock() {
           }}>{t}</button>
         ))}
       </div>
+
+      {/* ── MENÚ ── */}
+      {tab === 'Menú' && <MenuTab />}
 
       {/* ── INGREDIENTES ── */}
       {tab === 'Ingredientes' && (
@@ -380,7 +409,7 @@ export default function Stock() {
 
                 <div style={{ display:'flex', gap:10 }}>
                   <button onClick={() => setEditRecetaId(null)} style={{ flex:1, padding:'10px', background:'rgba(0,0,0,0.06)', border:'none', borderRadius:11, fontSize:13, color:G.textMid, cursor:'pointer' }}>Cancelar</button>
-                  <button onClick={saveReceta} disabled={savingReceta} style={{ flex:2, padding:'10px', background:G.teal, border:'none', borderRadius:11, fontSize:13, fontWeight:700, color:'white', cursor:'pointer', boxShadow:`0 4px 12px rgba(29,158,117,0.25)` }}>
+                  <button onClick={doSaveReceta} disabled={savingReceta} style={{ flex:2, padding:'10px', background:G.teal, border:'none', borderRadius:11, fontSize:13, fontWeight:700, color:'white', cursor:'pointer', boxShadow:`0 4px 12px rgba(29,158,117,0.25)` }}>
                     Guardar receta
                   </button>
                 </div>

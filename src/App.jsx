@@ -1,4 +1,4 @@
-import { Toaster } from "@/components/ui/toaster"
+import { Toaster } from 'sonner'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
 import { BrowserRouter as Router, Route, Routes, Navigate, useLocation } from 'react-router-dom';
@@ -8,7 +8,7 @@ import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import { AppProvider, useStore } from '@/lib/store';
 import { ToastProvider } from '@/lib/toast';
-import ToastContainer from './components/ToastContainer';
+import OfflineBanner from '@/components/OfflineBanner';
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
 import Salon from './pages/Salon';
@@ -31,7 +31,22 @@ const RoleGuard = ({ roles, children }) => {
   const { loading } = useStore();
   if (loading || role === null) return null;
   if (roles.includes(role)) return children;
-  return <Navigate to="/salon" replace />;
+  return (
+    <div style={{display:'flex',alignItems:'center',justifyContent:'center',minHeight:'60vh',fontFamily:"'DM Sans',system-ui,sans-serif"}}>
+      <div style={{textAlign:'center',maxWidth:340}}>
+        <div style={{width:56,height:56,borderRadius:'50%',background:'rgba(226,75,74,0.08)',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 16px'}}>
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#E24B4A" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        </div>
+        <div style={{fontSize:18,fontWeight:700,color:'#111827',marginBottom:8}}>Acceso restringido</div>
+        <div style={{fontSize:13,color:'#6B7280',lineHeight:1.6,marginBottom:20}}>
+          Tu rol de <strong>{role}</strong> no tiene permiso para acceder a esta sección. Hablá con el administrador si necesitás acceso.
+        </div>
+        <a href="/salon" style={{display:'inline-block',padding:'9px 20px',background:'#1D9E75',color:'white',textDecoration:'none',borderRadius:10,fontSize:13,fontWeight:600}}>
+          Ir al Salón
+        </a>
+      </div>
+    </div>
+  );
 };
 
 const AuthenticatedApp = () => {
@@ -50,8 +65,7 @@ const AuthenticatedApp = () => {
     if (authError.type === 'user_not_registered') {
       return <UserNotRegisteredError />;
     } else if (authError.type === 'auth_required') {
-      navigateToLogin();
-      return null;
+      return <Navigate to="/login" replace />;
     }
   }
 
@@ -123,6 +137,7 @@ function App() {
         <ToastProvider>
           <QueryClientProvider client={queryClientInstance}>
             <Router>
+              <OfflineBanner />
               <Routes>
                 <Route path="/login" element={<Login />} />
                 <Route path="/public/reservas/:branchSlug" element={<PublicReservation />} />
@@ -130,8 +145,7 @@ function App() {
                 <Route path="*" element={<AuthenticatedApp />} />
               </Routes>
             </Router>
-            <Toaster />
-            <ToastContainer />
+            <Toaster position="top-right" richColors closeButton />
           </QueryClientProvider>
         </ToastProvider>
       </AppProvider>

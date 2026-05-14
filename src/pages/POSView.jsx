@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '@/lib/store';
 import { supabase } from '@/api/supabaseClient';
@@ -7,13 +7,11 @@ import { getPrinterConfig, printReceipt, printComanda } from '@/lib/printer';
 import { getAfipConfig } from '@/lib/afip';
 import FacturaModal from '../components/facturacion/FacturaModal';
 import { G } from '@/lib/glass';
+import { getCategoryColor } from '@/lib/menuCategories';
+import { enqueue } from '@/lib/offlineQueue';
+import { useBidirectionalSync } from '@/lib/useBidirectionalSync';
 
-const CAT_COLORS = {
-  'Entradas':'#3B82F6','Principales':'#22C55E','Postres':'#A855F7',
-  'Bebidas':'#06B6D4','Pizzas':'#F97316','Pastas':'#EAB308',
-  'Carnes':'#EF4444','Promos':'#10B981',
-};
-function cc(cat) { return CAT_COLORS[cat] || '#8B5CF6'; }
+function cc(cat) { return getCategoryColor(cat); }
 function fmt(n) { return '$'+Number(n||0).toLocaleString('es-AR',{maximumFractionDigits:0}); }
 function fmtTime(ms) {
   const m = Math.floor((Date.now()-ms)/60000);
@@ -323,7 +321,38 @@ export default function POSView() {
   const { addToast } = useToast();
   const branchId = store.branchId!=='todas'?store.branchId:store.sucursales[0]?.id;
 
-  const [selectedTurn, setSelectedTurn] = useState(null);
+  // ── Sincronización bidireccional al reconectar ────────────
+  const handleServerSync = useCallback((turnsWithItems) => {
+    // Si hay una mesa seleccionada, actualizar sus ítems con los del servidor
+    setSelectedTurn(prev => {
+      if (!prev) return prev;
+      const serverTurn = turnsWithItems.find(t => t.id === prev.id);
+      if (!serverTurn) return prev; // Mesa cerrada por otro, mantener local
+      return { ...prev, ...serverTurn };
+    });
+    setOrder(prev => {
+      if (!selectedTurn) return prev;
+      const serverTurn = turnsWithItems.find(t => t.id === selectedTurn?.id);
+      if (!serverTurn?.items?.length) return prev;
+      // Merge: items del servidor + items locales no sincronizados aún
+      const serverItemIds = new Set(serverTurn.items.map(i => i.id));
+      const localOnlyItems = prev.filter(i => i.turnItemId && !serverItemIds.has(i.turnItemId));
+      return [
+        ...serverTurn.items.map(i => ({
+          uid: i.id, id: i.menu_item_id || i.id,
+          nombre: i.menu_item_name, precio: i.precio,
+          qty: i.cantidad, nota: i.notas || '',
+          sel: {}, extra: 0, turnItemId: i.id,
+          categoria: '',
+        })),
+        ...localOnlyItems,
+      ];
+    });
+  }, [selectedTurn]);
+
+  useBidirectionalSync(branchId, handleServerSync);
+
+
   const [order, setOrder] = useState([]);
   const [loadingOrder, setLoadingOrder] = useState(false);
   const [cat, setCat] = useState('Todo');
@@ -384,18 +413,36 @@ export default function POSView() {
   async function addToOrder(item,sel,nota,extra){
     const uid=item.id+'_'+Date.now();
     const newItem={uid,id:item.id,nombre:item.nombre,precio:item.precio,extra,qty:1,nota,sel,categoria:item.categoria||''};
+    // Optimistic update — UI inmediata
     setOrder(prev=>{
       const noMods=Object.keys(sel).length===0&&!nota;
       if(noMods){const ex=prev.find(i=>i.id===item.id&&!i.nota&&Object.keys(i.sel||{}).length===0);if(ex)return prev.map(i=>i.uid===ex.uid?{...i,qty:i.qty+1}:i);}
       return[...prev,newItem];
     });
     if(selectedTurn?.id){
-      try{
-        const modStr=Object.values(sel).flat().map(o=>o.label||o).join(', ');
-        const notaF=[modStr,nota].filter(Boolean).join(' | ');
-        const{data}=await supabase.from('turn_items').insert({turn_id:selectedTurn.id,branch_id:branchId,menu_item_id:item.id||null,menu_item_name:item.nombre,cantidad:1,precio:item.precio+extra,notas:notaF||null}).select().single();
-        if(data)setOrder(prev=>prev.map(i=>i.uid===uid?{...i,turnItemId:data.id}:i));
-      }catch(e){}
+      const modStr=Object.values(sel).flat().map(o=>o.label||o).join(', ');
+      const notaF=[modStr,nota].filter(Boolean).join(' | ');
+      const payload={
+        turn_id:selectedTurn.id,
+        branch_id:branchId,
+        menu_item_id:item.id||null,
+        menu_item_name:item.nombre,
+        cantidad:1,
+        precio:item.precio+extra,
+        notas:notaF||null,
+      };
+      if(navigator.onLine){
+        try{
+          const{data}=await supabase.from('turn_items').insert(payload).select().single();
+          if(data)setOrder(prev=>prev.map(i=>i.uid===uid?{...i,turnItemId:data.id}:i));
+        }catch(e){
+          // Si falla con conexión, encolar para reintento
+          await enqueue({ type:'INSERT_TURN_ITEM', ...payload }).catch(()=>{});
+        }
+      } else {
+        // Sin conexión — encolar para cuando vuelva internet
+        await enqueue({ type:'INSERT_TURN_ITEM', ...payload }).catch(()=>{});
+      }
     }
   }
 
@@ -494,13 +541,35 @@ export default function POSView() {
             {filtered.map(item=>{
               const c=cc(item.categoria);
               const qty=order.filter(i=>i.id===item.id).reduce((s,i)=>s+i.qty,0);
+              const hasImg = !!item.imagen_url;
               return(
-                <button key={item.id} onClick={()=>handleAdd(item)} style={{background:qty>0?c+'18':'rgba(255,255,255,0.65)',backdropFilter:'blur(12px)',border:qty>0?'2px solid '+c:'1.5px solid '+c+'44',borderRadius:16,padding:'13px 11px',cursor:'pointer',textAlign:'left',position:'relative',aspectRatio:'1/1',display:'flex',flexDirection:'column',justifyContent:'space-between',transition:'all 0.12s',boxShadow:qty>0?'0 6px 20px '+c+'30':'0 2px 10px rgba(0,0,0,0.07)'}}>
-                  {qty>0&&<div style={{position:'absolute',top:8,right:8,background:c,borderRadius:'50%',width:23,height:23,display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:800,color:'white'}}>{qty}</div>}
-                  <div style={{display:'inline-block',background:c+'22',borderRadius:6,padding:'2px 7px',fontSize:10,color:c,fontWeight:700,textTransform:'uppercase',letterSpacing:0.4,alignSelf:'flex-start'}}>{item.categoria}</div>
-                  <div>
-                    <div style={{fontSize:14,fontWeight:700,color:G.text,lineHeight:1.3,marginBottom:3}}>{item.nombre}</div>
-                    <div style={{fontSize:16,fontWeight:800,color:c}}>{fmt(item.precio)}</div>
+                <button key={item.id} onClick={()=>handleAdd(item)} style={{
+                  background: hasImg ? 'transparent' : qty>0?c+'18':'rgba(255,255,255,0.65)',
+                  backdropFilter: hasImg ? 'none' : 'blur(12px)',
+                  border: qty>0 ? '2px solid '+c : '1.5px solid '+c+'44',
+                  borderRadius:16, padding:0, cursor:'pointer', textAlign:'left',
+                  position:'relative', aspectRatio:'1/1', display:'flex',
+                  flexDirection:'column', justifyContent:'flex-end',
+                  overflow:'hidden', transition:'all 0.12s',
+                  boxShadow: qty>0 ? '0 6px 20px '+c+'30' : '0 2px 10px rgba(0,0,0,0.07)',
+                }}>
+                  {hasImg && (
+                    <img src={item.imagen_url} alt={item.nombre} style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', borderRadius:14 }} />
+                  )}
+                  {hasImg && (
+                    <div style={{ position:'absolute', inset:0, background:'linear-gradient(to top, rgba(0,0,0,0.72) 0%, rgba(0,0,0,0.1) 55%, transparent 100%)', borderRadius:14 }} />
+                  )}
+                  {qty>0 && (
+                    <div style={{ position:'absolute', top:8, right:8, background:c, borderRadius:'50%', width:23, height:23, display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:800, color:'white', zIndex:2 }}>{qty}</div>
+                  )}
+                  {!hasImg && (
+                    <div style={{ padding:'13px 11px', display:'flex', alignItems:'flex-start' }}>
+                      <div style={{ display:'inline-block', background:c+'22', borderRadius:6, padding:'2px 7px', fontSize:10, color:c, fontWeight:700, textTransform:'uppercase', letterSpacing:0.4 }}>{item.categoria}</div>
+                    </div>
+                  )}
+                  <div style={{ padding: hasImg ? '0 10px 11px' : '0 11px 13px', position:'relative', zIndex:1 }}>
+                    <div style={{ fontSize:13, fontWeight:700, color: hasImg ? 'white' : G.text, lineHeight:1.3, marginBottom:2, textShadow: hasImg ? '0 1px 4px rgba(0,0,0,0.5)' : 'none' }}>{item.nombre}</div>
+                    <div style={{ fontSize:15, fontWeight:800, color: hasImg ? 'white' : c, textShadow: hasImg ? '0 1px 4px rgba(0,0,0,0.5)' : 'none' }}>{fmt(item.precio)}</div>
                   </div>
                 </button>
               );
@@ -555,8 +624,13 @@ export default function POSView() {
               <button onClick={()=>setOrder([])} disabled={order.length===0} style={{flex:1,padding:'8px',background:'rgba(226,75,74,0.07)',border:'1px solid rgba(226,75,74,0.16)',borderRadius:9,color:order.length===0?G.textFaint:G.red,fontSize:11,fontWeight:600,cursor:'pointer'}}>Limpiar</button>
               {selectedTurn?.id&&<button onClick={enviarCocina} style={{flex:1,padding:'8px',background:'rgba(234,179,8,0.08)',border:'1px solid rgba(234,179,8,0.2)',borderRadius:9,color:'#EAB308',fontSize:11,fontWeight:600,cursor:'pointer'}}>Cocina</button>}
             </div>
-            <button onClick={()=>setShowCobro(true)} disabled={order.length===0} style={{width:'100%',padding:'14px',background:order.length===0?'rgba(0,0,0,0.05)':'linear-gradient(135deg,'+G.teal+',#0F6E56)',border:'none',borderRadius:12,color:order.length===0?G.textFaint:'white',fontSize:14,fontWeight:800,cursor:order.length===0?'not-allowed':'pointer',boxShadow:order.length>0?'0 7px 18px rgba(29,158,117,0.26)':'none',transition:'all 0.2s'}}>
-              {order.length===0?'Sin items':'Cobrar '+fmt(total)}
+            {!store.turnoActivo && order.length > 0 && (
+              <div style={{background:'rgba(239,159,39,0.10)',border:'1px solid rgba(239,159,39,0.3)',borderRadius:10,padding:'8px 12px',marginBottom:8,fontSize:11,color:'#92600A',fontWeight:600,textAlign:'center'}}>
+                ⚠ Abrí el turno de caja antes de cobrar
+              </div>
+            )}
+            <button onClick={()=>setShowCobro(true)} disabled={order.length===0||!store.turnoActivo} style={{width:'100%',padding:'14px',background:order.length===0||!store.turnoActivo?'rgba(0,0,0,0.05)':'linear-gradient(135deg,'+G.teal+',#0F6E56)',border:'none',borderRadius:12,color:order.length===0||!store.turnoActivo?G.textFaint:'white',fontSize:14,fontWeight:800,cursor:order.length===0||!store.turnoActivo?'not-allowed':'pointer',boxShadow:order.length>0&&store.turnoActivo?'0 7px 18px rgba(29,158,117,0.26)':'none',transition:'all 0.2s'}}>
+              {order.length===0?'Sin items':!store.turnoActivo?'Turno de caja cerrado':'Cobrar '+fmt(total)}
             </button>
           </div>
         </div>

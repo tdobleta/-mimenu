@@ -7,6 +7,8 @@ import { base44 } from '@/api/base44Client';
 import { supabase } from '@/api/supabaseClient';
 import useUserRole from '@/lib/useUserRole';
 import { G, glassLight } from '@/lib/glass';
+import { useKitchenNotifications } from '@/lib/useKitchenNotifications';
+import KitchenNotifDropdown from './KitchenNotifDropdown';
 
 const ROLE_BADGE = {
   Dueno:     { bg:'rgba(29,158,117,0.12)', c:G.teal,   label:'Dueño' },
@@ -37,6 +39,9 @@ export default function Topbar({ onMobile }) {
   const roleBadge = ROLE_BADGE[appRole] || ROLE_BADGE.Encargado;
   const [open, setOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [kitchenOpen, setKitchenOpen] = useState(false);
+  const { notifs, unread: kitchenUnread, markAllRead, clearAll } = useKitchenNotifications();
+  const kitchenRef = useRef();
   const ref = useRef();
   const userRef = useRef();
   void alertsRef;
@@ -133,7 +138,22 @@ export default function Topbar({ onMobile }) {
       <div style={{ display:'flex', alignItems:'center', gap:14 }}>
         <span className="hidden sm:block" style={{ fontSize:12, color:G.textFaint }}>{dateLong(new Date())}</span>
 
-        {/* Alertas */}
+        {/* Notificaciones cocina */}
+        <div ref={kitchenRef} style={{ position:'relative' }}>
+          <div onClick={() => { setKitchenOpen(v=>!v); if(!kitchenOpen) markAllRead(); }}
+            style={{ ...glassLight({ width:34, height:34, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', padding:0 }) }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={kitchenUnread > 0 ? '#1D9E75' : G.textMuted} strokeWidth="2"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.1 1 3"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>
+          </div>
+          {kitchenUnread > 0 && (
+            <span style={{ position:'absolute', top:-4, right:-4, width:16, height:16, background:'#1D9E75', borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', fontSize:9, fontWeight:700, color:'white', border:'2px solid white', animation:'kitchenPing 1s ease-in-out infinite' }}>
+              {kitchenUnread > 9 ? '9+' : kitchenUnread}
+            </span>
+          )}
+          {kitchenOpen && <KitchenNotifDropdown notifs={notifs} onClose={() => setKitchenOpen(false)} onClear={clearAll} />}
+          <style>{`@keyframes kitchenPing{0%,100%{transform:scale(1)}50%{transform:scale(1.2)}}`}</style>
+        </div>
+
+        {/* Alertas stock */}
         <div style={{ position:'relative', cursor:'pointer' }} onClick={() => setAlertsOpen(v=>!v)}>
           <div style={{ ...glassLight({ width:34, height:34, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', padding:0 }) }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={G.textMuted} strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>

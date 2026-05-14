@@ -23,7 +23,6 @@ function emptyState() {
     isDemo: false,
     closedTurns: [],
     turnoActivo: null,
-    egresos: {},
     teamMembers: [],
     restaurantId: null,
     ownerEmail: null,
@@ -58,10 +57,10 @@ export function AppProvider({ children }) {
       try {
         const user = await base44.auth.me();
         if (!user) {
-          // No hay sesión — AuthContext se encarga de redirigir al login
+          // No hay sesiÃ³n â€” AuthContext se encarga de redirigir al login
           return;
         }
-        // Intentar por owner_id primero (más preciso), luego por email
+        // Intentar por owner_id primero (mÃ¡s preciso), luego por email
         let restaurants = await base44.entities.Restaurant.filter({ owner_id: user.id });
         if (!restaurants || restaurants.length === 0) {
           restaurants = await base44.entities.Restaurant.filter({ owner_email: user.email });
@@ -73,8 +72,8 @@ export function AppProvider({ children }) {
           memberships = (byEmail || []).filter(m => m.email === user.email);
         } catch(e) {}
 
-        // Solo reintentar si hay un restaurante incompleto — posible usuario invitado
-        // en su primer login. Para dueños nuevos no hay reintento.
+        // Solo reintentar si hay un restaurante incompleto â€” posible usuario invitado
+        // en su primer login. Para dueÃ±os nuevos no hay reintento.
         if (memberships.length === 0 && restaurants && restaurants.length > 0 && !restaurants[0]?.onboarding_completado) {
           await new Promise(res => setTimeout(res, 1200));
           try {
@@ -86,10 +85,10 @@ export function AppProvider({ children }) {
         let restaurant;
 
         if (restaurants && restaurants.length > 0 && restaurants[0].onboarding_completado) {
-          // Dueño con onboarding completo — es el dueño del restaurante
+          // DueÃ±o con onboarding completo â€” es el dueÃ±o del restaurante
           restaurant = restaurants[0];
         } else if (memberships.length > 0) {
-          // Es miembro de equipo — cargar el restaurante al que pertenece
+          // Es miembro de equipo â€” cargar el restaurante al que pertenece
           // (tiene prioridad sobre un restaurante propio incompleto de un intento anterior)
           const rid = memberships[0].restaurant_id;
           const ownerRestaurants = await base44.entities.Restaurant.filter({ id: rid }).catch(() => []);
@@ -106,10 +105,10 @@ export function AppProvider({ children }) {
             };
           }
         } else if (restaurants && restaurants.length > 0) {
-          // Tiene restaurante propio sin completar — continuar onboarding
+          // Tiene restaurante propio sin completar â€” continuar onboarding
           restaurant = restaurants[0];
         } else {
-          // Usuario genuinamente nuevo — crear restaurante y arrancar onboarding
+          // Usuario genuinamente nuevo â€” crear restaurante y arrancar onboarding
           restaurant = await base44.entities.Restaurant.create({
             nombre: 'Mi Restaurante',
             owner_email: user.email,
@@ -121,7 +120,7 @@ export function AppProvider({ children }) {
             nombre: 'Principal',
             mesas: 8,
             franjas: ['12:00','13:00','20:00','21:00'],
-            metodo_conexion: 'mimenú POS',
+            metodo_conexion: 'mimenÃº POS',
           });
         }
         const branches = await base44.entities.Branch.filter({ restaurant_id: restaurant.id });
@@ -166,7 +165,7 @@ export function AppProvider({ children }) {
           stock[branch.id] = [];
           activity[branch.id] = [];
           charts[branch.id] = {
-            week: ['lun','mar','mié','jue','vie','sáb','dom'].map(day => ({ day, actual: 0, anterior: 0 })),
+            week: ['lun','mar','miÃ©','jue','vie','sÃ¡b','dom'].map(day => ({ day, actual: 0, anterior: 0 })),
             month: Array.from({length:30},(_,i)=>({ day:`${i+1}`, actual:0, anterior:0 })),
             year: ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'].map(mes=>({mes,actual:0,anterior:0})),
             topProducts: [],
@@ -204,7 +203,7 @@ export function AppProvider({ children }) {
           if (chosen) {
             let parsedRetiros = [];
             try { parsedRetiros = JSON.parse(chosen.retiros || '[]'); } catch(e) {}
-            // Reconstruir totalCache desde Turns reales para que el número en pantalla sea correcto
+            // Reconstruir totalCache desde Turns reales para que el nÃºmero en pantalla sea correcto
             const turnsDelTurno = await base44.entities.Turn.filter({
               caja_shift_id: chosen.id,
               status: 'cerrada',
@@ -303,7 +302,7 @@ export function AppProvider({ children }) {
             id: b.id,
             nombre: b.nombre || 'Sucursal',
             direccion: b.direccion || '',
-            conexion: b.metodo_conexion || 'mimenú POS',
+            conexion: b.metodo_conexion || 'mimenÃº POS',
             mesas: b.mesas || 4,
             franjas: b.franjas || ['12:00','13:00','20:00','21:00'],
           })),
@@ -348,7 +347,7 @@ export function AppProvider({ children }) {
     if (!s.branchId) return;
     const targetBid = s.branchId === 'todas' ? s.sucursales[0]?.id : s.branchId;
     if (!targetBid) return;
-    // Solo recargar si no tenemos los ítems de esa branch todavía
+    // Solo recargar si no tenemos los Ã­tems de esa branch todavÃ­a
     if (s.menuItems[targetBid]) return;
     (async () => {
       try {
@@ -443,7 +442,7 @@ export function AppProvider({ children }) {
           weekMap[d.day].anterior += d.anterior || 0;
         });
       });
-      const DAY_ORDER = ['lun','mar','mié','jue','vie','sáb','dom'];
+      const DAY_ORDER = ['lun','mar','miÃ©','jue','vie','sÃ¡b','dom'];
       const week = DAY_ORDER.map(day => weekMap[day] || { day, actual: 0, anterior: 0 });
 
       // Combinar topProducts sumando unidades y monto
@@ -513,6 +512,20 @@ export function AppProvider({ children }) {
   const getTables = (bid) => s.tables[bid] || [];
   const getActiveBranch = () => s.sucursales.find(su => su.id === s.branchId);
 
+  // â”€â”€ Helper: normalizar timestamps de base44 (puede venir como ms, segundos o ISO string)
+  const normTs = (ts) => {
+    if (!ts) return 0;
+    if (typeof ts === 'string') {
+      // ISO string "2026-05-07T00:00:00.000Z"
+      const d = new Date(ts);
+      return isNaN(d.getTime()) ? 0 : d.getTime();
+    }
+    const n = Number(ts);
+    // Si es menor a aÃ±o 2000 en ms, probablemente son segundos
+    if (n < 9_000_000_000) return n * 1000;
+    return n;
+  };
+
   const refreshCharts = useCallback(async (branchIdOverride) => {
     const activeBranch = branchIdOverride !== undefined ? branchIdOverride : s.branchId;
     if (!s.sucursales || s.sucursales.length === 0) return;
@@ -520,96 +533,237 @@ export function AppProvider({ children }) {
       ? s.sucursales.map(b => b.id)
       : [activeBranch];
 
-    const startOfToday = new Date(); startOfToday.setHours(0,0,0,0);
-    const startOfYesterday = startOfToday.getTime() - 24*60*60*1000;
-    const startOfWeek = startOfToday.getTime() - 7*24*60*60*1000;
+    // Calcular rangos de tiempo (siempre frescos en cada llamada)
+    const now = new Date();
+    const startOfToday = new Date(now); startOfToday.setHours(0,0,0,0);
+    const T0 = startOfToday.getTime();
+    const T_AYER = T0 - 86400000;
+    const T_SEMANA = T0 - 7 * 86400000;
+    const T_MES = T0 - 30 * 86400000;
+    const T_ANIO = T0 - 365 * 86400000;
+    const DAY_MS = 86400000;
+    const dayNames = ['lun','mar','miÃ©','jue','vie','sÃ¡b','dom'];
+    const mesNames = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+    // Lunes de esta semana y anterior
+    const lunesEsta = T0 - (((startOfToday.getDay() + 6) % 7) * DAY_MS);
+    const lunesAnt  = lunesEsta - 7 * DAY_MS;
 
     try {
+      // Traer mÃ¡s turnos para tener datos histÃ³ricos completos (2000 en lugar de 500)
       const closedArrays = await Promise.all(
         targetBranchIds.map(bid =>
-          base44.entities.Turn.filter({ status: 'cerrada', branch_id: bid }, '-closed_at', 500).catch(() => [])
+          base44.entities.Turn.filter({ status:'cerrada', branch_id:bid }, '-closed_at', 2000).catch(() => [])
         )
       );
-      const filtered = closedArrays.flat().filter(t => t.status !== 'anulada');
+      const filtered = closedArrays.flat()
+        .filter(t => t.status !== 'anulada')
+        .map(t => ({ ...t, _ts: normTs(t.closed_at) })); // normalizar timestamps una sola vez
 
       const newCharts = {};
       for (const bid of targetBranchIds) {
-        const branchTurns = filtered.filter(t => t.branch_id === bid);
-        const todayTurns = branchTurns.filter(t => t.closed_at >= startOfToday.getTime());
-        const yesterdayTurns = branchTurns.filter(t => t.closed_at >= startOfYesterday && t.closed_at < startOfToday.getTime());
-        const weekTurns = branchTurns.filter(t => t.closed_at >= startOfWeek);
+        const bTurns = filtered.filter(t => t.branch_id === bid);
 
-        const facturacionHoy = todayTurns.reduce((a,t) => a + (t.total_facturado||0), 0);
-        const facturacionAyer = yesterdayTurns.reduce((a,t) => a + (t.total_facturado||0), 0);
-        const ticketPromedio = todayTurns.length > 0 ? facturacionHoy / todayTurns.length : 0;
-        const ticketAnterior = yesterdayTurns.length > 0 ? facturacionAyer / yesterdayTurns.length : 0;
+        // Filtros con timestamps normalizados
+        const todayTurns     = bTurns.filter(t => t._ts >= T0);
+        const ayerTurns      = bTurns.filter(t => t._ts >= T_AYER && t._ts < T0);
+        const semanaTurns    = bTurns.filter(t => t._ts >= T_SEMANA);
+        const mesTurns       = bTurns.filter(t => t._ts >= T_MES);
 
-        const dayNames = ['lun','mar','mié','jue','vie','sáb','dom'];
-        const DAY_MS = 24*60*60*1000;
-        const lunesEsta = startOfToday.getTime() - (((startOfToday.getDay() + 6) % 7) * DAY_MS);
-        const lunesAnterior = lunesEsta - 7 * DAY_MS;
+        const facturacionHoy  = todayTurns.reduce((a,t) => a + (t.total_facturado||0), 0);
+        const facturacionAyer = ayerTurns.reduce((a,t)  => a + (t.total_facturado||0), 0);
+        const ticketPromedio  = todayTurns.length > 0 ? Math.round(facturacionHoy / todayTurns.length) : 0;
+        const ticketAnterior  = ayerTurns.length  > 0 ? Math.round(facturacionAyer / ayerTurns.length) : 0;
+
+        // â”€â”€ GrÃ¡fico semanal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         const weekData = dayNames.map((day, i) => {
-          const inicioEsta = lunesEsta + i * DAY_MS;
-          const finEsta = inicioEsta + DAY_MS;
-          const inicioAnt = lunesAnterior + i * DAY_MS;
-          const finAnt = inicioAnt + DAY_MS;
-          const actual = branchTurns
-            .filter(t => t.closed_at >= inicioEsta && t.closed_at < finEsta)
-            .reduce((a,t) => a + (t.total_facturado||0), 0);
-          const anterior = branchTurns
-            .filter(t => t.closed_at >= inicioAnt && t.closed_at < finAnt)
-            .reduce((a,t) => a + (t.total_facturado||0), 0);
+          const ini = lunesEsta + i * DAY_MS;
+          const fin = ini + DAY_MS;
+          const iniA = lunesAnt + i * DAY_MS;
+          const finA = iniA + DAY_MS;
+          const actual   = bTurns.filter(t => t._ts >= ini  && t._ts < fin ).reduce((a,t) => a+(t.total_facturado||0), 0);
+          const anterior = bTurns.filter(t => t._ts >= iniA && t._ts < finA).reduce((a,t) => a+(t.total_facturado||0), 0);
           return { day, actual, anterior };
         });
 
+        // â”€â”€ GrÃ¡fico mensual (Ãºltimos 30 dÃ­as vs 30 dÃ­as anteriores) â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        const monthData = Array.from({length:30}, (_, i) => {
+          const ini  = T_MES + i * DAY_MS;
+          const fin  = ini + DAY_MS;
+          const iniA = ini - 30 * DAY_MS;
+          const finA = iniA + DAY_MS;
+          const actual   = bTurns.filter(t => t._ts >= ini  && t._ts < fin ).reduce((a,t) => a+(t.total_facturado||0), 0);
+          const anterior = bTurns.filter(t => t._ts >= iniA && t._ts < finA).reduce((a,t) => a+(t.total_facturado||0), 0);
+          return { day: String(i+1), actual, anterior };
+        });
+
+        // â”€â”€ GrÃ¡fico anual â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        const yearData = mesNames.map((mes, i) => {
+          const year = now.getFullYear();
+          const iniMes  = new Date(year, i, 1).getTime();
+          const finMes  = new Date(year, i+1, 1).getTime();
+          const iniMesA = new Date(year-1, i, 1).getTime();
+          const finMesA = new Date(year-1, i+1, 1).getTime();
+          const actual   = bTurns.filter(t => t._ts >= iniMes  && t._ts < finMes ).reduce((a,t) => a+(t.total_facturado||0), 0);
+          const anterior = bTurns.filter(t => t._ts >= iniMesA && t._ts < finMesA).reduce((a,t) => a+(t.total_facturado||0), 0);
+          return { mes, actual, anterior };
+        });
+
+        // â”€â”€ Top productos (Ãºltimos 7 dÃ­as, batch de hasta 100 turnos) â”€â”€â”€â”€â”€â”€â”€â”€
         const productMap = {};
         try {
-          const weekItemArrays = await Promise.all(
-            weekTurns.map(turn =>
-              base44.entities.TurnItem.filter({ turn_id: turn.id }).catch(() => [])
-            )
+          // Limitar a 100 turnos recientes para evitar N+1 masivo
+          const topTurns = semanaTurns.slice(0, 100);
+          const itemArrays = await Promise.all(
+            topTurns.map(t => base44.entities.TurnItem.filter({ turn_id: t.id }).catch(() => []))
           );
-          weekItemArrays.flat().forEach(it => {
+          itemArrays.flat().forEach(it => {
             const key = it.menu_item_name || 'Sin nombre';
-            if (!productMap[key]) productMap[key] = { nombre: key, unidades: 0, monto: 0 };
-            productMap[key].unidades += it.cantidad || 0;
-            productMap[key].monto += (it.cantidad||0) * (it.precio||0);
+            if (!productMap[key]) productMap[key] = { nombre:key, unidades:0, monto:0 };
+            productMap[key].unidades += it.cantidad || 1;
+            productMap[key].monto    += (it.cantidad||1) * (it.precio||0);
           });
         } catch(e) {}
         const topProducts = Object.values(productMap).sort((a,b) => b.unidades - a.unidades).slice(0, 5);
 
         newCharts[bid] = {
-          week: weekData,
-          month: Array.from({length:30},(_,i)=>({ day:`${i+1}`, actual:0, anterior:0 })),
-          year: ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'].map(mes=>({mes,actual:0,anterior:0})),
+          week:weekData, month:monthData, year:yearData,
           facturacionHoy, facturacionAyer, ticketPromedio, ticketAnterior, topProducts,
         };
       }
 
-      // Construir actividad reciente por branch (últimos 8 cierres)
+      // Actividad reciente
       const newActivity = {};
       for (const bid of targetBranchIds) {
         const sorted = filtered
           .filter(t => t.branch_id === bid)
-          .sort((a,b) => (b.closed_at||0) - (a.closed_at||0))
+          .sort((a,b) => (b._ts||0) - (a._ts||0))
           .slice(0, 8);
         newActivity[bid] = sorted.map(t => ({
           id: t.id,
-          texto: `Mesa ${t.mesa_num} cerrada — $${(t.total_facturado||0).toLocaleString('es-AR')}`,
-          ts: t.closed_at || Date.now(),
+          texto: `Mesa ${t.mesa_num} cerrada â€” $${(t.total_facturado||0).toLocaleString('es-AR')}`,
+          ts: t._ts || Date.now(),
           color: '#1D9E75',
         }));
       }
-      setS(prev => ({ ...prev, charts: { ...prev.charts, ...newCharts }, activity: { ...prev.activity, ...newActivity }, closedTurns: filtered }));
+
+      setS(prev => ({
+        ...prev,
+        charts: { ...prev.charts, ...newCharts },
+        activity: { ...prev.activity, ...newActivity },
+        closedTurns: filtered,
+      }));
     } catch(err) {
       console.error('Error refreshCharts:', err);
+    }
+  }, [s.branchId, s.sucursales]);
+
+
+  // ── refreshChartsForRange: carga datos para cualquier rango de fechas ────────
+  // startTs y endTs son timestamps en ms (Date.getTime())
+  // Compara con el mismo período anterior (mismo número de días)
+  const refreshChartsForRange = useCallback(async (startTs, endTs, branchIdOverride) => {
+    const activeBranch = branchIdOverride !== undefined ? branchIdOverride : s.branchId;
+    if (!s.sucursales || s.sucursales.length === 0) return;
+    const targetBranchIds = activeBranch === 'todas' || !activeBranch
+      ? s.sucursales.map(b => b.id)
+      : [activeBranch];
+
+    const rangeDuration = endTs - startTs;
+    const prevStartTs = startTs - rangeDuration;
+    const prevEndTs   = startTs;
+    const DAY_MS = 86400000;
+    const totalDays = Math.max(1, Math.ceil(rangeDuration / DAY_MS));
+
+    try {
+      const closedArrays = await Promise.all(
+        targetBranchIds.map(bid =>
+          base44.entities.Turn.filter({ status:'cerrada', branch_id:bid }, '-closed_at', 2000).catch(() => [])
+        )
+      );
+      const allTurns = closedArrays.flat()
+        .filter(t => t.status !== 'anulada')
+        .map(t => ({ ...t, _ts: normTs(t.closed_at) }));
+
+      const newCharts = {};
+      for (const bid of targetBranchIds) {
+        const bTurns = allTurns.filter(t => t.branch_id === bid);
+
+        // Datos del rango seleccionado
+        const rangeTurns = bTurns.filter(t => t._ts >= startTs && t._ts < endTs);
+        const prevTurns  = bTurns.filter(t => t._ts >= prevStartTs && t._ts < prevEndTs);
+
+        const facturacionHoy  = rangeTurns.reduce((a,t) => a + (t.total_facturado||0), 0);
+        const facturacionAyer = prevTurns.reduce((a,t)  => a + (t.total_facturado||0), 0);
+        const ticketPromedio  = rangeTurns.length > 0 ? Math.round(facturacionHoy / rangeTurns.length) : 0;
+        const ticketAnterior  = prevTurns.length  > 0 ? Math.round(facturacionAyer / prevTurns.length) : 0;
+
+        // Gráfico día a día para el rango seleccionado
+        const dayNames = ['dom','lun','mar','mié','jue','vie','sáb'];
+        const weekData = Array.from({ length: totalDays }, (_, i) => {
+          const ini   = startTs + i * DAY_MS;
+          const fin   = ini + DAY_MS;
+          const iniP  = prevStartTs + i * DAY_MS;
+          const finP  = iniP + DAY_MS;
+          const d     = new Date(ini);
+          const label = totalDays <= 31
+            ? (totalDays <= 7 ? dayNames[d.getDay()] : `${d.getDate()}/${d.getMonth()+1}`)
+            : ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'][d.getMonth()];
+          const actual   = rangeTurns.filter(t => t._ts >= ini  && t._ts < fin ).reduce((a,t) => a+(t.total_facturado||0), 0);
+          const anterior = prevTurns.filter(t  => t._ts >= iniP && t._ts < finP).reduce((a,t) => a+(t.total_facturado||0), 0);
+          return { day: label, actual, anterior };
+        });
+
+        // Top productos del rango
+        const productMap = {};
+        try {
+          const topTurns = rangeTurns.slice(0, 100);
+          const itemArrays = await Promise.all(
+            topTurns.map(t => base44.entities.TurnItem.filter({ turn_id: t.id }).catch(() => []))
+          );
+          itemArrays.flat().forEach(it => {
+            const key = it.menu_item_name || 'Sin nombre';
+            if (!productMap[key]) productMap[key] = { nombre:key, unidades:0, monto:0 };
+            productMap[key].unidades += it.cantidad || 1;
+            productMap[key].monto    += (it.cantidad||1) * (it.precio||0);
+          });
+        } catch(e) {}
+        const topProducts = Object.values(productMap).sort((a,b) => b.unidades - a.unidades).slice(0, 5);
+
+        // Actividad reciente
+        const sorted = bTurns.sort((a,b) => (b._ts||0) - (a._ts||0)).slice(0, 8);
+        const activity = sorted.map(t => ({
+          id: t.id,
+          texto: `Mesa ${t.mesa_num} cerrada — $${(t.total_facturado||0).toLocaleString('es-AR')}`,
+          ts: t._ts || Date.now(),
+          color: '#1D9E75',
+        }));
+
+        newCharts[bid] = {
+          week: weekData, month: weekData, year: weekData,
+          facturacionHoy, facturacionAyer, ticketPromedio, ticketAnterior, topProducts,
+          rangeStartTs: startTs, rangeEndTs: endTs,
+        };
+
+        // activity separada
+        setS(prev => ({
+          ...prev,
+          activity: { ...prev.activity, [bid]: activity },
+        }));
+      }
+
+      setS(prev => ({
+        ...prev,
+        charts: { ...prev.charts, ...newCharts },
+        closedTurns: allTurns,
+      }));
+    } catch(err) {
+      console.error('Error refreshChartsForRange:', err);
     }
   }, [s.branchId, s.sucursales]);
 
   const setClosedTurns = (turns) => setS(p => ({ ...p, closedTurns: turns }));
 
   const setTurnoActivo = (turno) => setS(p => ({ ...p, turnoActivo: turno }));
-  const addEgreso = (bid, egreso) => setS(p => ({ ...p, egresos: { ...p.egresos, [bid]: [...(p.egresos[bid]||[]), egreso] } }));
   const addTeamMember = (member) => setS(p => ({ ...p, teamMembers: [...(p.teamMembers||[]), member] }));
   const removeTeamMember = (id) => setS(p => ({ ...p, teamMembers: (p.teamMembers||[]).filter(m => m.id !== id) }));
 
@@ -653,9 +807,8 @@ export function AppProvider({ children }) {
     addMenuItem, updateMenuItem, deleteMenuItem, setMenuItems, getMenuItems,
     updateSucursal, addEquipo,
     getCharts, getReservas, getStock, getActivity, getTables, getActiveBranch,
-    refreshCharts, setClosedTurns,
+    refreshCharts, refreshChartsForRange, setClosedTurns,
     setTurnoActivo, addRetiro, cerrarTurnoActivo,
-    addEgreso,
     addTeamMember, removeTeamMember,
     logAccion,
     completeOnboarding,
@@ -665,5 +818,4 @@ export function AppProvider({ children }) {
 }
 
 export const useStore = () => useContext(AppContext);
-
 

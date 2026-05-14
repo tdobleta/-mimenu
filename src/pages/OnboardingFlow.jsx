@@ -3,16 +3,10 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useStore } from '@/lib/store';
+import { MENU_CATEGORIES, CATEGORY_NAMES as CATEGORIAS, DEFAULT_CATEGORY, getCategoryColor, getCategoryBg } from '@/lib/menuCategories';
 
 const STEPS = ['Tu restaurante', 'Las mesas', 'El menú', '¡Listo!'];
 const MESAS_OPCIONES = [4, 6, 8, 10, 12, 15, 20, 25, 30];
-const CATEGORIAS = ['Entradas', 'Principales', 'Postres', 'Bebidas'];
-const CAT_BADGE = {
-  Entradas:    { bg:'#FFEDD5', c:'#EA580C' },
-  Principales: { bg:'#E8F7F2', c:'#1D9E75' },
-  Postres:     { bg:'#FCE7F3', c:'#DB2777' },
-  Bebidas:     { bg:'#DBEAFE', c:'#3B82F6' },
-};
 
 export default function OnboardingFlow() {
   const navigate = useNavigate();
@@ -24,7 +18,7 @@ export default function OnboardingFlow() {
   const [form1, setForm1] = useState({ nombre:'', telefono:'', direccion:'' });
   const [numMesas, setNumMesas] = useState(8);
   const [productos, setProductos] = useState([]);
-  const [prodForm, setProdForm] = useState({ nombre:'', precio:'', categoria:'Principales' });
+  const [prodForm, setProdForm] = useState({ nombre:'', precio:'', categoria: DEFAULT_CATEGORY });
   const [prodError, setProdError] = useState({ nombre:false, precio:false });
 
   async function handleStep1() {
@@ -307,7 +301,7 @@ function Step3({ productos, setProductos, prodForm, setProdForm, prodError, addP
       ) : (
         <div>
           {productos.map(p => {
-            const badge = CAT_BADGE[p.categoria] || CAT_BADGE.Principales;
+            const badge = { bg: getCategoryBg(p.categoria), c: getCategoryColor(p.categoria) };
             return (
               <div key={p.id} style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 0', borderBottom:'0.5px solid rgba(0,0,0,0.05)' }}>
                 <span style={{ flex:1, fontSize:14, fontWeight:500, color:'#111827' }}>{p.nombre}</span>
