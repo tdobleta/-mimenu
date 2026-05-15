@@ -384,13 +384,19 @@ export default function POSView() {
       if(its?.length>0){
         setOrder(its.map(it=>({uid:it.id,id:it.menu_item_id||null,nombre:it.menu_item_name,precio:it.precio,extra:0,qty:it.cantidad,nota:it.notas||'',sel:{},turnItemId:it.id,categoria:''})));
       } else { setOrder([]); }
-      const ch=supabase.channel('pos_'+turn.id).on('postgres_changes',{event:'INSERT',schema:'public',table:'turn_items',filter:'turn_id=eq.'+turn.id},payload=>{
-        const it=payload.new;
-        setOrder(prev=>{
-          if(prev.find(x=>x.turnItemId===it.id))return prev;
-          return [...prev,{uid:it.id,id:it.menu_item_id||null,nombre:it.menu_item_name,precio:it.precio,extra:0,qty:it.cantidad,nota:it.notas||'',sel:{},turnItemId:it.id,categoria:''}];
-        });
-      }).subscribe();
+
+      // Canal por SUCURSAL en lugar de por turno — evita 50 conexiones simultáneas
+      if(rtRef.current) supabase.removeChannel(rtRef.current);
+      const ch = supabase.channel('pos_branch_'+branchId)
+        .on('postgres_changes',{event:'INSERT',schema:'public',table:'turn_items',filter:'branch_id=eq.'+branchId},payload=>{
+          const it = payload.new;
+          // Solo procesar ítems del turno actualmente seleccionado
+          if(it.turn_id !== turn.id) return;
+          setOrder(prev=>{
+            if(prev.find(x=>x.turnItemId===it.id)) return prev;
+            return [...prev,{uid:it.id,id:it.menu_item_id||null,nombre:it.menu_item_name,precio:it.precio,extra:0,qty:it.cantidad,nota:it.notas||'',sel:{},turnItemId:it.id,categoria:''}];
+          });
+        }).subscribe();
       rtRef.current=ch;
     } catch(e){}
     setLoadingOrder(false);
