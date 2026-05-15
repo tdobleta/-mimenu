@@ -1,0 +1,66 @@
+name: Daily Backup
+
+on:
+  schedule:
+    - cron: '0 3 * * *'  # 3am UTC = medianoche Argentina
+  workflow_dispatch:      # Triggereable manualmente desde GitHub
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup fecha
+        id: fecha
+        run: |
+          echo "year=$(date +%Y)" >> $GITHUB_OUTPUT
+          echo "month=$(date +%m)" >> $GITHUB_OUTPUT
+          echo "day=$(date +%d)" >> $GITHUB_OUTPUT
+          echo "filename=backup_$(date +%Y-%m-%d).sql" >> $GITHUB_OUTPUT
+
+      - name: Install Supabase CLI
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/supabase/cli/main/install.sh | sh
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Dump database
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          supabase db dump \
+            --db-url "postgresql://postgres.eoiwdmavwwapaqcchhrg:${{ secrets.SUPABASE_DB_PASSWORD }}@aws-0-sa-east-1.pooler.supabase.com:5432/postgres" \
+            -f ${{ steps.fecha.outputs.filename }}
+
+      - name: Comprimir backup
+        run: gzip ${{ steps.fecha.outputs.filename }}
+
+      - name: Subir a Supabase Storage
+        run: |
+          curl -X POST \
+            "${{ secrets.VITE_SUPABASE_URL }}/storage/v1/object/backups/${{ steps.fecha.outputs.year }}/${{ steps.fecha.outputs.month }}/${{ steps.fecha.outputs.filename }}.gz" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            -H "Content-Type: application/octet-stream" \
+            --data-binary @${{ steps.fecha.outputs.filename }}.gz
+
+      - name: Guardar en GitHub artifacts como redundancia
+        uses: actions/upload-artifact@v4
+        with:
+          name: db-backup-${{ steps.fecha.outputs.year }}-${{ steps.fecha.outputs.month }}-${{ steps.fecha.outputs.day }}
+          path: "*.sql.gz"
+          retention-days: 30
+
+      - name: Verificar backup
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            "${{ secrets.VITE_SUPABASE_URL }}/storage/v1/object/backups/${{ steps.fecha.outputs.year }}/${{ steps.fecha.outputs.month }}/${{ steps.fecha.outputs.filename }}.gz" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}")
+          if [ "$STATUS" != "200" ]; then
+            echo "::error::Backup verification failed - status $STATUS"
+            exit 1
+          fi
+          echo "Backup verificado correctamente"
+
+      - name: Notificar si falla
+        if: failure()
+        run: echo "::error::Backup falló el $(date +%Y-%m-%d)"
