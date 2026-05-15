@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '@/lib/store';
 import { useToast } from '@/lib/toast';
-import ManualTurnForm from '@/components/settings/ManualTurnForm';
+import ManualTurnForm from '@/components/configuracion/ManualTurnForm';
 
 export default function Conexion() {
   const navigate = useNavigate();

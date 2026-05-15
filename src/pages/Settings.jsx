@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import RestaurantTab from '../components/settings/RestaurantTab';
-import BranchesTab from '../components/settings/BranchesTab';
-import ConnectionTab from '../components/settings/ConnectionTab';
-import TeamTab from '../components/settings/TeamTab';
+import RestaurantTab from '../components/configuracion/RestaurantTab';
+import BranchesTab from '../components/configuracion/BranchesTab';
+import ConnectionTab from '../components/configuracion/ConnectionTab';
+import TeamTab from '../components/configuracion/TeamTab';
 
 const TABS = [
   { key: 'restaurant', label: 'Mi restaurante' },

@@ -6,7 +6,7 @@ import { money, stockStatus } from '@/lib/fmt';
 import { useAuth } from '@/lib/AuthContext';
 import useUserRole from '@/lib/useUserRole';
 import { G, glass, glassDeep, glassLight, labelStyle, fontDisplay } from '@/lib/glass';
-import MenuTab from '../components/config/MenuTab';
+import MenuTab from '../components/configuracion/MenuTab';
 import {
   fetchRecetas, saveReceta,
   fetchPrecios, savePrecio,

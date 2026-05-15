@@ -2,12 +2,12 @@ import { useState, useEffect, useMemo } from 'react';
 import { useStore } from '@/lib/store';
 import { base44 } from '@/api/base44Client';
 import { Link } from 'react-router-dom';
-import AnalyticsSummary from '../components/analiticas/AnalyticsSummary';
-import SalesEvolution from '../components/analiticas/SalesEvolution';
-import IncomeDistribution from '../components/analiticas/IncomeDistribution';
-import TablePerformance from '../components/analiticas/TablePerformance';
-import StarProducts from '../components/analiticas/StarProducts';
-import TeamAndReservations from '../components/analiticas/TeamAndReservations';
+import AnalyticsSummary from '../components/analytics/AnalyticsSummary';
+import SalesEvolution from '../components/analytics/SalesEvolution';
+import IncomeDistribution from '../components/analytics/IncomeDistribution';
+import TablePerformance from '../components/analytics/TablePerformance';
+import StarProducts from '../components/analytics/StarProducts';
+import TeamAndReservations from '../components/analytics/TeamAndReservations';
 
 const PERIODS = [
   ['today','Hoy'],

@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import RestauranteTab from '../components/config/RestauranteTab';
-import SucursalesTab from '../components/config/SucursalesTab';
-import EquipoTab from '../components/config/EquipoTab';
-import AuditoriaTab from '../components/config/AuditoriaTab';
+import RestauranteTab from '../components/configuracion/RestauranteTab';
+import SucursalesTab from '../components/configuracion/SucursalesTab';
+import EquipoTab from '../components/configuracion/EquipoTab';
+import AuditoriaTab from '../components/configuracion/AuditoriaTab';
 import PrinterSetup from '../components/printer/PrinterSetup';
 import FacturacionSetup from '../components/facturacion/FacturacionSetup';
 import { G, fontDisplay } from '@/lib/glass';
