@@ -1,0 +1,27 @@
+[build]
+  command = "npm ci && npx vite build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    # Prevenir clickjacking
+    X-Frame-Options = "DENY"
+    # Prevenir MIME sniffing
+    X-Content-Type-Options = "nosniff"
+    # Forzar HTTPS
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains"
+    # Referrer policy
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    # Permissions policy
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
+    # Content Security Policy
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.sentry-cdn.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://*.supabase.co blob:; connect-src 'self' https://*.supabase.co https://o4511389456728064.ingest.us.sentry.io wss://*.supabase.co; worker-src 'self' blob:;"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
