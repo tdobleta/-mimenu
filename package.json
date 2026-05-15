@@ -9,7 +9,11 @@
     "lint": "eslint . --quiet",
     "lint:fix": "eslint . --fix",
     "typecheck": "tsc -p ./jsconfig.json",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@base44/vite-plugin": "^1.0.13",
@@ -42,7 +46,6 @@
     "@radix-ui/react-toggle": "^1.1.2",
     "@radix-ui/react-toggle-group": "^1.1.2",
     "@radix-ui/react-tooltip": "^1.1.8",
-    "@sentry/react": "^10.53.1",
     "@supabase/supabase-js": "^2.49.0",
     "@tanstack/react-query": "^5.84.1",
     "canvas-confetti": "^1.9.4",
