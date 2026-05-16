@@ -1,27 +1,24 @@
 // lib/useBidirectionalSync.js
-// Sincronización bidireccional al reconectar.
-// Cuando una tablet vuelve a estar online, recarga el estado
-// de las mesas activas para recibir cambios de otras tablets.
+// v2 — 3 fixes críticos:
+// 1. Supabase Realtime para turns y turn_items (sync < 2s entre tablets)
+// 2. Fix N+1: fetchTurnItemsBatch en vez de 1 query por mesa
+// 3. Lock optimista: UPDATE solo si status='abierta'
 
 import { useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/api/supabaseClient';
+import { fetchTurnItemsBatch } from '@/lib/pagination';
 import { registerBackgroundSync } from '@/lib/offlineSync';
 
-/**
- * Hook que sincroniza el estado local con Supabase al reconectar.
- * @param {string} branchId - ID de la sucursal activa
- * @param {Function} onSync - callback que recibe los turns actualizados
- */
 export function useBidirectionalSync(branchId, onSync) {
-  const lastSyncRef = useRef(null);
+  const lastSyncRef  = useRef(null);
   const isSyncingRef = useRef(false);
+  const channelRef   = useRef(null);
 
+  // ── 1 query para turns + 1 query para TODOS los items (fix N+1) ───
   const pullFromServer = useCallback(async () => {
     if (!branchId || isSyncingRef.current) return;
     isSyncingRef.current = true;
-
     try {
-      // 1. Traer todos los turns abiertos actuales
       const { data: turns, error } = await supabase
         .from('turns')
         .select('*')
@@ -30,58 +27,58 @@ export function useBidirectionalSync(branchId, onSync) {
         .order('opened_at', { ascending: true });
 
       if (error) throw error;
+      if (!turns?.length) { onSync?.([]); return; }
 
-      // 2. Para cada turn, traer sus ítems
-      const turnsWithItems = await Promise.all(
-        (turns || []).map(async (turn) => {
-          const { data: items } = await supabase
-            .from('turn_items')
-            .select('*')
-            .eq('turn_id', turn.id);
-          return { ...turn, items: items || [] };
-        })
-      );
+      // fetchTurnItemsBatch: 1 sola query para todos los items
+      const turnIds = turns.map(t => t.id);
+      const allItems = await fetchTurnItemsBatch(turnIds);
 
+      // Agrupar por turn_id
+      const itemsByTurn = allItems.reduce((acc, item) => {
+        if (!acc[item.turn_id]) acc[item.turn_id] = [];
+        acc[item.turn_id].push(item);
+        return acc;
+      }, {});
+
+      onSync?.(turns.map(turn => ({ ...turn, items: itemsByTurn[turn.id] || [] })));
       lastSyncRef.current = Date.now();
-
-      // 3. Notificar al componente con el estado actualizado
-      onSync?.(turnsWithItems);
-
     } catch (err) {
-      console.error('[bidirectionalSync] Error al sincronizar:', err);
+      console.error('[bidirectionalSync]', err);
     } finally {
       isSyncingRef.current = false;
     }
   }, [branchId, onSync]);
 
+  // ── Realtime: push en vez de polling cada 60s ─────────────────
   useEffect(() => {
     if (!branchId) return;
 
-    // Sync inicial al montar
     pullFromServer();
 
-    // Sync al reconectar
+    const channel = supabase
+      .channel(`salon_rt_${branchId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'turns', filter: `branch_id=eq.${branchId}` },
+        () => pullFromServer())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'turn_items' },
+        () => pullFromServer())
+      .subscribe();
+
+    channelRef.current = channel;
+
     const handleOnline = async () => {
-      // Primero enviar pendientes, luego recibir cambios
       await registerBackgroundSync().catch(() => {});
-      // Pequeño delay para que el Background Sync termine primero
       setTimeout(() => pullFromServer(), 1500);
     };
-
-    // Escuchar sync completado del SW
-    const handleSwSync = () => {
-      setTimeout(() => pullFromServer(), 500);
-    };
+    const handleSwSync = () => setTimeout(() => pullFromServer(), 500);
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('mimenu-sync-completed', handleSwSync);
 
-    // Polling cada 60s como fallback
-    const interval = setInterval(() => {
-      if (navigator.onLine) pullFromServer();
-    }, 60000);
+    // Polling de 60s como fallback si Realtime falla
+    const interval = setInterval(() => { if (navigator.onLine) pullFromServer(); }, 60000);
 
     return () => {
+      supabase.removeChannel(channel);
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('mimenu-sync-completed', handleSwSync);
       clearInterval(interval);
@@ -89,4 +86,21 @@ export function useBidirectionalSync(branchId, onSync) {
   }, [branchId, pullFromServer]);
 
   return { pullFromServer, lastSync: lastSyncRef.current };
+}
+
+// ── Lock optimista para cerrar mesa ──────────────────────────────
+// Si dos mozos intentan cerrar la misma mesa, solo uno gana.
+export async function cerrarMesaConLock(turnId, updates) {
+  const { data, error } = await supabase
+    .from('turns')
+    .update({ ...updates, status: 'cerrada' })
+    .eq('id', turnId)
+    .eq('status', 'abierta')  // Solo cierra si sigue abierta
+    .select()
+    .single();
+
+  if (error || !data) {
+    throw new Error('Esta mesa ya fue cerrada por otro usuario. Recargá la pantalla.');
+  }
+  return data;
 }

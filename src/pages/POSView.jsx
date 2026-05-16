@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { usePOSStore } from '@/lib/storeSelectors';
+import { useStore } from '@/lib/store';
 import { supabase } from '@/api/supabaseClient';
 import { useToast } from '@/lib/toast';
 import { getPrinterConfig, printReceipt, printComanda } from '@/lib/printer';
@@ -9,7 +9,7 @@ import FacturaModal from '../components/facturacion/FacturaModal';
 import { G } from '@/lib/glass';
 import { getCategoryColor } from '@/lib/menuCategories';
 import { enqueue } from '@/lib/offlineQueue';
-import { useBidirectionalSync } from '@/lib/useBidirectionalSync';
+import { useBidirectionalSync, cerrarMesaConLock } from '@/lib/useBidirectionalSync';
 
 function cc(cat) { return getCategoryColor(cat); }
 function fmt(n) { return '$'+Number(n||0).toLocaleString('es-AR',{maximumFractionDigits:0}); }
@@ -317,7 +317,7 @@ function MesaSelector({ branchId, onSelect, onDirecta, restaurante }) {
 
 export default function POSView() {
   const navigate = useNavigate();
-  const store = usePOSStore();
+  const store = useStore();
   const { addToast } = useToast();
   const branchId = store.branchId!=='todas'?store.branchId:store.sucursales[0]?.id;
 
@@ -482,7 +482,15 @@ export default function POSView() {
           await supabase.from('turn_items').insert({turn_id:tid,branch_id:branchId,menu_item_id:item.id||null,menu_item_name:item.nombre,cantidad:item.qty,precio:item.precio+(item.extra||0),notas:notaF||null});
         }
       }
-      await supabase.from('turns').update({status:'cerrada',closed_at:Date.now(),total_facturado:tot,metodo_pago:metodo,propina,pagos,caja_shift_id:cajaId||null}).eq('id',tid);
+      // Lock optimista — previene race condition si dos mozos cierran la misma mesa
+      await cerrarMesaConLock(tid, {
+        closed_at: Date.now(),
+        total_facturado: tot,
+        metodo_pago: metodo,
+        propina,
+        pagos,
+        caja_shift_id: cajaId || null,
+      });
       if(cajaId){
         try{
           const{data:ts}=await supabase.from('turns').select('total_facturado').eq('caja_shift_id',cajaId).eq('status','cerrada');
