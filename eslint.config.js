@@ -9,9 +9,14 @@ export default [
     files: [
       "src/components/**/*.{js,mjs,cjs,jsx}",
       "src/pages/**/*.{js,mjs,cjs,jsx}",
+      "src/lib/**/*.{js,mjs,cjs,jsx}",   // ← agregado: cubre lógica crítica
+      "src/api/**/*.{js,mjs,cjs,jsx}",    // ← agregado: cubre supabaseClient, db.js
       "src/Layout.jsx",
     ],
-    ignores: ["src/lib/**/*", "src/components/ui/**/*"],
+    ignores: [
+      "src/components/ui/**/*",           // shadcn generado automáticamente
+      "src/lib/offlineQueue.js",          // IndexedDB puro, sin React
+    ],
     ...pluginJs.configs.recommended,
     ...pluginReact.configs.flat.recommended,
     languageOptions: {
@@ -19,16 +24,10 @@ export default [
       parserOptions: {
         ecmaVersion: 2022,
         sourceType: "module",
-        ecmaFeatures: {
-          jsx: true,
-        },
+        ecmaFeatures: { jsx: true },
       },
     },
-    settings: {
-      react: {
-        version: "detect",
-      },
-    },
+    settings: { react: { version: "detect" } },
     plugins: {
       react: pluginReact,
       "react-hooks": pluginReactHooks,
@@ -41,12 +40,7 @@ export default [
       "unused-imports/no-unused-imports": "error",
       "unused-imports/no-unused-vars": [
         "warn",
-        {
-          vars: "all",
-          varsIgnorePattern: "^_",
-          args: "after-used",
-          argsIgnorePattern: "^_",
-        },
+        { vars: "all", varsIgnorePattern: "^_", args: "after-used", argsIgnorePattern: "^_" },
       ],
       "react/prop-types": "off",
       "react/react-in-jsx-scope": "off",
@@ -55,9 +49,7 @@ export default [
         { ignore: ["cmdk-input-wrapper", "toast-close"] },
       ],
       "react-hooks/rules-of-hooks": "error",
+      "react-hooks/exhaustive-deps": "warn",  // detecta dependencias faltantes en hooks
     },
   },
 ];
-
-
-
