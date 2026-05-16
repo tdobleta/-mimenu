@@ -10,6 +10,8 @@ import { AppProvider, useStore } from '@/lib/store';
 import { ToastProvider } from '@/lib/toast';
 import OfflineBanner from '@/components/OfflineBanner';
 import Layout from './components/Layout';
+import TerminosServicio from './pages/legal/TerminosServicio';
+import PoliticaPrivacidad from './pages/legal/PoliticaPrivacidad';
 import Dashboard from './pages/Dashboard';
 import Salon from './pages/Salon';
 import Reservas from './pages/Reservas';
@@ -142,6 +144,8 @@ function App() {
                 <Route path="/login" element={<Login />} />
                 <Route path="/public/reservas/:branchSlug" element={<PublicReservation />} />
                 <Route path="/public/cocina" element={<Cocina />} />
+                <Route path="/terminos" element={<TerminosServicio />} />
+                <Route path="/privacidad" element={<PoliticaPrivacidad />} />
                 <Route path="*" element={<AuthenticatedApp />} />
               </Routes>
             </Router>
