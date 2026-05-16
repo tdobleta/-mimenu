@@ -4,6 +4,7 @@ import { money, dateLong, elapsedMin, fmtElapsed } from '@/lib/fmt';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import AnalyticsActions from '../components/analytics/AnalyticsActions';
 import { G, fontDisplay } from '@/lib/glass';
+import GuidedTour, { useTour } from '@/components/GuidedTour';
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 const card = (extra = {}) => ({
@@ -239,6 +240,7 @@ function CustomTooltip({ active, payload, label }) {
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 export default function Dashboard() {
   const store = useDashboardStore();
+  const { mostrar: mostrarTour, cerrar: cerrarTour } = useTour();
 
   // Rango por defecto: esta semana (lunes → hoy + 1)
   const defaultStart = getLunesDeHoy();
@@ -329,6 +331,7 @@ export default function Dashboard() {
 
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:24 }}>
+      {mostrarTour && <GuidedTour onClose={cerrarTour} />}
 
       {/* ── Header ── */}
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:10 }}>

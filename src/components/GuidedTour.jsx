@@ -1,325 +1,202 @@
+// src/components/GuidedTour.jsx
+// Tutorial interactivo first-run.
+// Pensado para ser claro para cualquier persona,
+// sin importar su experiencia con tecnología.
+
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { G, fontDisplay } from '@/lib/glass';
 
-const TOUR_KEY = 'mimenu_tour_done';
+const TOUR_KEY = 'mimenu_tour_v2_done';
 
-// ── Pasos del tour ─────────────────────────────────────────────────────────────
 const PASOS = [
   {
-    id: 'salon',
-    ruta: '/salon',
-    titulo: 'El Salón',
-    emoji: '🪑',
-    descripcion: 'Acá los mozos ven todas las mesas del restaurante. Hacen clic en una mesa para abrirla, agregan los platos del pedido y envían la comanda a cocina.',
-    accion: 'Tocá una mesa para ver cómo funciona',
-    highlight: { top: '50%', left: '50%', w: 300, h: 200 },
-  },
-  {
-    id: 'caja',
-    ruta: '/caja',
-    titulo: 'La Caja',
-    emoji: '💰',
-    descripcion: 'Antes de empezar el servicio, abrí el turno de caja con el fondo inicial. Al final del día cerrás el turno y ves el resumen de ventas.',
-    accion: 'Hacé clic en "Abrir turno" para comenzar',
-    highlight: { top: '30%', left: '50%', w: 260, h: 60 },
-  },
-  {
-    id: 'pos',
-    ruta: '/caja',
-    titulo: 'El POS',
-    emoji: '🖥️',
-    descripcion: 'Desde Caja podés abrir el POS — la pantalla de cobro completa. Muestra las mesas abiertas, cargás productos, cobrás y emitís factura, todo desde un solo lugar.',
-    accion: 'Usá el botón "Abrir POS" cuando estés listo para cobrar',
-    highlight: { top: '13%', right: '2%', w: 140, h: 44 },
-  },
-  {
-    id: 'configuracion',
-    ruta: '/configuracion',
-    titulo: 'Configuración',
-    emoji: '⚙️',
-    descripcion: 'Cargá tu menú con todos los productos y precios. También podés configurar la impresora térmica, la facturación AFIP y los datos de tu restaurante.',
-    accion: 'Andá a la pestaña "Menú" para agregar tus platos',
-    highlight: { top: '12%', left: '15%', w: 480, h: 44 },
-  },
-  {
-    id: 'reportes',
-    ruta: '/reportes',
-    titulo: 'Reportes',
-    emoji: '📊',
-    descripcion: 'Acá ves el detalle de todas las ventas por día, los productos más vendidos, el rendimiento de cada mozo y las reservas. Todo exportable a CSV.',
-    accion: 'Usá los filtros de período para analizar tus datos',
-    highlight: { top: '15%', right: '2%', w: 320, h: 44 },
-  },
-  {
-    id: 'listo',
+    id: 1,
+    emoji: '👋',
+    titulo: '¡Bienvenido a mimenú!',
+    descripcion: 'Te vamos a mostrar cómo funciona el sistema en menos de 2 minutos. Podés saltear esto cuando quieras.',
+    detalle: null,
+    boton: 'Empezar el recorrido',
     ruta: null,
-    titulo: '¡Listo para arrancar!',
-    emoji: '🎉',
-    descripcion: 'Ya sabés lo básico. Si tenés dudas, cada sección tiene su propio flujo intuitivo. ¡Éxito con tu restaurante!',
-    accion: null,
-    highlight: null,
+  },
+  {
+    id: 2,
+    emoji: '🍽️',
+    titulo: 'Paso 1 — Configurá tu menú',
+    descripcion: 'Antes de atender clientes, necesitás cargar los platos y bebidas que vendés.',
+    detalle: 'Hacé clic en "Stock y ventas" en el menú de la izquierda → luego en la pestaña "Menú". Ahí podés agregar cada plato con nombre y precio.',
+    boton: 'Ir a cargar el menú',
+    ruta: '/stock',
+  },
+  {
+    id: 3,
+    emoji: '🪑',
+    titulo: 'Paso 2 — Abrí el Salón',
+    descripcion: 'Cuando llega un cliente, vas al Salón y abrís su mesa.',
+    detalle: 'Hacé clic en "Salón" en el menú. Vas a ver todas las mesas de tu local. Para atender una mesa, tocala y elegí "Abrir mesa".',
+    boton: 'Ver el Salón',
+    ruta: '/salon',
+  },
+  {
+    id: 4,
+    emoji: '📱',
+    titulo: 'Paso 3 — Tomá el pedido',
+    descripcion: 'Con la mesa abierta, podés anotar lo que pide cada cliente.',
+    detalle: 'Desde el Salón, tocá la mesa que está ocupada → aparece el POS (sistema de pedidos). Tocá los platos para agregarlos al pedido. Cuando terminás, enviás la comanda a cocina.',
+    boton: 'Entendido',
+    ruta: null,
+  },
+  {
+    id: 5,
+    emoji: '👨‍🍳',
+    titulo: 'Paso 4 — La cocina ve el pedido',
+    descripcion: 'Automáticamente, lo que pediste aparece en la pantalla de cocina.',
+    detalle: 'El cocinero ve los pedidos en tiempo real en "Vista Cocina" (abajo en el menú). Cuando el plato está listo, lo marca y vos recibís una notificación.',
+    boton: 'Entendido',
+    ruta: null,
+  },
+  {
+    id: 6,
+    emoji: '💰',
+    titulo: 'Paso 5 — Cerrá la mesa y cobrá',
+    descripcion: 'Cuando el cliente pide la cuenta, cerrás la mesa desde el Salón.',
+    detalle: 'Tocá la mesa → "Cerrar y cobrar". Elegís cómo pagó (efectivo, tarjeta, etc.) y confirmás. La venta queda registrada automáticamente.',
+    boton: 'Entendido',
+    ruta: null,
+  },
+  {
+    id: 7,
+    emoji: '📊',
+    titulo: 'Paso 6 — Mirá cómo va tu negocio',
+    descripcion: 'En el Dashboard podés ver las ventas del día, los platos más pedidos y mucho más.',
+    detalle: 'Hacé clic en "Dashboard" en el menú. Podés filtrar por día, semana o mes.',
+    boton: 'Ver el Dashboard',
+    ruta: '/',
+  },
+  {
+    id: 8,
+    emoji: '✅',
+    titulo: '¡Ya sabés todo lo básico!',
+    descripcion: 'Con estos 6 pasos podés empezar a usar mimenú hoy mismo.',
+    detalle: 'Si tenés dudas, usá el botón de chat (💬) abajo a la derecha para consultar. ¡Mucho éxito!',
+    boton: '¡Empezar a usar mimenú!',
+    ruta: '/',
+    final: true,
   },
 ];
 
-// ── Componente spotlight ───────────────────────────────────────────────────────
-function Spotlight({ highlight }) {
-  if (!highlight) return null;
-  const { top, left, right, bottom, w, h } = highlight;
-  return (
-    <div style={{
-      position: 'fixed',
-      top: typeof top === 'string' ? top : undefined,
-      left: typeof left === 'string' ? left : undefined,
-      right: typeof right === 'string' ? right : undefined,
-      bottom: typeof bottom === 'string' ? bottom : undefined,
-      transform: 'translate(-50%, -50%)',
-      width: w,
-      height: h,
-      borderRadius: 14,
-      boxShadow: `0 0 0 9999px rgba(15,15,35,0.65)`,
-      border: `2px solid rgba(29,158,117,0.8)`,
-      zIndex: 1050,
-      pointerEvents: 'none',
-      animation: 'pulseHighlight 2s ease-in-out infinite',
-    }} />
-  );
-}
-
-// ── Card del tour ──────────────────────────────────────────────────────────────
-function TourCard({ paso, stepIdx, total, onNext, onSkip }) {
-  const isLast = stepIdx === total - 1;
-
-  return (
-    <div style={{
-      position: 'fixed',
-      bottom: 32,
-      left: '50%',
-      transform: 'translateX(-50%)',
-      zIndex: 1200,
-      width: 480,
-      maxWidth: '95vw',
-      background: 'rgba(255,255,255,0.97)',
-      backdropFilter: 'blur(24px)',
-      borderRadius: 22,
-      boxShadow: '0 24px 64px rgba(0,0,0,0.2), 0 0 0 1px rgba(255,255,255,0.8)',
-      padding: '24px 26px',
-      fontFamily: "'DM Sans', system-ui, sans-serif",
-      animation: 'slideUp 0.35s cubic-bezier(0.34,1.56,0.64,1)',
-    }}>
-      {/* Progress */}
-      <div style={{ display: 'flex', gap: 4, marginBottom: 18 }}>
-        {Array.from({ length: total }).map((_, i) => (
-          <div key={i} style={{
-            flex: 1, height: 3, borderRadius: 99,
-            background: i <= stepIdx ? G.teal : 'rgba(0,0,0,0.08)',
-            transition: 'background 0.3s',
-          }} />
-        ))}
-      </div>
-
-      {/* Content */}
-      <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start', marginBottom: 20 }}>
-        <div style={{
-          fontSize: 32, lineHeight: 1, flexShrink: 0,
-          background: 'rgba(29,158,117,0.08)', borderRadius: 14,
-          width: 56, height: 56, display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>{paso.emoji}</div>
-        <div>
-          <div style={{ fontSize: 18, fontWeight: 700, color: G.text, fontFamily: fontDisplay, marginBottom: 6, letterSpacing: '-0.02em' }}>
-            {paso.titulo}
-          </div>
-          <div style={{ fontSize: 13, color: '#4B5563', lineHeight: 1.65 }}>
-            {paso.descripcion}
-          </div>
-          {paso.accion && (
-            <div style={{
-              marginTop: 12, fontSize: 12, color: G.teal, fontWeight: 700,
-              background: 'rgba(29,158,117,0.08)', borderRadius: 9,
-              padding: '6px 12px', display: 'inline-block',
-            }}>
-              👉 {paso.accion}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Buttons */}
-      <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-        {!isLast && (
-          <button onClick={onSkip} style={{
-            fontSize: 12, color: '#9CA3AF', background: 'none', border: 'none',
-            cursor: 'pointer', padding: '8px 0', fontFamily: 'inherit',
-          }}>
-            Saltar guía
-          </button>
-        )}
-        <div style={{ flex: 1 }} />
-        <button onClick={onNext} style={{
-          padding: '10px 24px',
-          background: isLast ? `linear-gradient(135deg, ${G.teal}, #0F6E56)` : G.teal,
-          border: 'none', borderRadius: 12, fontSize: 14, fontWeight: 700,
-          color: 'white', cursor: 'pointer',
-          boxShadow: `0 4px 14px rgba(29,158,117,0.3)`,
-          fontFamily: 'inherit',
-          display: 'flex', alignItems: 'center', gap: 7,
-        }}>
-          {isLast ? 'Comenzar' : 'Entendido'}
-          {!isLast && <span style={{ fontSize: 16 }}>→</span>}
-          {isLast && <span style={{ fontSize: 16 }}>🚀</span>}
-        </button>
-      </div>
-
-      {/* Step counter */}
-      <div style={{ textAlign: 'center', marginTop: 12, fontSize: 11, color: '#D1D5DB' }}>
-        {stepIdx + 1} de {total}
-      </div>
-    </div>
-  );
-}
-
-// ── Pantalla de bienvenida ────────────────────────────────────────────────────
-function WelcomeScreen({ onGuia, onSaltar }) {
-  return (
-    <div style={{
-      position: 'fixed', inset: 0, zIndex: 2000,
-      background: 'linear-gradient(140deg, #eef2ff 0%, #f8fffc 35%, #fdf4ff 70%, #fff8f0 100%)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      fontFamily: "'DM Sans', system-ui, sans-serif",
-    }}>
-      {/* Orbs decorativos */}
-      <div style={{ position: 'fixed', top: -100, right: -80, width: 500, height: 500, borderRadius: '50%', background: 'radial-gradient(circle, rgba(127,119,221,0.15) 0%, transparent 70%)', pointerEvents: 'none' }} />
-      <div style={{ position: 'fixed', bottom: -80, left: -60, width: 400, height: 400, borderRadius: '50%', background: 'radial-gradient(circle, rgba(29,158,117,0.12) 0%, transparent 70%)', pointerEvents: 'none' }} />
-
-      <div style={{
-        background: 'rgba(255,255,255,0.7)',
-        backdropFilter: 'blur(32px)',
-        border: '1px solid rgba(255,255,255,0.85)',
-        borderRadius: 28,
-        padding: '48px 44px',
-        textAlign: 'center',
-        maxWidth: 480,
-        width: '90vw',
-        boxShadow: '0 24px 80px rgba(80,80,180,0.12)',
-        animation: 'fadeIn 0.5s ease',
-      }}>
-        <div style={{ fontSize: 52, marginBottom: 20 }}>🎉</div>
-        <div style={{ fontSize: 28, fontWeight: 800, color: G.text, fontFamily: fontDisplay, letterSpacing: '-0.03em', marginBottom: 8 }}>
-          ¡Restaurante configurado!
-        </div>
-        <div style={{ fontSize: 15, color: '#6B7280', lineHeight: 1.65, marginBottom: 32 }}>
-          Tu sistema está listo. ¿Querés que te mostremos cómo usar las funciones principales?
-        </div>
-
-        <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexDirection: 'column' }}>
-          <button onClick={onGuia} style={{
-            padding: '14px 32px',
-            background: `linear-gradient(135deg, ${G.teal}, #0F6E56)`,
-            border: 'none', borderRadius: 14, fontSize: 15, fontWeight: 700,
-            color: 'white', cursor: 'pointer',
-            boxShadow: `0 6px 20px rgba(29,158,117,0.3)`,
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9,
-          }}>
-            <span style={{ fontSize: 18 }}>🗺️</span>
-            Guía rápida
-          </button>
-          <button onClick={onSaltar} style={{
-            padding: '13px 32px',
-            background: 'rgba(255,255,255,0.7)',
-            border: '1px solid rgba(0,0,0,0.10)',
-            borderRadius: 14, fontSize: 15, fontWeight: 600,
-            color: '#6B7280', cursor: 'pointer',
-          }}>
-            Comenzar directamente
-          </button>
-        </div>
-      </div>
-
-      <style>{`
-        @keyframes fadeIn { from { opacity:0; transform:scale(0.96); } to { opacity:1; transform:scale(1); } }
-        @keyframes slideUp { from { opacity:0; transform:translateX(-50%) translateY(20px); } to { opacity:1; transform:translateX(-50%) translateY(0); } }
-        @keyframes pulseHighlight { 0%,100% { box-shadow: 0 0 0 9999px rgba(15,15,35,0.65), 0 0 0 4px rgba(29,158,117,0.3); } 50% { box-shadow: 0 0 0 9999px rgba(15,15,35,0.65), 0 0 0 8px rgba(29,158,117,0.5); } }
-      `}</style>
-    </div>
-  );
-}
-
-// ── GuidedTour principal ──────────────────────────────────────────────────────
-export default function GuidedTour({ onFinish }) {
+export default function GuidedTour({ onClose }) {
+  const [paso, setPaso] = useState(0);
   const navigate = useNavigate();
-  const [phase, setPhase] = useState('welcome'); // 'welcome' | 'tour' | 'done'
-  const [stepIdx, setStepIdx] = useState(0);
+  const actual = PASOS[paso];
 
-  const paso = PASOS[stepIdx];
-
-  function handleGuia() {
-    setPhase('tour');
-    if (PASOS[0].ruta) navigate(PASOS[0].ruta);
-  }
-
-  function handleSaltar() {
-    localStorage.setItem(TOUR_KEY, '1');
-    setPhase('done');
-    onFinish?.();
-  }
-
-  function handleNext() {
-    const nextIdx = stepIdx + 1;
-    if (nextIdx >= PASOS.length) {
+  function siguiente() {
+    if (actual.ruta) navigate(actual.ruta);
+    if (actual.final) {
       localStorage.setItem(TOUR_KEY, '1');
-      setPhase('done');
-      onFinish?.();
+      onClose?.();
       return;
     }
-    setStepIdx(nextIdx);
-    if (PASOS[nextIdx].ruta) navigate(PASOS[nextIdx].ruta);
+    setPaso(p => Math.min(p + 1, PASOS.length - 1));
   }
 
-  if (phase === 'done') return null;
-
-  if (phase === 'welcome') {
-    return <WelcomeScreen onGuia={handleGuia} onSaltar={handleSaltar} />;
+  function saltar() {
+    localStorage.setItem(TOUR_KEY, '1');
+    onClose?.();
   }
+
+  const progreso = Math.round((paso / (PASOS.length - 1)) * 100);
 
   return (
-    <>
-      {/* Overlay oscuro (sin spotlight si no hay highlight) */}
-      {!paso.highlight && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,15,35,0.55)', zIndex: 1050, pointerEvents: 'none' }} />
-      )}
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 9999,
+      background: 'rgba(0,0,0,0.6)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      padding: 20,
+    }}>
+      <div style={{
+        background: 'white', borderRadius: 20,
+        padding: '36px 32px', maxWidth: 480, width: '100%',
+        boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+        position: 'relative',
+      }}>
+        {/* Barra de progreso */}
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 5, borderRadius: '20px 20px 0 0', background: '#F3F4F6', overflow: 'hidden' }}>
+          <div style={{ height: '100%', width: `${progreso}%`, background: '#1D9E75', transition: 'width 0.4s ease', borderRadius: '20px 20px 0 0' }} />
+        </div>
 
-      {/* Spotlight */}
-      {paso.highlight && <Spotlight highlight={paso.highlight} />}
+        {/* Paso actual */}
+        {paso > 0 && (
+          <div style={{ fontSize: 12, color: '#9CA3AF', marginBottom: 16, marginTop: 8 }}>
+            Paso {paso} de {PASOS.length - 1}
+          </div>
+        )}
 
-      {/* Card del paso */}
-      <TourCard
-        paso={paso}
-        stepIdx={stepIdx}
-        total={PASOS.length}
-        onNext={handleNext}
-        onSkip={handleSaltar}
-      />
+        {/* Emoji grande */}
+        <div style={{ fontSize: 52, marginBottom: 16, textAlign: 'center' }}>
+          {actual.emoji}
+        </div>
 
-      <style>{`
-        @keyframes slideUp { from { opacity:0; transform:translateX(-50%) translateY(20px); } to { opacity:1; transform:translateX(-50%) translateY(0); } }
-        @keyframes pulseHighlight { 0%,100% { box-shadow: 0 0 0 9999px rgba(15,15,35,0.65), 0 0 0 4px rgba(29,158,117,0.3); } 50% { box-shadow: 0 0 0 9999px rgba(15,15,35,0.65), 0 0 0 8px rgba(29,158,117,0.5); } }
-      `}</style>
-    </>
+        {/* Título */}
+        <h2 style={{ fontSize: 22, fontWeight: 700, color: '#111827', marginBottom: 12, textAlign: 'center', lineHeight: 1.3 }}>
+          {actual.titulo}
+        </h2>
+
+        {/* Descripción principal */}
+        <p style={{ fontSize: 16, color: '#374151', lineHeight: 1.7, textAlign: 'center', marginBottom: actual.detalle ? 16 : 24 }}>
+          {actual.descripcion}
+        </p>
+
+        {/* Detalle en caja destacada */}
+        {actual.detalle && (
+          <div style={{
+            background: '#F0FBF7', border: '1px solid #A7F3D0',
+            borderRadius: 12, padding: '14px 16px', marginBottom: 24,
+            fontSize: 14, color: '#065F46', lineHeight: 1.7,
+          }}>
+            💡 {actual.detalle}
+          </div>
+        )}
+
+        {/* Botón principal */}
+        <button onClick={siguiente} style={{
+          width: '100%', padding: '14px 20px',
+          background: '#1D9E75', color: 'white',
+          border: 'none', borderRadius: 12,
+          fontSize: 16, fontWeight: 600, cursor: 'pointer',
+          marginBottom: 12, transition: 'transform 0.1s',
+        }}
+          onMouseDown={e => e.currentTarget.style.transform = 'scale(0.98)'}
+          onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'}
+        >
+          {actual.boton} {!actual.final && '→'}
+        </button>
+
+        {/* Botón saltar */}
+        {!actual.final && (
+          <button onClick={saltar} style={{
+            width: '100%', padding: '10px',
+            background: 'none', border: 'none',
+            fontSize: 13, color: '#9CA3AF', cursor: 'pointer',
+          }}>
+            Saltar tutorial
+          </button>
+        )}
+      </div>
+    </div>
   );
 }
 
-// ── Hook para usar el tour ────────────────────────────────────────────────────
+// Hook para saber si mostrar el tour
 export function useTour() {
-  const [showTour, setShowTour] = useState(false);
+  const [mostrar, setMostrar] = useState(false);
 
-  function startTour() {
-    localStorage.removeItem(TOUR_KEY);
-    setShowTour(true);
-  }
+  useEffect(() => {
+    const done = localStorage.getItem(TOUR_KEY);
+    if (!done) {
+      // Pequeño delay para que la app cargue primero
+      setTimeout(() => setMostrar(true), 1500);
+    }
+  }, []);
 
-  function isTourDone() {
-    return !!localStorage.getItem(TOUR_KEY);
-  }
-
-  return { showTour, setShowTour, startTour, isTourDone };
+  return { mostrar, cerrar: () => setMostrar(false) };
 }
