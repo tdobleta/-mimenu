@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useStore } from '@/lib/store';
+import { usePOSStore } from '@/lib/storeSelectors';
 import { supabase } from '@/api/supabaseClient';
 import { useToast } from '@/lib/toast';
 import { getPrinterConfig, printReceipt, printComanda } from '@/lib/printer';
@@ -317,7 +317,7 @@ function MesaSelector({ branchId, onSelect, onDirecta, restaurante }) {
 
 export default function POSView() {
   const navigate = useNavigate();
-  const store = useStore();
+  const store = usePOSStore();
   const { addToast } = useToast();
   const branchId = store.branchId!=='todas'?store.branchId:store.sucursales[0]?.id;
 

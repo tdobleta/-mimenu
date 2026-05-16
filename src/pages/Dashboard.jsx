@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useStore } from '@/lib/store';
+import { useDashboardStore } from '@/lib/storeSelectors';
 import { money, dateLong, elapsedMin, fmtElapsed } from '@/lib/fmt';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import AnalyticsActions from '../components/analytics/AnalyticsActions';
@@ -238,7 +238,7 @@ function CustomTooltip({ active, payload, label }) {
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 export default function Dashboard() {
-  const store = useStore();
+  const store = useDashboardStore();
 
   // Rango por defecto: esta semana (lunes → hoy + 1)
   const defaultStart = getLunesDeHoy();
