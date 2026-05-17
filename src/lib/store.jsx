@@ -1,4 +1,5 @@
 import { supabase } from "@/api/supabaseClient";
+import { base44 } from '@/api/base44Client';
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { fetchClosedTurnsPaginated } from '@/lib/pagination';
 
@@ -818,4 +819,5 @@ export function AppProvider({ children }) {
 }
 
 export const useStore = () => useContext(AppContext);
+
 
