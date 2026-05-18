@@ -553,7 +553,7 @@ export function AppProvider({ children }) {
       // Traer mÃ¡s turnos para tener datos histÃ³ricos completos (2000 en lugar de 500)
       const closedArrays = await Promise.all(
         targetBranchIds.map(bid =>
-          fetchClosedTurnsPaginated(bid, T_ANIO, Date.now(), 500).catch(() => [])
+          fetchClosedTurnsPaginated(bid, new Date(new Date().getFullYear(), 0, 1).toISOString(), new Date().toISOString(), 500).catch(() => [])
         )
       );
       const filtered = closedArrays.flat()
@@ -678,7 +678,7 @@ export function AppProvider({ children }) {
     try {
       const closedArrays = await Promise.all(
         targetBranchIds.map(bid =>
-          fetchClosedTurnsPaginated(bid, T_ANIO, Date.now(), 500).catch(() => [])
+          fetchClosedTurnsPaginated(bid, new Date(new Date().getFullYear(), 0, 1).toISOString(), new Date().toISOString(), 500).catch(() => [])
         )
       );
       const allTurns = closedArrays.flat()
@@ -787,7 +787,7 @@ export function AppProvider({ children }) {
           accion,
           detalle: detalle || '',
           sucursal_nombre: sucursal || '',
-          ts,
+          ts: new Date().toISOString(),
         }).catch(() => {});
       }
       return { ...p, auditoria: [localEntry, ...(p.auditoria||[])] };
@@ -819,5 +819,6 @@ export function AppProvider({ children }) {
 }
 
 export const useStore = () => useContext(AppContext);
+
 
 

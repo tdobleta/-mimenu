@@ -30,7 +30,7 @@ export default function OpenShiftModal({ onClose }) {
     if (!branchId) return;
     setSaving(true);
     try {
-      const now = Date.now();
+      const now = new Date().toISOString();
       const created = await base44.entities.CajaShift.create({
         branch_id: branchId,
         tipo_turno: tipo,

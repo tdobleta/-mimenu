@@ -10,8 +10,8 @@ const PAGE_SIZE = 100;
  * Carga turns cerrados con cursor pagination.
  * Evita traer 2000 rows de una vez.
  * @param {string} branchId
- * @param {number} startTs - timestamp de inicio del rango
- * @param {number} endTs - timestamp de fin del rango
+ * @param {string} startTs - ISO 8601 string de inicio del rango (timestamptz)
+ * @param {string} endTs - ISO 8601 string de fin del rango (timestamptz)
  * @param {number} maxRows - máximo de rows a traer (default 500)
  */
 export async function fetchClosedTurnsPaginated(branchId, startTs, endTs, maxRows = 500) {

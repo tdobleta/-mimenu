@@ -173,7 +173,7 @@ export async function addEgreso(branchId, {
       unidad:             unidad || '',
       motivo:             motivo || '',
       origen,
-      ts:                 Date.now(),
+      ts:                 new Date().toISOString(),
     })
     .select()
     .single();

@@ -473,7 +473,7 @@ export default function POSView() {
       const cajaId=store.turnoActivo?.id||null;
       let tid=selectedTurn?.id;
       if(!tid){
-        const{data,error}=await supabase.from('turns').insert({branch_id:branchId,mesa_num:0,mozo:'',status:'abierta',opened_at:Date.now(),total_facturado:0,caja_shift_id:cajaId||null}).select().single();
+        const{data,error}=await supabase.from('turns').insert({branch_id:branchId,mesa_num:0,mozo:'',status:'abierta',opened_at:new Date().toISOString(),total_facturado:0,caja_shift_id:cajaId||null}).select().single();
         if(error)throw error;
         tid=data.id;
         for(const item of order){
@@ -484,7 +484,7 @@ export default function POSView() {
       }
       // Lock optimista — previene race condition si dos mozos cierran la misma mesa
       await cerrarMesaConLock(tid, {
-        closed_at: Date.now(),
+        closed_at: new Date().toISOString(),
         total_facturado: tot,
         metodo_pago: metodo,
         propina,

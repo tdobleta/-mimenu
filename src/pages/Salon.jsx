@@ -316,6 +316,8 @@ function MesaSelector({ branchId, onSelect, onDirecta, restaurante }) {
 }
 
 export default function POSView() {
+  const [selectedTurn, setSelectedTurn] = useState(null);
+  const [order, setOrder] = useState([]);
   const navigate = useNavigate();
   const store = useSalonStore();
   const { addToast } = useToast();
@@ -353,7 +355,6 @@ export default function POSView() {
   useBidirectionalSync(branchId, handleServerSync);
 
 
-  const [order, setOrder] = useState([]);
   const [loadingOrder, setLoadingOrder] = useState(false);
   const [cat, setCat] = useState('Todo');
   const [q, setQ] = useState('');
@@ -473,7 +474,7 @@ export default function POSView() {
       const cajaId=store.turnoActivo?.id||null;
       let tid=selectedTurn?.id;
       if(!tid){
-        const{data,error}=await supabase.from('turns').insert({branch_id:branchId,mesa_num:0,mozo:'',status:'abierta',opened_at:Date.now(),total_facturado:0,caja_shift_id:cajaId||null}).select().single();
+        const{data,error}=await supabase.from('turns').insert({branch_id:branchId,mesa_num:0,mozo:'',status:'abierta',opened_at:new Date().toISOString(),total_facturado:0,caja_shift_id:cajaId||null}).select().single();
         if(error)throw error;
         tid=data.id;
         for(const item of order){
@@ -482,7 +483,7 @@ export default function POSView() {
           await supabase.from('turn_items').insert({turn_id:tid,branch_id:branchId,menu_item_id:item.id||null,menu_item_name:item.nombre,cantidad:item.qty,precio:item.precio+(item.extra||0),notas:notaF||null});
         }
       }
-      await supabase.from('turns').update({status:'cerrada',closed_at:Date.now(),total_facturado:tot,metodo_pago:metodo,propina,pagos,caja_shift_id:cajaId||null}).eq('id',tid);
+      await supabase.from('turns').update({status:'cerrada',closed_at:new Date().toISOString(),total_facturado:tot,metodo_pago:metodo,propina,pagos,caja_shift_id:cajaId||null}).eq('id',tid);
       if(cajaId){
         try{
           const{data:ts}=await supabase.from('turns').select('total_facturado').eq('caja_shift_id',cajaId).eq('status','cerrada');

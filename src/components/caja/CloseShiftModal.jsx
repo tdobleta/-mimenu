@@ -37,7 +37,7 @@ export default function CloseShiftModal({ ventasPorMetodo, totalVentas, retirosT
       const totalFinal = totalReal > 0 ? totalReal : totalVentas;
 
       await base44.entities.CajaShift.update(store.turnoActivo.id, {
-        cerrado_at: Date.now(),
+        cerrado_at: new Date().toISOString(),
         status: 'cerrado',
         arqueo_efectivo: arqueoNum || 0,
         diferencia_caja: diferencia,
