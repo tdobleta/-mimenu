@@ -331,7 +331,7 @@ export function AppProvider({ children }) {
       if (session) init();
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session) init();
+      if (event === 'SIGNED_IN' && session) init();
     });
     return () => subscription.unsubscribe();
   }, []);

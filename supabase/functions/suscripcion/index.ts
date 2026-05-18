@@ -76,6 +76,10 @@ async function crearSuscripcion(req: Request, supabase: any, user: any) {
   const plan = PLANES[planId as keyof typeof PLANES];
   if (!plan) return new Response(JSON.stringify({ error: 'Plan no válido' }), { status: 400, headers: { ...CORS, 'Content-Type': 'application/json' } });
 
+  // Verificar que el restaurante pertenece al usuario
+  const { data: ownedRestaurant } = await supabase.from('restaurants').select('id').eq('id', restaurantId).eq('owner_id', user.id).single();
+  if (!ownedRestaurant) return new Response(JSON.stringify({ error: 'No autorizado para este restaurante' }), { status: 403, headers: { ...CORS, 'Content-Type': 'application/json' } });
+
   // Crear plan en MP si no existe
   const mpPlanRes = await fetch(`${MP_BASE}/preapproval_plan`, {
     method: 'POST',
@@ -132,6 +136,10 @@ async function crearSuscripcion(req: Request, supabase: any, user: any) {
 async function cancelarSuscripcion(req: Request, supabase: any, user: any) {
   const { restaurantId } = await req.json();
 
+  // Verificar que el restaurante pertenece al usuario
+  const { data: ownedRestaurant } = await supabase.from('restaurants').select('id').eq('id', restaurantId).eq('owner_id', user.id).single();
+  if (!ownedRestaurant) return new Response(JSON.stringify({ error: 'No autorizado para este restaurante' }), { status: 403, headers: { ...CORS, 'Content-Type': 'application/json' } });
+
   const { data: sub } = await supabase
     .from('suscripciones')
     .select('mp_preapproval_id')
@@ -166,6 +174,33 @@ async function estadoSuscripcion(supabase: any, user: any) {
 
 // ── Webhook de MercadoPago ────────────────────────────────────
 async function handleWebhook(req: Request) {
+  // Validar firma de MercadoPago
+  const xSignature = req.headers.get('x-signature') || '';
+  const xRequestId = req.headers.get('x-request-id') || '';
+  const webhookSecret = Deno.env.get('MP_WEBHOOK_SECRET');
+
+  if (webhookSecret) {
+    // Extraer ts y v1 del header x-signature: "ts=...,v1=..."
+    const parts = Object.fromEntries(xSignature.split(',').map(p => { const [k,v] = p.split('='); return [k.trim(), v]; }));
+    const ts = parts['ts'] || '';
+    const v1 = parts['v1'] || '';
+
+    // Reconstruir el string firmado
+    const bodyText = JSON.stringify(await req.clone().json());
+    const dataId = JSON.parse(bodyText)?.data?.id || '';
+    const manifest = `id:${dataId};request-id:${xRequestId};ts:${ts};`;
+
+    const encoder = new TextEncoder();
+    const key = await crypto.subtle.importKey('raw', encoder.encode(webhookSecret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+    const sig = await crypto.subtle.sign('HMAC', key, encoder.encode(manifest));
+    const computed = Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, '0')).join('');
+
+    if (computed !== v1) {
+      console.error('[suscripcion] Webhook firma inválida');
+      return new Response('Unauthorized', { status: 401 });
+    }
+  }
+
   const supabaseAdmin = createClient(
     Deno.env.get('SUPABASE_URL')!,
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,

@@ -19,7 +19,8 @@ export default function Login() {
         const { error: err } = await supabase.auth.signInWithPassword({ email, password });
         if (err) throw err;
         const from = new URLSearchParams(window.location.search).get('from');
-        window.location.href = from || '/';
+        const safeTo = from && from.startsWith('/') && !from.startsWith('//') ? from : '/';
+        window.location.href = safeTo;
       } else {
         const { error: err } = await supabase.auth.signUp({ email, password });
         if (err) throw err;

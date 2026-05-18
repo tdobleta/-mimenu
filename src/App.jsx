@@ -1,4 +1,5 @@
 import { Toaster } from 'sonner'
+import { supabase } from '@/api/supabaseClient'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
 import { BrowserRouter as Router, Route, Routes, Navigate, useLocation } from 'react-router-dom';
@@ -108,6 +109,23 @@ const RoutedApp = () => {
   const loc = useLocation();
   const { needsOnboarding } = useStore();
   if (needsOnboarding) return <OnboardingFlow />;
+  if (role === null) return (
+    <div style={{ minHeight:'100vh', backgroundColor:'#F6F8FA', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:"'DM Sans', sans-serif", padding:20 }}>
+      <div style={{ backgroundColor:'white', borderRadius:16, padding:40, maxWidth:400, width:'100%', textAlign:'center', boxShadow:'0 4px 24px rgba(0,0,0,0.08)' }}>
+        <div style={{ width:52, height:52, borderRadius:'50%', backgroundColor:'#FEE2E2', display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 20px' }}>
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+        </div>
+        <div style={{ fontSize:18, fontWeight:700, color:'#111827', marginBottom:8 }}>Sin acceso asignado</div>
+        <div style={{ fontSize:13, color:'#6B7280', lineHeight:'20px', marginBottom:24 }}>
+          Tu cuenta no tiene acceso a ningún restaurante. Pedile al administrador que te invite desde Configuración → Equipo.
+        </div>
+        <button onClick={() => supabase.auth.signOut().then(() => window.location.href = '/login')}
+          style={{ padding:'9px 20px', backgroundColor:'#1D9E75', color:'white', border:'none', borderRadius:8, fontSize:13, fontWeight:600, cursor:'pointer' }}>
+          Cerrar sesión
+        </button>
+      </div>
+    </div>
+  );
   if (role === 'Cocinero' && loc.pathname !== '/cocina') {
     return <Navigate to="/cocina" replace />;
   }
