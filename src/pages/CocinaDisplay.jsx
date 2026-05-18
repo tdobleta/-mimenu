@@ -12,7 +12,8 @@ const COLORS = {
 const ORDER = { nueva:0, preparando:1, lista:2 };
 
 function fmtElapsed(openedAt) {
-  const mins = Math.floor((Date.now() - openedAt) / 60000);
+  const ms = typeof openedAt === 'string' ? new Date(openedAt).getTime() : openedAt;
+  const mins = Math.floor((Date.now() - ms) / 60000);
   if (mins < 1) return 'Ahora';
   if (mins < 60) return `${mins}m`;
   return `${Math.floor(mins/60)}h ${mins%60}m`;
@@ -122,7 +123,7 @@ export default function CocinaDisplay() {
 
   const visibles = comandas
     .map(c => ({ ...c, estado: c.turn.cocina_estado || 'nueva' }))
-    .sort((a,b) => (ORDER[a.estado]-ORDER[b.estado]) || (a.turn.opened_at-b.turn.opened_at));
+    .sort((a,b) => (ORDER[a.estado]-ORDER[b.estado]) || (new Date(a.turn.opened_at).getTime()-new Date(b.turn.opened_at).getTime()));
 
   const segundosDesdeUpdate = lastUpdate ? Math.max(0, Math.floor((Date.now()-lastUpdate)/1000)) : null;
 

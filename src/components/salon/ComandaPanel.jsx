@@ -3,6 +3,7 @@ import { useStore } from '@/lib/store';
 import { money, elapsedMin, fmtTableTime, tableTotal } from '@/lib/fmt';
 import CloseTableModal from './CloseTableModal';
 import { dbAddTurnItem, dbUpdateTurnItem } from '@/lib/posApi';
+import { supabase } from '@/api/supabaseClient';
 import { base44 } from '@/api/base44Client';
 import { getPrinterConfig, printComanda } from '@/lib/printer';
 import { useAuth } from '@/lib/AuthContext';
@@ -424,27 +425,44 @@ const [facturaDatos, setFacturaDatos] = useState(null);
             if (cerrando) return;
             setCerrando(true);
             if (!store.turnoActivo) { addToast('No hay turno de caja abierto. Abrí la caja antes de cerrar mesas.', 'error'); setCerrando(false); return; }
-            if (table.turnId) {
-              const currentTurn = await base44.entities.Turn.filter({ id: table.turnId }).catch(() => []);
-              if (currentTurn && currentTurn[0]?.status === 'cerrada') { addToast('Esta mesa ya fue cerrada.', 'warning'); store.closeTable(branchId, table.id); setShowClose(false); onClose(); setCerrando(false); return; }
-            }
+            // La verificación de doble cierre se hace dentro de cerrar_mesa_atomico con FOR UPDATE lock
             const cajaShiftId = store.turnoActivo.id;
             try {
               if (table.turnId) {
-                await base44.entities.Turn.update(table.turnId, { status:'cerrada', closed_at:new Date().toISOString(), total_facturado:finalTotal, descuento:discAmount||0, propina:propinaAmount||0, metodo_pago:method, mozo:table.mozo||'', ...(cajaShiftId?{caja_shift_id:cajaShiftId}:{}) });
+                // Cierre atómico: lock + update turn + update caja en una sola transacción
+                const { data: resultado, error: rpcError } = await supabase.rpc('cerrar_mesa_atomico', {
+                  p_turn_id: table.turnId,
+                  p_total: finalTotal,
+                  p_propina: propinaAmount || 0,
+                  p_metodo: method,
+                  p_mozo: table.mozo || '',
+                  p_caja_shift_id: cajaShiftId || null,
+                });
+                if (rpcError) throw rpcError;
+                if (!resultado?.ok) {
+                  if (resultado?.error === 'turno_ya_cerrado') {
+                    addToast('Esta mesa ya fue cerrada por otro dispositivo.', 'warning');
+                    store.closeTable(branchId, table.id);
+                    setShowClose(false); onClose(); setCerrando(false);
+                    return;
+                  }
+                  throw new Error(resultado?.error || 'Error al cerrar mesa');
+                }
               } else {
+                // Venta directa sin turn previo — crear turn cerrado
                 const turn = await base44.entities.Turn.create({ branch_id:branchId, mesa_num:table.num, status:'cerrada', opened_at:table.openedAt ? new Date(table.openedAt).toISOString() : new Date().toISOString(), closed_at:new Date().toISOString(), total_facturado:finalTotal, descuento:discAmount||0, propina:propinaAmount||0, metodo_pago:method, mozo:table.mozo||'', ...(cajaShiftId?{caja_shift_id:cajaShiftId}:{}) });
                 await Promise.all((table.order||[]).map(item => base44.entities.TurnItem.create({ turn_id:turn.id, branch_id:branchId, menu_item_name:item.nombre, menu_item_id:item.itemId, cantidad:item.qty, precio:item.precio })));
               }
               store.closeTable(branchId, table.id);
               // Descontar stock automáticamente según recetas configuradas
               descontarStockPorMesa(table.order || [], branchId, store).catch(() => {});
-              try {
-                const turnsActualizados = await base44.entities.Turn.filter({ caja_shift_id:cajaShiftId, status:'cerrada' }).catch(() => []);
-                const nuevoTotal = (turnsActualizados||[]).reduce((a,t) => a+(t.total_facturado||0)+(t.propina||0), 0);
-                await base44.entities.CajaShift.update(cajaShiftId, { total_facturado_turno:nuevoTotal });
-                store.setTurnoActivo({ ...store.turnoActivo, totalCache:nuevoTotal });
-              } catch(e) { console.warn('Cache caja no actualizado:', e); }
+              // El total de caja ya se actualizó dentro de cerrar_mesa_atomico
+              if (store.turnoActivo) {
+                try {
+                  const { data: cajaData } = await supabase.from('caja_shifts').select('total_facturado_turno').eq('id', cajaShiftId).single();
+                  if (cajaData) store.setTurnoActivo({ ...store.turnoActivo, totalCache: cajaData.total_facturado_turno });
+                } catch(e) { console.warn('Cache caja no actualizado:', e); }
+              }
               setShowClose(false);
 const afipCfg = getAfipConfig();
 if (afipCfg.habilitado) {

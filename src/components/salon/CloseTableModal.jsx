@@ -82,16 +82,16 @@ export default function CloseTableModal({ table, total, branchId, onClose, onCon
   }
 
   return (
-    <div style={{ position:'fixed', inset:0, zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(15,15,35,0.5)', backdropFilter:'blur(4px)' }}
+    <div style={{ position:'fixed', top:0, left:0, right:0, bottom:0, zIndex:9999, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(15,15,35,0.45)', padding:8 }}
       onClick={onClose}>
       <div style={{
-        background:'rgba(255,255,255,0.88)',
-        backdropFilter:'blur(24px) saturate(180%)',
-        WebkitBackdropFilter:'blur(24px) saturate(180%)',
-        border:'1px solid rgba(255,255,255,0.8)',
+        background:'#FFFFFF',
+        
+        
+        border:'1px solid rgba(0,0,0,0.08)',
         boxShadow:'0 24px 64px rgba(60,60,160,0.16)',
         borderRadius:20,
-        width:440, maxWidth:'95vw', maxHeight:'90vh', overflowY:'auto', padding:24,
+        width:440, maxWidth:'92vw', maxHeight:'96vh', overflowY:'auto', padding:'20px 22px',
         fontFamily:"'DM Sans', system-ui, sans-serif",
       }} onClick={e => e.stopPropagation()}>
 
@@ -168,13 +168,13 @@ export default function CloseTableModal({ table, total, branchId, onClose, onCon
             const active = isM1 || isM2;
             const handleClick = () => {
               if (!mixMode) {
-                if (m === method1) return; // ya seleccionado
-                // Primer click en otro método: preguntar si quiere mix o cambiar
-                // Simple: cambiar método primario. Para mix, usar el botón de pago mixto.
-                setMethod1(m);
+                if (m === method1) return;
+                setMixMode(true); setMethod2(m);
+                setAmount1(String(totalConPropina)); setAmount2('0');
               } else {
+                if (m === method1) return;
                 if (m === method2) { setMixMode(false); setMethod2(null); setAmount1(''); setAmount2(''); }
-                else if (m !== method1) { setMethod2(m); }
+                else { setMethod2(m); setAmount2(String(Math.max(0, totalConPropina - (Number(amount1)||0)))); }
               }
             };
             return (
@@ -191,15 +191,6 @@ export default function CloseTableModal({ table, total, branchId, onClose, onCon
             );
           })}
         </div>
-
-        {/* Toggle pago mixto */}
-        <button onClick={() => {
-          if (mixMode) { setMixMode(false); setMethod2(null); setAmount1(''); setAmount2(''); }
-          else { setMixMode(true); setMethod2(METHODS.find(m => m !== method1) || 'Tarjeta'); setAmount1(String(totalConPropina)); setAmount2('0'); }
-        }} style={{ fontSize:11, color: mixMode ? '#E24B4A' : '#9BA3B8', background:'none', border:'none', cursor:'pointer', marginBottom:10, padding:0, display:'flex', alignItems:'center', gap:4 }}>
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
-          {mixMode ? 'Cancelar pago mixto' : 'Pago mixto (2 métodos)'}
-        </button>
 
         {/* Pago mixto */}
         {mixMode && (

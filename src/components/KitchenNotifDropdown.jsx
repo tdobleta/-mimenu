@@ -2,7 +2,8 @@ import { useEffect, useRef } from 'react';
 import { G, glassLight } from '@/lib/glass';
 
 function fmtTs(ts) {
-  const m = Math.floor((Date.now() - ts) / 60000);
+  const ms = typeof ts === 'string' ? new Date(ts).getTime() : ts;
+  const m = Math.floor((Date.now() - ms) / 60000);
   if (m < 1) return 'Ahora';
   if (m < 60) return `hace ${m}m`;
   return `hace ${Math.floor(m/60)}h`;
