@@ -1,7 +1,7 @@
 import { supabase } from "@/api/supabaseClient";
 import { base44 } from '@/api/base44Client';
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { fetchClosedTurnsPaginated } from '@/lib/pagination';
+import { fetchClosedTurnsPaginated, fetchTurnItemsBatch } from '@/lib/pagination';
 
 const now = () => Date.now();
 
@@ -268,13 +268,9 @@ export function AppProvider({ children }) {
           });
 
           try {
-            const itemArrays = await Promise.all(
-              openTurns.map(turn =>
-                base44.entities.TurnItem.filter({ turn_id: turn.id }).catch(() => [])
-              )
-            );
-            openTurns.forEach((turn, idx) => {
-              const items = itemArrays[idx] || [];
+            const allItems = await fetchTurnItemsBatch(openTurns.map(t => t.id));
+            openTurns.forEach((turn) => {
+              const items = allItems.filter(it => it.turn_id === turn.id);
               const bid = turn.branch_id;
               if (tables[bid] && items.length > 0) {
                 const mesa = tables[bid].find(t => t.turnId === turn.id);
@@ -610,21 +606,16 @@ export function AppProvider({ children }) {
         });
 
         // â”€â”€ Top productos (Ãºltimos 7 dÃ­as, batch de hasta 100 turnos) â”€â”€â”€â”€â”€â”€â”€â”€
-        const productMap = {};
+        let topProducts = [];
         try {
-          // Limitar a 100 turnos recientes para evitar N+1 masivo
-          const topTurns = semanaTurns.slice(0, 100);
-          const itemArrays = await Promise.all(
-            topTurns.map(t => base44.entities.TurnItem.filter({ turn_id: t.id }).catch(() => []))
-          );
-          itemArrays.flat().forEach(it => {
-            const key = it.menu_item_name || 'Sin nombre';
-            if (!productMap[key]) productMap[key] = { nombre:key, unidades:0, monto:0 };
-            productMap[key].unidades += it.cantidad || 1;
-            productMap[key].monto    += (it.cantidad||1) * (it.precio||0);
+          const { data: tpData } = await supabase.rpc('get_top_products', {
+            p_branch_id: bid,
+            p_desde: new Date(T_SEMANA).toISOString(),
+            p_hasta: new Date().toISOString(),
+            p_limit: 5,
           });
+          topProducts = (tpData || []).map(p => ({ nombre: p.nombre, unidades: Number(p.unidades), monto: Number(p.monto) }));
         } catch(e) {}
-        const topProducts = Object.values(productMap).sort((a,b) => b.unidades - a.unidades).slice(0, 5);
 
         newCharts[bid] = {
           week:weekData, month:monthData, year:yearData,
@@ -714,21 +705,18 @@ export function AppProvider({ children }) {
           return { day: label, actual, anterior };
         });
 
-        // Top productos del rango
-        const productMap = {};
+        // Top productos del rango (1 sola query SQL)
+        let topProducts = [];
         try {
-          const topTurns = rangeTurns.slice(0, 100);
-          const itemArrays = await Promise.all(
-            topTurns.map(t => base44.entities.TurnItem.filter({ turn_id: t.id }).catch(() => []))
-          );
-          itemArrays.flat().forEach(it => {
-            const key = it.menu_item_name || 'Sin nombre';
-            if (!productMap[key]) productMap[key] = { nombre:key, unidades:0, monto:0 };
-            productMap[key].unidades += it.cantidad || 1;
-            productMap[key].monto    += (it.cantidad||1) * (it.precio||0);
+          const { data: tpData } = await supabase.rpc('get_top_products', {
+            p_branch_id: bid,
+            p_desde: new Date(startTs).toISOString(),
+            p_hasta: new Date(endTs).toISOString(),
+            p_limit: 5,
           });
+          topProducts = (tpData || []).map(p => ({ nombre: p.nombre, unidades: Number(p.unidades), monto: Number(p.monto) }));
         } catch(e) {}
-        const topProducts = Object.values(productMap).sort((a,b) => b.unidades - a.unidades).slice(0, 5);
+        // topProducts ya calculado por RPC arriba
 
         // Actividad reciente
         const sorted = bTurns.sort((a,b) => (b._ts||0) - (a._ts||0)).slice(0, 8);
