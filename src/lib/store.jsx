@@ -53,13 +53,13 @@ const AppContext = createContext(null);
 export function AppProvider({ children }) {
   const [s, setS] = useState(emptyState);
 
+  const initInProgressRef = useRef(false);
+
   useEffect(() => {
-    const initInProgressRef = useRef(false);
 
   async function init() {
     if (initInProgressRef.current) return;
     initInProgressRef.current = true;
-    try {
       try {
         const user = await base44.auth.me();
         if (!user) {

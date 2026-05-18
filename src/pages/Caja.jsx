@@ -173,7 +173,7 @@ export default function Caja() {
                 const hoy = new Date(); hoy.setHours(0,0,0,0);
                 const apertura = new Date(turnoActivo.abiertaAt); apertura.setHours(0,0,0,0);
                 if (apertura.getTime() < hoy.getTime()) {
-                  return <span style={{ backgroundColor:'#FEF3C7', color:'#92600A', padding:'4px 10px', borderRadius:99, fontSize:11, fontWeight:600 }}>âš  Turno de ayer â€” cerrá y abrí uno nuevo</span>;
+                  return <span style={{ backgroundColor:'#FEF3C7', color:'#92600A', padding:'4px 10px', borderRadius:99, fontSize:11, fontWeight:600 }}>⚠  Turno de ayer â€” cerrá y abrí uno nuevo</span>;
                 }
                 return null;
               })()}

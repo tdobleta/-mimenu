@@ -174,7 +174,7 @@ export default function CocinaDisplay() {
           {segundosDesdeUpdate !== null && <span style={{ color:'rgba(29,158,117,0.7)', fontWeight:400, fontSize:11 }}>· {segundosDesdeUpdate}s</span>}
         </div>
         <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-          <span style={{ fontSize:12, color:'rgba(255,255,255,0.5)' }}>{user?.email||''}</span>
+          
           <button onClick={() => supabase.auth.signOut().then(() => window.location.href='/login')}
             style={{ padding:'6px 12px', border:'0.5px solid rgba(255,255,255,0.15)', borderRadius:7, fontSize:12, color:'rgba(255,255,255,0.7)', backgroundColor:'transparent', cursor:'pointer' }}>
             Cerrar sesión
@@ -226,7 +226,7 @@ export default function CocinaDisplay() {
                         <span style={{ backgroundColor:'rgba(255,255,255,0.25)', color:'white', padding:'2px 8px', borderRadius:99, fontSize:10, fontWeight:800 }}>✓ LISTA</span>
                       )}
                     </div>
-                    {turn.mozo && <div style={{ fontSize:12, color:estado==='nueva'?'#6B7280':'rgba(255,255,255,0.85)', marginTop:4 }}>{turn.mozo}</div>}
+                    
                   </div>
                   <div style={{ textAlign:'right', flexShrink:0 }}>
                     <div style={{ fontSize:13, color:estado==='nueva'?'#9CA3AF':'rgba(255,255,255,0.85)' }}>{fmtHora(turn.opened_at)}</div>

@@ -11,7 +11,8 @@ const COLORS = {
 const ORDER = { nueva:0, preparando:1, lista:2 };
 
 function fmtElapsed(openedAt) {
-  const mins = Math.floor((Date.now() - openedAt) / 60000);
+  const ms = typeof openedAt === 'string' ? new Date(openedAt).getTime() : openedAt;
+  const mins = Math.floor((Date.now() - ms) / 60000);
   if (mins < 1) return 'Ahora';
   if (mins < 60) return `${mins}m`;
   return `${Math.floor(mins/60)}h ${mins%60}m`;
@@ -95,7 +96,7 @@ export default function Cocina() {
 
   const visibles = comandas
     .map(c => ({ ...c, estado: estadosLocales[c.turn.id] || 'nueva' }))
-    .sort((a,b) => (ORDER[a.estado] - ORDER[b.estado]) || (a.turn.opened_at - b.turn.opened_at));
+    .sort((a,b) => (ORDER[a.estado] - ORDER[b.estado]) || (new Date(a.turn.opened_at).getTime() - new Date(b.turn.opened_at).getTime()));
 
   const segundosDesdeUpdate = lastUpdate ? Math.max(0, Math.floor((Date.now() - lastUpdate) / 1000)) : null;
   const reciente = segundosDesdeUpdate !== null && segundosDesdeUpdate < 15;
@@ -168,7 +169,7 @@ export default function Cocina() {
                         <span style={{ backgroundColor:'#1D9E75', color:'white', padding:'2px 8px', borderRadius:99, fontSize:10, fontWeight:800, letterSpacing:'0.5px', animation:'cocpulse 1.5s ease-in-out infinite' }}>NUEVA</span>
                       )}
                     </div>
-                    {turn.mozo && <div style={{ fontSize:12, color: estado==='nueva' ? '#6B7280' : 'rgba(255,255,255,0.85)', marginTop:4 }}>{turn.mozo}</div>}
+                    
                   </div>
                   <div style={{ textAlign:'right', flexShrink:0 }}>
                     <div style={{ fontSize:13, color: estado==='nueva' ? '#9CA3AF' : 'rgba(255,255,255,0.85)' }}>{fmtHora(turn.opened_at)}</div>
