@@ -168,13 +168,13 @@ export default function CloseTableModal({ table, total, branchId, onClose, onCon
             const active = isM1 || isM2;
             const handleClick = () => {
               if (!mixMode) {
-                if (m === method1) return;
-                setMixMode(true); setMethod2(m);
-                setAmount1(String(totalConPropina)); setAmount2('0');
+                if (m === method1) return; // ya seleccionado
+                // Primer click en otro método: preguntar si quiere mix o cambiar
+                // Simple: cambiar método primario. Para mix, usar el botón de pago mixto.
+                setMethod1(m);
               } else {
-                if (m === method1) return;
                 if (m === method2) { setMixMode(false); setMethod2(null); setAmount1(''); setAmount2(''); }
-                else { setMethod2(m); setAmount2(String(Math.max(0, totalConPropina - (Number(amount1)||0)))); }
+                else if (m !== method1) { setMethod2(m); }
               }
             };
             return (
@@ -191,6 +191,15 @@ export default function CloseTableModal({ table, total, branchId, onClose, onCon
             );
           })}
         </div>
+
+        {/* Toggle pago mixto */}
+        <button onClick={() => {
+          if (mixMode) { setMixMode(false); setMethod2(null); setAmount1(''); setAmount2(''); }
+          else { setMixMode(true); setMethod2(METHODS.find(m => m !== method1) || 'Tarjeta'); setAmount1(String(totalConPropina)); setAmount2('0'); }
+        }} style={{ fontSize:11, color: mixMode ? '#E24B4A' : '#9BA3B8', background:'none', border:'none', cursor:'pointer', marginBottom:10, padding:0, display:'flex', alignItems:'center', gap:4 }}>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+          {mixMode ? 'Cancelar pago mixto' : 'Pago mixto (2 métodos)'}
+        </button>
 
         {/* Pago mixto */}
         {mixMode && (

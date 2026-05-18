@@ -13,7 +13,8 @@ import { useBidirectionalSync, cerrarMesaConLock } from '@/lib/useBidirectionalS
 
 function cc(cat) { return getCategoryColor(cat); }
 function fmt(n) { return '$'+Number(n||0).toLocaleString('es-AR',{maximumFractionDigits:0}); }
-function fmtTime(ms) {
+function fmtTime(ts) {
+  const ms = typeof ts === 'string' ? new Date(ts).getTime() : ts;
   const m = Math.floor((Date.now()-ms)/60000);
   if (m < 60) return m+'m';
   return Math.floor(m/60)+'h '+m%60+'m';
@@ -298,13 +299,10 @@ function MesaSelector({ branchId, onSelect, onDirecta, restaurante }) {
             <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))',gap:14}}>
               {turns.map(turn=>(
                 <button key={turn.id} onClick={()=>onSelect(turn)}
-                  style={{background:'rgba(255,255,255,0.6)',backdropFilter:'blur(16px)',border:'1.5px solid '+G.teal+'44',borderRadius:18,padding:'20px 18px',cursor:'pointer',textAlign:'left',transition:'all 0.15s',boxShadow:'0 4px 20px rgba(29,158,117,0.10)'}}>
-                  <div style={{fontSize:32,fontWeight:800,color:G.teal,fontFamily:"'Playfair Display',Georgia,serif",marginBottom:8}}>Mesa {turn.mesa_num}</div>
-                  <div style={{fontSize:12,color:G.textMuted,marginBottom:4}}>{turn.mozo||'Sin mozo'}</div>
-                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:10}}>
-                    <span style={{fontSize:11,color:G.textFaint,background:'rgba(0,0,0,0.05)',padding:'3px 8px',borderRadius:99}}>{fmtTime(turn.opened_at)}</span>
-                    <span style={{fontSize:13,fontWeight:700,color:G.teal}}>Cobrar</span>
-                  </div>
+                  style={{background:'rgba(255,255,255,0.6)',backdropFilter:'blur(16px)',border:'1.5px solid '+G.teal+'44',borderRadius:18,padding:'24px 18px',cursor:'pointer',textAlign:'center',transition:'all 0.15s',boxShadow:'0 4px 20px rgba(29,158,117,0.10)',display:'flex',flexDirection:'column',alignItems:'center',gap:8}}>
+                  <div style={{fontSize:38,fontWeight:800,color:G.teal,fontFamily:"'Playfair Display',Georgia,serif",lineHeight:1}}>Mesa {turn.mesa_num}</div>
+                  <span style={{fontSize:11,color:G.textFaint,background:'rgba(0,0,0,0.05)',padding:'3px 10px',borderRadius:99}}>{fmtTime(turn.opened_at)}</span>
+                  <span style={{fontSize:13,fontWeight:700,color:'white',background:G.teal,padding:'6px 20px',borderRadius:8,marginTop:4}}>Cobrar</span>
                 </button>
               ))}
             </div>
@@ -320,6 +318,9 @@ export default function POSView() {
   const store = useStore();
   const { addToast } = useToast();
   const branchId = store.branchId!=='todas'?store.branchId:store.sucursales[0]?.id;
+
+  const [selectedTurn, setSelectedTurn] = useState(null);
+  const [order, setOrder] = useState([]);
 
   // ── Sincronización bidireccional al reconectar ────────────
   const handleServerSync = useCallback((turnsWithItems) => {
@@ -353,7 +354,6 @@ export default function POSView() {
   useBidirectionalSync(branchId, handleServerSync);
 
 
-  const [order, setOrder] = useState([]);
   const [loadingOrder, setLoadingOrder] = useState(false);
   const [cat, setCat] = useState('Todo');
   const [q, setQ] = useState('');
@@ -473,7 +473,7 @@ export default function POSView() {
       const cajaId=store.turnoActivo?.id||null;
       let tid=selectedTurn?.id;
       if(!tid){
-        const{data,error}=await supabase.from('turns').insert({branch_id:branchId,mesa_num:0,mozo:'',status:'abierta',opened_at:new Date().toISOString(),total_facturado:0,caja_shift_id:cajaId||null}).select().single();
+        const{data,error}=await supabase.from('turns').insert({branch_id:branchId,mesa_num:0,mozo:'',status:'abierta',opened_at:Date.now(),total_facturado:0,caja_shift_id:cajaId||null}).select().single();
         if(error)throw error;
         tid=data.id;
         for(const item of order){
@@ -484,7 +484,7 @@ export default function POSView() {
       }
       // Lock optimista — previene race condition si dos mozos cierran la misma mesa
       await cerrarMesaConLock(tid, {
-        closed_at: new Date().toISOString(),
+        closed_at: Date.now(),
         total_facturado: tot,
         metodo_pago: metodo,
         propina,

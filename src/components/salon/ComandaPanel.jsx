@@ -431,9 +431,9 @@ const [facturaDatos, setFacturaDatos] = useState(null);
             const cajaShiftId = store.turnoActivo.id;
             try {
               if (table.turnId) {
-                await base44.entities.Turn.update(table.turnId, { status:'cerrada', closed_at:Date.now(), total_facturado:finalTotal, descuento:discAmount||0, propina:propinaAmount||0, metodo_pago:method, mozo:table.mozo||'', ...(cajaShiftId?{caja_shift_id:cajaShiftId}:{}) });
+                await base44.entities.Turn.update(table.turnId, { status:'cerrada', closed_at:new Date().toISOString(), total_facturado:finalTotal, descuento:discAmount||0, propina:propinaAmount||0, metodo_pago:method, mozo:table.mozo||'', ...(cajaShiftId?{caja_shift_id:cajaShiftId}:{}) });
               } else {
-                const turn = await base44.entities.Turn.create({ branch_id:branchId, mesa_num:table.num, status:'cerrada', opened_at:table.openedAt||Date.now(), closed_at:Date.now(), total_facturado:finalTotal, descuento:discAmount||0, propina:propinaAmount||0, metodo_pago:method, mozo:table.mozo||'', ...(cajaShiftId?{caja_shift_id:cajaShiftId}:{}) });
+                const turn = await base44.entities.Turn.create({ branch_id:branchId, mesa_num:table.num, status:'cerrada', opened_at:table.openedAt ? new Date(table.openedAt).toISOString() : new Date().toISOString(), closed_at:new Date().toISOString(), total_facturado:finalTotal, descuento:discAmount||0, propina:propinaAmount||0, metodo_pago:method, mozo:table.mozo||'', ...(cajaShiftId?{caja_shift_id:cajaShiftId}:{}) });
                 await Promise.all((table.order||[]).map(item => base44.entities.TurnItem.create({ turn_id:turn.id, branch_id:branchId, menu_item_name:item.nombre, menu_item_id:item.itemId, cantidad:item.qty, precio:item.precio })));
               }
               store.closeTable(branchId, table.id);

@@ -19,7 +19,9 @@ export function dateShort(str) {
 }
 
 export function elapsedMin(ts) {
-  return Math.max(0, Math.floor((Date.now() - ts) / 60000));
+  // Acepta tanto ms (número) como ISO string (timestamptz de Supabase)
+  const ms = typeof ts === 'string' ? new Date(ts).getTime() : ts;
+  return Math.max(0, Math.floor((Date.now() - ms) / 60000));
 }
 
 export function fmtElapsed(min) {
