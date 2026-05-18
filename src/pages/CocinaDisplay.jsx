@@ -55,13 +55,36 @@ export default function CocinaDisplay() {
   useEffect(() => {
     if (!activeBranchId) return;
     loadCocina();
-    const interval = setInterval(loadCocina, 12000);
-    return () => clearInterval(interval);
+
+    // Realtime: recargar cuando cambian turns o turn_items de esta branch
+    const channel = supabase
+      .channel(`cocina_rt_${activeBranchId}`)
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'turns',
+        filter: `branch_id=eq.${activeBranchId}`
+      }, () => loadCocina())
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'turn_items'
+      }, () => loadCocina())
+      .subscribe();
+
+    // Fallback: polling cada 60s por si Realtime se desconecta
+    const fallback = setInterval(loadCocina, 60000);
+
+    return () => {
+      supabase.removeChannel(channel);
+      clearInterval(fallback);
+    };
   }, [activeBranchId, loadCocina]);
 
   useEffect(() => {
     const t = setInterval(() => setTick(x => x+1), 1000);
-    return () => clearInterval(t);
+    return () => {
+      clearInterval(t);
+      // Limpiar todos los timers de remoción al desmontar
+      Object.values(removalTimers.current).forEach(clearTimeout);
+      removalTimers.current = {};
+    };
   }, []);
 
   // ── Marcar ítem individual ────────────────────────────────────────────────

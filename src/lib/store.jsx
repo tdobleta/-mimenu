@@ -54,7 +54,12 @@ export function AppProvider({ children }) {
   const [s, setS] = useState(emptyState);
 
   useEffect(() => {
-    async function init() {
+    const initInProgressRef = useRef(false);
+
+  async function init() {
+    if (initInProgressRef.current) return;
+    initInProgressRef.current = true;
+    try {
       try {
         const user = await base44.auth.me();
         if (!user) {
@@ -320,6 +325,8 @@ export function AppProvider({ children }) {
       } catch (err) {
         console.error('Error init:', err);
         setS(prev => ({ ...prev, loading: false, isDemo: false }));
+      } finally {
+        initInProgressRef.current = false;
       }
     }
 
@@ -328,6 +335,8 @@ export function AppProvider({ children }) {
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_IN' && session) init();
+      if (event === 'SIGNED_OUT') setS(emptyState());
+      // TOKEN_REFRESHED: no re-ejecutar init() — solo renueva el JWT
     });
     return () => subscription.unsubscribe();
   }, []);
@@ -642,7 +651,7 @@ export function AppProvider({ children }) {
         ...prev,
         charts: { ...prev.charts, ...newCharts },
         activity: { ...prev.activity, ...newActivity },
-        closedTurns: filtered,
+        closedTurns: filtered.slice(0, 500),
       }));
     } catch(err) {
       console.error('Error refreshCharts:', err);
@@ -743,7 +752,7 @@ export function AppProvider({ children }) {
       setS(prev => ({
         ...prev,
         charts: { ...prev.charts, ...newCharts },
-        closedTurns: allTurns,
+        closedTurns: allTurns.slice(0, 500),
       }));
     } catch(err) {
       console.error('Error refreshChartsForRange:', err);
@@ -778,7 +787,7 @@ export function AppProvider({ children }) {
           ts: new Date().toISOString(),
         }).catch(() => {});
       }
-      return { ...p, auditoria: [localEntry, ...(p.auditoria||[])] };
+      return { ...p, auditoria: [localEntry, ...(p.auditoria||[])].slice(0, 100) };
     });
   };
   const addRetiro = (retiro) => setS(p => p.turnoActivo ? ({ ...p, turnoActivo: { ...p.turnoActivo, retiros: [...(p.turnoActivo.retiros||[]), retiro] } }) : p);
