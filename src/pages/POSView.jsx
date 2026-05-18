@@ -9,7 +9,7 @@ import FacturaModal from '../components/facturacion/FacturaModal';
 import { G } from '@/lib/glass';
 import { getCategoryColor } from '@/lib/menuCategories';
 import { enqueue } from '@/lib/offlineQueue';
-import { useBidirectionalSync, cerrarMesaConLock } from '@/lib/useBidirectionalSync';
+import { useBidirectionalSync } from '@/lib/useBidirectionalSync';
 
 function cc(cat) { return getCategoryColor(cat); }
 function fmt(n) { return '$'+Number(n||0).toLocaleString('es-AR',{maximumFractionDigits:0}); }
@@ -473,7 +473,7 @@ export default function POSView() {
       const cajaId=store.turnoActivo?.id||null;
       let tid=selectedTurn?.id;
       if(!tid){
-        const{data,error}=await supabase.from('turns').insert({branch_id:branchId,mesa_num:0,mozo:'',status:'abierta',opened_at:Date.now(),total_facturado:0,caja_shift_id:cajaId||null}).select().single();
+        const{data,error}=await supabase.from('turns').insert({branch_id:branchId,mesa_num:0,mozo:'',status:'abierta',opened_at:new Date().toISOString(),total_facturado:0,caja_shift_id:cajaId||null}).select().single();
         if(error)throw error;
         tid=data.id;
         for(const item of order){
@@ -482,22 +482,30 @@ export default function POSView() {
           await supabase.from('turn_items').insert({turn_id:tid,branch_id:branchId,menu_item_id:item.id||null,menu_item_name:item.nombre,cantidad:item.qty,precio:item.precio+(item.extra||0),notas:notaF||null});
         }
       }
-      // Lock optimista — previene race condition si dos mozos cierran la misma mesa
-      await cerrarMesaConLock(tid, {
-        closed_at: Date.now(),
-        total_facturado: tot,
-        metodo_pago: metodo,
-        propina,
-        pagos,
-        caja_shift_id: cajaId || null,
+      // Cierre atómico: lock + update turn + update caja en 1 transacción SQL
+      const { data: resultado, error: rpcError } = await supabase.rpc('cerrar_mesa_atomico', {
+        p_turn_id: tid,
+        p_total: tot,
+        p_propina: propina || 0,
+        p_metodo: metodo,
+        p_mozo: selectedTurn?.mozo || '',
+        p_caja_shift_id: cajaId || null,
       });
-      if(cajaId){
-        try{
-          const{data:ts}=await supabase.from('turns').select('total_facturado').eq('caja_shift_id',cajaId).eq('status','cerrada');
-          const nt=(ts||[]).reduce((s,t)=>s+(t.total_facturado||0),0);
-          await supabase.from('caja_shifts').update({total_facturado_turno:nt}).eq('id',cajaId);
-          store.setTurnoActivo({...store.turnoActivo,totalCache:nt});
-        }catch(e){}
+      if (rpcError) throw rpcError;
+      if (!resultado?.ok) {
+        if (resultado?.error === 'turno_ya_cerrado') {
+          addToast('Esta mesa ya fue cerrada por otro dispositivo.', 'warning');
+          setShowCobro(false);
+          return;
+        }
+        throw new Error(resultado?.error || 'Error al cerrar mesa');
+      }
+      // Actualizar cache de caja desde DB (ya actualizado por la transacción)
+      if (cajaId) {
+        try {
+          const { data: cajaData } = await supabase.from('caja_shifts').select('total_facturado_turno').eq('id', cajaId).single();
+          if (cajaData) store.setTurnoActivo({ ...store.turnoActivo, totalCache: cajaData.total_facturado_turno });
+        } catch(e) {}
       }
       if(selectedTurn?.id){const tables=store.getTables(branchId);const table=tables.find(t=>t.turnId===selectedTurn.id);if(table)store.closeTable(branchId,table.id);}
       store.refreshCharts&&store.refreshCharts();
