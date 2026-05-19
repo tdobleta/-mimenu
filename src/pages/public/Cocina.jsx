@@ -1,6 +1,20 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
+import { supabase } from '@/api/supabaseClient';
+
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+
+async function updateCocinaEstado(turnId, branchId, updates) {
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/cocina-update`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ turn_id: turnId, branch_id: branchId, ...updates }),
+  });
+  const data = await res.json();
+  if (!data.ok) throw new Error(data.error || 'Error actualizando cocina');
+  return data;
+}
 
 const COLORS = {
   nueva:      { bg:'#FFFFFF', border:'#1D9E75', borderWidth:2,   headerBg:'#F0FBF7', headerText:'#111827', timerColor:'#1D9E75', pulse:true  },
@@ -27,17 +41,10 @@ export default function Cocina() {
   const [searchParams] = useSearchParams();
   const branchId = searchParams.get('branch');
   const [comandas, setComandas] = useState([]);
-  const [estadosLocales, setEstadosLocales] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(`cocina_estados_public`) || '{}'); } catch { return {}; }
-  });
   const [loading, setLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState(null);
   const [, setTick] = useState(0);
   const removalTimers = useRef({});
-
-  useEffect(() => {
-    try { localStorage.setItem(`cocina_estados_public`, JSON.stringify(estadosLocales)); } catch {}
-  }, [estadosLocales]);
 
   async function loadCocina() {
     try {
@@ -51,13 +58,19 @@ export default function Cocina() {
           return { turn, items: [] };
         }
       }));
-      setComandas(withItems);
-      setEstadosLocales(prev => {
-        const next = { ...prev };
-        withItems.forEach(({ turn }) => {
-          if (!next[turn.id]) next[turn.id] = 'nueva';
+      setComandas(prev => {
+        // Preserve local cocina_estado for turns already showing (avoid flicker during poll)
+        const prevMap = new Map(prev.map(c => [c.turn.id, c.turn.cocina_estado]));
+        return withItems.map(c => {
+          const prevEstado = prevMap.get(c.turn.id);
+          // Only keep local estado if it's more advanced than DB (optimistic update pending write)
+          const dbEstado = c.turn.cocina_estado || 'nueva';
+          const localOrder = ORDER[prevEstado] ?? -1;
+          const dbOrder = ORDER[dbEstado] ?? -1;
+          return localOrder > dbOrder
+            ? { ...c, turn: { ...c.turn, cocina_estado: prevEstado } }
+            : c;
         });
-        return next;
       });
       setLastUpdate(Date.now());
     } catch(err) {
@@ -71,6 +84,40 @@ export default function Cocina() {
     loadCocina();
     const interval = setInterval(loadCocina, 12000);
     return () => clearInterval(interval);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [branchId]);
+
+  // Realtime: sync state changes from Salon/ControlCocina immediately
+  useEffect(() => {
+    if (!branchId) return;
+    const channel = supabase
+      .channel(`cocina_public_${branchId}`)
+      .on('postgres_changes', {
+        event: 'UPDATE', schema: 'public', table: 'turns',
+        filter: `branch_id=eq.${branchId}`,
+      }, (payload) => {
+        const updated = payload.new;
+        setComandas(prev => {
+          // Turn became open+enviado_cocina → add it
+          if (updated.status === 'abierta' && updated.enviado_cocina) {
+            const exists = prev.some(c => c.turn.id === updated.id);
+            if (exists) {
+              return prev.map(c => c.turn.id === updated.id ? { ...c, turn: { ...c.turn, ...updated } } : c);
+            }
+            // New comanda arrived — trigger a full reload to get items too
+            loadCocina();
+            return prev;
+          }
+          // Turn closed/cancelled → remove it
+          if (updated.status !== 'abierta') {
+            return prev.filter(c => c.turn.id !== updated.id);
+          }
+          return prev.map(c => c.turn.id === updated.id ? { ...c, turn: { ...c.turn, ...updated } } : c);
+        });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [branchId]);
 
   useEffect(() => {
@@ -78,9 +125,19 @@ export default function Cocina() {
     return () => clearInterval(t);
   }, []);
 
+  // Cleanup removal timers on unmount
+  useEffect(() => {
+    return () => {
+      Object.values(removalTimers.current).forEach(clearTimeout);
+      removalTimers.current = {};
+    };
+  }, []);
+
   async function cambiarEstado(turnId, nuevoEstado) {
-    // Optimistic UI update
-    setEstadosLocales(prev => ({ ...prev, [turnId]: nuevoEstado }));
+    // Optimistic update on comandas array (not localStorage)
+    setComandas(prev => prev.map(c =>
+      c.turn.id === turnId ? { ...c, turn: { ...c.turn, cocina_estado: nuevoEstado } } : c
+    ));
 
     try {
       const comanda_lista = nuevoEstado === 'lista';
@@ -90,25 +147,27 @@ export default function Cocina() {
       });
     } catch(err) {
       console.error('Error actualizando estado cocina:', err);
+      // Revert optimistic update on error
+      setComandas(prev => prev.map(c =>
+        c.turn.id === turnId ? { ...c, turn: { ...c.turn, cocina_estado: c.turn.cocina_estado } } : c
+      ));
     }
 
     if (nuevoEstado === 'lista') {
       if (removalTimers.current[turnId]) clearTimeout(removalTimers.current[turnId]);
       removalTimers.current[turnId] = setTimeout(() => {
         setComandas(prev => prev.filter(c => c.turn.id !== turnId));
-        setEstadosLocales(prev => {
-          const next = { ...prev };
-          delete next[turnId];
-          return next;
-        });
         delete removalTimers.current[turnId];
       }, 90000);
     }
   }
 
-  const visibles = comandas
-    .map(c => ({ ...c, estado: estadosLocales[c.turn.id] || 'nueva' }))
-    .sort((a,b) => (ORDER[a.estado] - ORDER[b.estado]) || (new Date(a.turn.opened_at).getTime() - new Date(b.turn.opened_at).getTime()));
+  const visibles = [...comandas]
+    .sort((a, b) => {
+      const ea = ORDER[a.turn.cocina_estado || 'nueva'] ?? 0;
+      const eb = ORDER[b.turn.cocina_estado || 'nueva'] ?? 0;
+      return ea !== eb ? ea - eb : new Date(a.turn.opened_at).getTime() - new Date(b.turn.opened_at).getTime();
+    });
 
   const segundosDesdeUpdate = lastUpdate ? Math.max(0, Math.floor((Date.now() - lastUpdate) / 1000)) : null;
   const reciente = segundosDesdeUpdate !== null && segundosDesdeUpdate < 15;
@@ -163,7 +222,8 @@ export default function Cocina() {
 
       {!loading && visibles.length > 0 && (
         <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(300px, 1fr))', gap:16, padding:20 }}>
-          {visibles.map(({ turn, items, estado }) => {
+          {visibles.map(({ turn, items }) => {
+            const estado = turn.cocina_estado || 'nueva';
             const c = COLORS[estado] || COLORS.nueva;
             return (
               <div key={turn.id} style={{
@@ -181,7 +241,6 @@ export default function Cocina() {
                         <span style={{ backgroundColor:'#1D9E75', color:'white', padding:'2px 8px', borderRadius:99, fontSize:10, fontWeight:800, letterSpacing:'0.5px', animation:'cocpulse 1.5s ease-in-out infinite' }}>NUEVA</span>
                       )}
                     </div>
-                    
                   </div>
                   <div style={{ textAlign:'right', flexShrink:0 }}>
                     <div style={{ fontSize:13, color: estado==='nueva' ? '#9CA3AF' : 'rgba(255,255,255,0.85)' }}>{fmtHora(turn.opened_at)}</div>
@@ -234,5 +293,3 @@ export default function Cocina() {
     </div>
   );
 }
-
-

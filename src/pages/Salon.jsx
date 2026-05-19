@@ -7,6 +7,7 @@ import ComandaPanel from '../components/salon/ComandaPanel';
 import LayoutEditor from '../components/salon/LayoutEditor';
 import { dbLoadActiveTurns } from '@/lib/posApi';
 import { base44 } from '@/api/base44Client';
+import { supabase } from '@/api/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
 import useUserRole from '@/lib/useUserRole';
 import { G, glass, glassDeep, glassLight, fontDisplay } from '@/lib/glass';
@@ -41,8 +42,36 @@ export default function Salon() {
       turns.forEach(t => {
         const existing = store.getTables(displayBranch).find(tb => tb.num === t.mesa_num);
         if (existing && existing.status === 'libre') store.openTableWithTurn(displayBranch, existing.id, t.id, t.mozo, t.opened_at);
+        // Sync comanda_lista and cocina_estado on load
+        if (existing && t.comanda_lista !== undefined) store.setTableComandaLista(displayBranch, existing.id, !!t.comanda_lista);
       });
     }).catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [displayBranch]);
+
+  // Realtime: sync comanda_lista instantly when kitchen marks order ready
+  useEffect(() => {
+    if (!displayBranch) return;
+    const channel = supabase
+      .channel(`salon_comanda_${displayBranch}`)
+      .on('postgres_changes', {
+        event: 'UPDATE', schema: 'public', table: 'turns',
+        filter: `branch_id=eq.${displayBranch}`,
+      }, (payload) => {
+        const updated = payload.new;
+        const tables = store.getTables(displayBranch);
+        const tableMatch = tables.find(t => t.turnId === updated.id);
+        if (!tableMatch) return;
+        if (updated.comanda_lista !== undefined) {
+          store.setTableComandaLista(displayBranch, tableMatch.id, !!updated.comanda_lista);
+        }
+        // Sync open/close state changes from other devices
+        if (updated.status === 'cerrada' || updated.status === 'anulada') {
+          store.closeTable(displayBranch, tableMatch.id);
+        }
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [displayBranch]);
 
