@@ -8,7 +8,7 @@ const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 async function updateCocinaEstado(turnId, branchId, updates) {
   const res = await fetch(`${SUPABASE_URL}/functions/v1/cocina-update`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + import.meta.env.VITE_SUPABASE_ANON_KEY },
     body: JSON.stringify({ turn_id: turnId, branch_id: branchId, ...updates }),
   });
   const data = await res.json();
@@ -293,3 +293,4 @@ export default function Cocina() {
     </div>
   );
 }
+
