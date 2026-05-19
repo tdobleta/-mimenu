@@ -147,36 +147,33 @@ const [facturaDatos, setFacturaDatos] = useState(null);
   const accentColor = getCatColor(activeCat, cats);
 
   function addItem(item) {
-    const ex = order.find(i => i.itemId === item.id && !i.libre);
-    const next = ex
-      ? order.map(i => (i.itemId === item.id && !i.libre) ? { ...i, qty:i.qty+1 } : i)
-      : [...order, { itemId:item.id, nombre:item.nombre, precio:item.precio, qty:1 }];
+    // Cada producto es una línea nueva (no agrupar)
+    const uid = 'uid_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
+    const newItem = { itemId:item.id, nombre:item.nombre, precio:item.precio, qty:1, uid, nota:'' };
+    const next = [...order, newItem];
     store.updateTableOrder(branchId, table.id, next);
     if (table.turnId) {
-      if (ex) {
-        const updated = next.find(i => i.itemId === item.id && !i.libre);
-        if (ex.turnItemId) dbUpdateTurnItem(ex.turnItemId, updated.qty).catch(() => {
-          addToast('No se actualizó la cantidad en el servidor. Revisá conexión.', 'warning');
-        });
-      } else {
-        // Intentar 2 veces antes de mostrar error
         const tryAdd = (retries) => dbAddTurnItem({ turnId:table.turnId, branchId, menuItemId:item.id, nombre:item.nombre, precio:item.precio, qty:1 })
-          .then(ti => store.setOrderItemTurnItemId(branchId, table.id, item.id, ti.id))
+          .then(ti => {
+            const updated = [...next];
+            const idx = updated.findIndex(i => i.uid === uid);
+            if (idx >= 0) updated[idx] = { ...updated[idx], turnItemId: ti.id };
+            store.updateTableOrder(branchId, table.id, updated);
+          })
           .catch(err => {
             if (retries > 0) setTimeout(() => tryAdd(retries - 1), 1500);
             else addToast('Ítem en pedido local pero no guardado. Revisá conexión.', 'warning');
           });
         tryAdd(1);
-      }
     }
   }
 
-  function changeQty(itemId, d, turnItemId) {
-    const orderItem = turnItemId ? order.find(i => i.turnItemId === turnItemId) : order.find(i => i.itemId === itemId);
+  function changeQty(uid, d, turnItemId) {
+    const orderItem = order.find(i => i.uid === uid || i.turnItemId === turnItemId);
     if (!orderItem) return;
+    const key = orderItem.uid || orderItem.turnItemId;
     const next = order.map(i =>
-      (turnItemId ? i.turnItemId === turnItemId : i.itemId === itemId && i.turnItemId === orderItem.turnItemId)
-        ? { ...i, qty:i.qty+d } : i
+      (i.uid || i.turnItemId) === key ? { ...i, qty:i.qty+d } : i
     ).filter(i => i.qty > 0);
     store.updateTableOrder(branchId, table.id, next);
     if (orderItem?.turnItemId) dbUpdateTurnItem(orderItem.turnItemId, orderItem.qty + d).catch(() => {});
@@ -217,12 +214,15 @@ const [facturaDatos, setFacturaDatos] = useState(null);
           <div style={{ height:'0.5px', background:'rgba(0,0,0,0.08)', marginBottom:12 }} />
           <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
             {order.map(item => (
-              <div key={item.itemId} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8 }}>
-                <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap', minWidth:0 }}>
-                  <span style={{ fontSize:13, color:G.textMid }}>{item.nombre} × {item.qty}</span>
-                  {item.libre && <span style={{ background:'rgba(249,115,22,0.12)', color:'#F97316', padding:'1px 6px', borderRadius:99, fontSize:9, fontWeight:700, letterSpacing:'0.3px' }}>LIBRE</span>}
+              <div key={item.uid || item.itemId} style={{ marginBottom:4 }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8 }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap', minWidth:0 }}>
+                    <span style={{ fontSize:13, color:G.textMid }}>{item.nombre}</span>
+                    {item.libre && <span style={{ background:'rgba(249,115,22,0.12)', color:'#F97316', padding:'1px 6px', borderRadius:99, fontSize:9, fontWeight:700, letterSpacing:'0.3px' }}>LIBRE</span>}
+                  </div>
+                  <span style={{ fontSize:13, fontWeight:700, color:G.text, whiteSpace:'nowrap' }}>{money(item.precio)}</span>
                 </div>
-                <span style={{ fontSize:13, fontWeight:700, color:G.text, whiteSpace:'nowrap' }}>{money(item.precio * item.qty)}</span>
+                {item.nota && <div style={{ fontSize:11, color:G.teal, paddingLeft:2, fontStyle:'italic' }}>↳ {item.nota}</div>}
               </div>
             ))}
           </div>
@@ -368,20 +368,28 @@ const [facturaDatos, setFacturaDatos] = useState(null);
           ? <div style={{ fontSize:12, color:G.textFaint, textAlign:'center', padding:'20px 0' }}>Agregá ítems desde el menú</div>
           : <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
               {order.map(item => (
-                <div key={item.turnItemId || item.itemId} style={{ display:'flex', alignItems:'center', gap:8, padding:'6px 0', borderBottom:'1px solid rgba(255,255,255,0.4)' }}>
-                  <div style={{ flex:1, minWidth:0 }}>
-                    <div style={{ fontSize:12, fontWeight:600, color:G.text, display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
-                      <span>{item.nombre}</span>
-                      {item.libre && <span style={{ background:'rgba(249,115,22,0.12)', color:'#F97316', padding:'1px 6px', borderRadius:99, fontSize:9, fontWeight:700, letterSpacing:'0.3px' }}>LIBRE</span>}
+                <div key={item.uid || item.turnItemId || item.itemId} style={{ padding:'8px 0', borderBottom:'1px solid rgba(255,255,255,0.4)' }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ fontSize:12, fontWeight:600, color:G.text, display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
+                        <span>{item.nombre}</span>
+                        {item.libre && <span style={{ background:'rgba(249,115,22,0.12)', color:'#F97316', padding:'1px 6px', borderRadius:99, fontSize:9, fontWeight:700, letterSpacing:'0.3px' }}>LIBRE</span>}
+                      </div>
+                      <div style={{ fontSize:11, color:G.textFaint }}>{money(item.precio)}</div>
                     </div>
-                    <div style={{ fontSize:11, color:G.textFaint }}>{money(item.precio)} c/u</div>
+                    <button onClick={() => {
+                      const nota = prompt('Instrucciones (ej: sin sal, bien cocido, etc.)', item.nota || '');
+                      if (nota !== null) {
+                        const next = order.map(i => (i.uid || i.turnItemId || i.itemId) === (item.uid || item.turnItemId || item.itemId) ? { ...i, nota } : i);
+                        store.updateTableOrder(branchId, table.id, next);
+                      }
+                    }} style={{ background:'none', border:'1px solid rgba(0,0,0,0.08)', borderRadius:6, padding:'3px 8px', fontSize:10, color: item.nota ? G.teal : G.textFaint, cursor:'pointer', whiteSpace:'nowrap' }}>
+                      {item.nota ? '✎ Editada' : '+ Instrucciones'}
+                    </button>
+                    <button onClick={() => changeQty(item.uid, -item.qty, item.turnItemId)} style={{ width:22, height:22, border:'1px solid rgba(0,0,0,0.08)', background:'white', borderRadius:6, cursor:'pointer', fontSize:13, color:G.textMuted, display:'flex', alignItems:'center', justifyContent:'center' }}>✕</button>
+                    <div style={{ fontSize:12, fontWeight:700, color:G.text, minWidth:50, textAlign:'right' }}>{money(item.precio)}</div>
                   </div>
-                  <div style={{ display:'flex', alignItems:'center', gap:2, border:'1px solid rgba(255,255,255,0.7)', background:'rgba(255,255,255,0.5)', borderRadius:99, padding:'2px' }}>
-                    <button onClick={() => changeQty(item.itemId, -1, item.turnItemId)} style={{ width:22, height:22, border:'none', background:'none', cursor:'pointer', fontSize:15, color:G.textMuted, display:'flex', alignItems:'center', justifyContent:'center' }}>−</button>
-                    <span style={{ fontSize:12, fontWeight:700, minWidth:18, textAlign:'center', color:G.text }}>{item.qty}</span>
-                    <button onClick={() => changeQty(item.itemId, 1, item.turnItemId)} style={{ width:22, height:22, border:'none', background:'none', cursor:'pointer', fontSize:15, color:G.textMuted, display:'flex', alignItems:'center', justifyContent:'center' }}>+</button>
-                  </div>
-                  <div style={{ fontSize:12, fontWeight:700, color:G.text, minWidth:60, textAlign:'right' }}>{money(item.precio*item.qty)}</div>
+                  {item.nota && <div style={{ fontSize:11, color:G.teal, marginTop:4, paddingLeft:2, fontStyle:'italic' }}>↳ {item.nota}</div>}
                 </div>
               ))}
             </div>
@@ -451,7 +459,7 @@ const [facturaDatos, setFacturaDatos] = useState(null);
               } else {
                 // Venta directa sin turn previo — crear turn cerrado
                 const turn = await base44.entities.Turn.create({ branch_id:branchId, mesa_num:table.num, status:'cerrada', opened_at:table.openedAt ? new Date(table.openedAt).toISOString() : new Date().toISOString(), closed_at:new Date().toISOString(), total_facturado:finalTotal, descuento:discAmount||0, propina:propinaAmount||0, metodo_pago:method, mozo:table.mozo||'', ...(cajaShiftId?{caja_shift_id:cajaShiftId}:{}) });
-                await Promise.all((table.order||[]).map(item => base44.entities.TurnItem.create({ turn_id:turn.id, branch_id:branchId, menu_item_name:item.nombre, menu_item_id:item.itemId, cantidad:item.qty, precio:item.precio })));
+                await Promise.all((table.order||[]).map(item => base44.entities.TurnItem.create({ turn_id:turn.id, branch_id:branchId, menu_item_name:item.nombre, menu_item_id:item.itemId, cantidad:item.qty, precio:item.precio, notas:item.nota||null })));
               }
               store.closeTable(branchId, table.id);
               // Descontar stock automáticamente según recetas configuradas
