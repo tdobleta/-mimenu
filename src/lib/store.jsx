@@ -126,7 +126,7 @@ export function AppProvider({ children }) {
             nombre: 'Principal',
             mesas: 8,
             franjas: ['12:00','13:00','20:00','21:00'],
-            metodo_conexion: 'mimenÃº POS',
+            metodo_conexion: 'mimenú POS',
           });
         }
         const branches = await base44.entities.Branch.filter({ restaurant_id: restaurant.id });
@@ -171,7 +171,7 @@ export function AppProvider({ children }) {
           stock[branch.id] = [];
           activity[branch.id] = [];
           charts[branch.id] = {
-            week: ['lun','mar','miÃ©','jue','vie','sÃ¡b','dom'].map(day => ({ day, actual: 0, anterior: 0 })),
+            week: ['lun','mar','mié','jue','vie','sáb','dom'].map(day => ({ day, actual: 0, anterior: 0 })),
             month: Array.from({length:30},(_,i)=>({ day:`${i+1}`, actual:0, anterior:0 })),
             year: ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'].map(mes=>({mes,actual:0,anterior:0})),
             topProducts: [],
@@ -304,7 +304,7 @@ export function AppProvider({ children }) {
             id: b.id,
             nombre: b.nombre || 'Sucursal',
             direccion: b.direccion || '',
-            conexion: b.metodo_conexion || 'mimenÃº POS',
+            conexion: b.metodo_conexion || 'mimenú POS',
             mesas: b.mesas || 4,
             franjas: b.franjas || ['12:00','13:00','20:00','21:00'],
           })),
@@ -448,7 +448,7 @@ export function AppProvider({ children }) {
           weekMap[d.day].anterior += d.anterior || 0;
         });
       });
-      const DAY_ORDER = ['lun','mar','miÃ©','jue','vie','sÃ¡b','dom'];
+      const DAY_ORDER = ['lun','mar','mié','jue','vie','sáb','dom'];
       const week = DAY_ORDER.map(day => weekMap[day] || { day, actual: 0, anterior: 0 });
 
       // Combinar topProducts sumando unidades y monto
@@ -548,7 +548,7 @@ export function AppProvider({ children }) {
     const T_MES = T0 - 30 * 86400000;
     const T_ANIO = T0 - 365 * 86400000;
     const DAY_MS = 86400000;
-    const dayNames = ['lun','mar','miÃ©','jue','vie','sÃ¡b','dom'];
+    const dayNames = ['lun','mar','mié','jue','vie','sáb','dom'];
     const mesNames = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
     // Lunes de esta semana y anterior
     const lunesEsta = T0 - (((startOfToday.getDay() + 6) % 7) * DAY_MS);

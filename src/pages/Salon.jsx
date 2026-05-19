@@ -143,7 +143,8 @@ export default function Salon() {
 function ShiftIndicator() {
   const { turnoActivo } = useStore();
   if (turnoActivo) {
-    const mins = Math.max(0, Math.floor((Date.now() - turnoActivo.abiertaAt) / 60000));
+    const abiertaMs = typeof turnoActivo.abiertaAt === 'string' ? new Date(turnoActivo.abiertaAt).getTime() : turnoActivo.abiertaAt;
+    const mins = Math.max(0, Math.floor((Date.now() - abiertaMs) / 60000));
     const h = Math.floor(mins/60), m = mins%60;
     const elapsed = h > 0 ? `${h}h ${m}m` : `${m}m`;
     return (

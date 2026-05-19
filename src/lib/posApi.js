@@ -10,7 +10,6 @@ export async function dbOpenTable({ branchId, mesaNum, mozo }) {
       mesa_num: mesaNum,
       mozo: mozo || '',
       status: 'abierta',
-      opened_at: Date.now(),
       total_facturado: 0,
     })
     .select()
@@ -22,7 +21,7 @@ export async function dbOpenTable({ branchId, mesaNum, mozo }) {
 export async function dbCloseTable({ turnId, total, metodo }) {
   const { data, error } = await supabase
     .from('turns')
-    .update({ status: 'cerrada', closed_at: Date.now(), total_facturado: total, metodo_pago: metodo })
+    .update({ status: 'cerrada', closed_at: new Date().toISOString(), total_facturado: total, metodo_pago: metodo })
     .eq('id', turnId)
     .select()
     .single();

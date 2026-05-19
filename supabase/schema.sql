@@ -142,9 +142,11 @@ CREATE TABLE IF NOT EXISTS turns (
   descuento        numeric(12,2) DEFAULT 0,
   metodo_pago      text DEFAULT '',
   motivo_anulacion text DEFAULT '',
-  enviado_cocina   boolean DEFAULT false,
-  comanda_lista    boolean DEFAULT false,
-  cocina_estado    text DEFAULT 'nueva' CHECK (cocina_estado IN ('nueva', 'preparando', 'lista')),
+  enviado_cocina      boolean DEFAULT false,
+  comanda_lista       boolean DEFAULT false,
+  cocina_estado       text DEFAULT 'nueva' CHECK (cocina_estado IN ('nueva', 'preparando', 'lista')),
+  comanda_entregada   boolean DEFAULT false,
+  comanda_entregada_at timestamptz,
   created_at       timestamptz DEFAULT now()
 );
 
