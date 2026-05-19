@@ -3,6 +3,7 @@ import { base44 } from '@/api/base44Client';
 import { supabase } from '@/api/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
 import { useStore } from '@/lib/store';
+import { fetchTurnItemsBatch } from '@/lib/pagination';
 
 // ── Helper: actualizar estado via Edge Function (bypasses RLS) ──────────
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
@@ -54,12 +55,30 @@ export default function CocinaDisplay() {
       const turns = await base44.entities.Turn.filter(
         { status:'abierta', enviado_cocina:true, branch_id:activeBranchId }, '-opened_at', 50
       );
-      const withItems = await Promise.all((turns||[]).map(async turn => {
-        try {
-          const items = await base44.entities.TurnItem.filter({ turn_id:turn.id });
-          return { turn, items:items||[] };
-        } catch { return { turn, items:[] }; }
+      if (!turns || turns.length === 0) {
+        setComandas([]);
+        setLastUpdate(Date.now());
+        setLoading(false);
+        return;
+      }
+      // Batch: 1 sola query para TODOS los items (elimina N+1)
+      // Antes: N requests, uno por mesa. Con 15 mesas = 16 requests por evento.
+      // Ahora: 2 requests siempre (turns + batch de items).
+      const turnIds = turns.map(t => t.id);
+      const allItems = await fetchTurnItemsBatch(turnIds);
+
+      // Agrupar items por turn_id
+      const itemsByTurn = allItems.reduce((acc, item) => {
+        if (!acc[item.turn_id]) acc[item.turn_id] = [];
+        acc[item.turn_id].push(item);
+        return acc;
+      }, {});
+
+      const withItems = turns.map(turn => ({
+        turn,
+        items: itemsByTurn[turn.id] || [],
       }));
+
       setComandas(withItems);
       setLastUpdate(Date.now());
     } catch(err) { console.error('Error cargando cocina:', err); }

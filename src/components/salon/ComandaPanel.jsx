@@ -78,24 +78,25 @@ const [facturaDatos, setFacturaDatos] = useState(null);
 
   useEffect(() => { setYaEnviado(false); }, [table.turnId]);
 
-  // Polling 15s
+  // Polling 30s — solo sincronización de ítems entre dispositivos.
+  // comanda_lista ya está cubierto por el canal Realtime de Salon.jsx,
+  // así que se elimina esa query para reducir la carga a la mitad.
   useEffect(() => {
     if (!table.turnId) return;
     const interval = setInterval(async () => {
       try {
-        const turns = await base44.entities.Turn.filter({ id: table.turnId }).catch(() => []);
-        const turn = turns?.[0];
-        if (turn?.comanda_lista !== undefined) store.setTableComandaLista(branchId, table.id, !!turn.comanda_lista);
         const items = await base44.entities.TurnItem.filter({ turn_id: table.turnId });
         if (!items || items.length === 0) return;
         const serverOrder = items.map(it => ({ itemId:it.menu_item_id||null, nombre:it.menu_item_name, precio:it.precio, qty:it.cantidad, turnItemId:it.id, libre:!it.menu_item_id }));
-        const localIds  = (table.order||[]).map(i => i.turnItemId).sort().join(',');
-        const serverIds = serverOrder.map(i => i.turnItemId).sort().join(',');
+        const localIds   = (table.order||[]).map(i => i.turnItemId).sort().join(',');
+        const serverIds  = serverOrder.map(i => i.turnItemId).sort().join(',');
         const localQtys  = (table.order||[]).map(i => `${i.turnItemId}:${i.qty}`).sort().join(',');
         const serverQtys = serverOrder.map(i => `${i.turnItemId}:${i.qty}`).sort().join(',');
-        if (localIds !== serverIds || localQtys !== serverQtys) store.updateTableOrder(branchId, table.id, serverOrder);
+        if (localIds !== serverIds || localQtys !== serverQtys) {
+          store.updateTableOrder(branchId, table.id, serverOrder);
+        }
       } catch(e) {}
-    }, 15000);
+    }, 30000);
     return () => clearInterval(interval);
   }, [table.turnId, branchId]);
 
