@@ -4,8 +4,8 @@
 // v2 — con sonido de alerta y sin localStorage
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { supabase } from '@/api/supabaseClient';
 import { useStore } from '@/lib/store';
+import { subscribeToTurns } from '@/lib/realtimeManager';
 
 // ── Sonido de alerta generado con Web Audio API ──────────────
 // No requiere archivo de audio externo

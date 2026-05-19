@@ -10,6 +10,7 @@ import { G } from '@/lib/glass';
 import { getCategoryColor } from '@/lib/menuCategories';
 import { enqueue } from '@/lib/offlineQueue';
 import { useBidirectionalSync } from '@/lib/useBidirectionalSync';
+import { subscribeToTurns } from '@/lib/realtimeManager';
 
 function cc(cat) { return getCategoryColor(cat); }
 function fmt(n) { return '$'+Number(n||0).toLocaleString('es-AR',{maximumFractionDigits:0}); }
@@ -261,19 +262,14 @@ function MesaSelector({ branchId, onSelect, onDirecta, restaurante }) {
     load();
 
     // Realtime: actualizar lista de mesas sin polling
-    const channel = supabase
-      .channel(`pos_mesa_selector_${branchId}`)
-      .on('postgres_changes', {
-        event: '*', schema: 'public', table: 'turns',
-        filter: `branch_id=eq.${branchId}`,
-      }, () => load())
-      .subscribe();
+    // Usa singleton realtimeManager → comparte canal con otros componentes del mismo branch
+    const unsubTurns = subscribeToTurns(branchId, () => load());
 
     // Fallback polling cada 60s por si Realtime se desconecta
     const iv = setInterval(() => { if (navigator.onLine) load(); }, 60000);
 
     return () => {
-      supabase.removeChannel(channel);
+      unsubTurns();
       clearInterval(iv);
     };
   },[branchId]);
@@ -340,9 +336,16 @@ export default function POSView() {
   const [selectedTurn, setSelectedTurn] = useState(null);
   const [order, setOrder] = useState([]);
 
+  // Ref siempre fresco para evitar stale closure en handleServerSync
+  const selectedTurnRef = useRef(null);
+  useEffect(() => { selectedTurnRef.current = selectedTurn; }, [selectedTurn]);
+
   // ── Sincronización bidireccional al reconectar ────────────
+  // deps: [] — callback estable, no se recrea al cambiar de mesa.
+  // Antes: [selectedTurn] → handleServerSync recreado → pullFromServer recreado
+  // → canal Realtime desmontado/remontado en cada selección de mesa.
   const handleServerSync = useCallback((turnsWithItems) => {
-    // Si hay una mesa seleccionada, actualizar sus ítems con los del servidor
+    // Actualizar el turn seleccionado con datos frescos del servidor
     setSelectedTurn(prev => {
       if (!prev) return prev;
       const serverTurn = turnsWithItems.find(t => t.id === prev.id);
@@ -350,8 +353,9 @@ export default function POSView() {
       return { ...prev, ...serverTurn };
     });
     setOrder(prev => {
-      if (!selectedTurn) return prev;
-      const serverTurn = turnsWithItems.find(t => t.id === selectedTurn?.id);
+      const cur = selectedTurnRef.current; // siempre fresco, sin stale closure
+      if (!cur) return prev;
+      const serverTurn = turnsWithItems.find(t => t.id === cur.id);
       if (!serverTurn?.items?.length) return prev;
       // Merge: items del servidor + items locales no sincronizados aún
       const serverItemIds = new Set(serverTurn.items.map(i => i.id));
@@ -367,7 +371,8 @@ export default function POSView() {
         ...localOnlyItems,
       ];
     });
-  }, [selectedTurn]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useBidirectionalSync(branchId, handleServerSync);
 

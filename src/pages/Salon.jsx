@@ -7,7 +7,7 @@ import ComandaPanel from '../components/salon/ComandaPanel';
 import LayoutEditor from '../components/salon/LayoutEditor';
 import { dbLoadActiveTurns } from '@/lib/posApi';
 import { base44 } from '@/api/base44Client';
-import { supabase } from '@/api/supabaseClient';
+import { subscribeToTurns } from '@/lib/realtimeManager';
 import { useAuth } from '@/lib/AuthContext';
 import useUserRole from '@/lib/useUserRole';
 import { G, glass, glassDeep, glassLight, fontDisplay } from '@/lib/glass';
@@ -58,30 +58,27 @@ export default function Salon() {
   // puede tener mesas sin turnId si los turns aún no cargaron del DB.
   useEffect(() => {
     if (!displayBranch) return;
-    const channel = supabase
-      .channel(`salon_comanda_${displayBranch}`)
-      .on('postgres_changes', {
-        event: 'UPDATE', schema: 'public', table: 'turns',
-        filter: `branch_id=eq.${displayBranch}`,
-      }, (payload) => {
-        const updated = payload.new;
-        // storeRef.current es siempre el store más reciente (no el del montaje)
-        const s = storeRef.current;
-        const tables = s.getTables(displayBranch);
-        // Buscar la mesa por turnId primero; fallback por mesa_num si turnId aún no sincronizó
-        const tableMatch = tables.find(t => t.turnId === updated.id)
-          || tables.find(t => t.num === updated.mesa_num && t.status !== 'libre');
-        if (!tableMatch) return;
-        if (updated.comanda_lista !== undefined) {
-          s.setTableComandaLista(displayBranch, tableMatch.id, !!updated.comanda_lista);
-        }
-        // Sync cierre/anulación desde otro dispositivo
-        if (updated.status === 'cerrada' || updated.status === 'anulada') {
-          s.closeTable(displayBranch, tableMatch.id);
-        }
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    // Usa singleton realtimeManager → comparte canal con otros componentes del mismo branch
+    const unsub = subscribeToTurns(displayBranch, (payload) => {
+      const updated = payload.new;
+      // Solo procesar UPDATEs
+      if (payload.eventType !== 'UPDATE') return;
+      // storeRef.current es siempre el store más reciente (no el del montaje)
+      const s = storeRef.current;
+      const tables = s.getTables(displayBranch);
+      // Buscar la mesa por turnId primero; fallback por mesa_num si turnId aún no sincronizó
+      const tableMatch = tables.find(t => t.turnId === updated.id)
+        || tables.find(t => t.num === updated.mesa_num && t.status !== 'libre');
+      if (!tableMatch) return;
+      if (updated.comanda_lista !== undefined) {
+        s.setTableComandaLista(displayBranch, tableMatch.id, !!updated.comanda_lista);
+      }
+      // Sync cierre/anulación desde otro dispositivo
+      if (updated.status === 'cerrada' || updated.status === 'anulada') {
+        s.closeTable(displayBranch, tableMatch.id);
+      }
+    });
+    return () => unsub();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [displayBranch]);
 

@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
-import { supabase } from '@/api/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
 import { useStore } from '@/lib/store';
 import { fetchTurnItemsBatch } from '@/lib/pagination';
+import { subscribeToTurns, subscribeToTurnItems } from '@/lib/realtimeManager';
 
 // ── Helper: actualizar estado via Edge Function (bypasses RLS) ──────────
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
@@ -90,22 +90,16 @@ export default function CocinaDisplay() {
     loadCocina();
 
     // Realtime: recargar cuando cambian turns o turn_items de esta branch
-    const channel = supabase
-      .channel(`cocina_rt_${activeBranchId}`)
-      .on('postgres_changes', {
-        event: '*', schema: 'public', table: 'turns',
-        filter: `branch_id=eq.${activeBranchId}`
-      }, () => loadCocina())
-      .on('postgres_changes', {
-        event: '*', schema: 'public', table: 'turn_items'
-      }, () => loadCocina())
-      .subscribe();
+    // Usa singleton realtimeManager → comparte canal con otros componentes del mismo branch
+    const unsubTurns = subscribeToTurns(activeBranchId, () => loadCocina());
+    const unsubItems = subscribeToTurnItems(() => loadCocina());
 
     // Fallback: polling cada 60s por si Realtime se desconecta
     const fallback = setInterval(loadCocina, 60000);
 
     return () => {
-      supabase.removeChannel(channel);
+      unsubTurns();
+      unsubItems();
       clearInterval(fallback);
     };
   }, [activeBranchId, loadCocina]);
