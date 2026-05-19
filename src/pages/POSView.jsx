@@ -247,6 +247,8 @@ function MesaSelector({ branchId, onSelect, onDirecta, restaurante }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!branchId) return;
+
     async function load() {
       setLoading(true);
       try {
@@ -255,9 +257,25 @@ function MesaSelector({ branchId, onSelect, onDirecta, restaurante }) {
       } catch(e){}
       setLoading(false);
     }
-    if(branchId) load();
-    const iv = setInterval(()=>{ if(branchId) load(); },30000);
-    return ()=>clearInterval(iv);
+
+    load();
+
+    // Realtime: actualizar lista de mesas sin polling
+    const channel = supabase
+      .channel(`pos_mesa_selector_${branchId}`)
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'turns',
+        filter: `branch_id=eq.${branchId}`,
+      }, () => load())
+      .subscribe();
+
+    // Fallback polling cada 60s por si Realtime se desconecta
+    const iv = setInterval(() => { if (navigator.onLine) load(); }, 60000);
+
+    return () => {
+      supabase.removeChannel(channel);
+      clearInterval(iv);
+    };
   },[branchId]);
 
   const bgStyle = {position:'fixed',inset:0,background:'linear-gradient(140deg,#eef2ff 0%,#f8fffc 35%,#fdf4ff 70%,#fff8f0 100%)',display:'flex',flexDirection:'column',fontFamily:"'DM Sans',system-ui,sans-serif"};

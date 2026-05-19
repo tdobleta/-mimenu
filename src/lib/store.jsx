@@ -228,10 +228,23 @@ export function AppProvider({ children }) {
           }
         } catch(e) {}
 
-        // Cargar reservas desde DB para cada branch en paralelo
+        // Cargar reservas desde DB: solo los próximos 30 días (no toda la historia)
+        const hoyStr = new Date().toISOString().split('T')[0];
+        const en30Dias = new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0];
         try {
           const reservasArrays = await Promise.all(
-            branches.map(b => base44.entities.Reservation.filter({ branch_id: b.id }).catch(() => []))
+            branches.map(b => {
+              // Supabase no soporta rango en filter() simple; usar query directa
+              return supabase
+                .from('reservations')
+                .select('*')
+                .eq('branch_id', b.id)
+                .gte('fecha', hoyStr)
+                .lte('fecha', en30Dias)
+                .order('fecha', { ascending: true })
+                .then(({ data }) => data || [])
+                .catch(() => []);
+            })
           );
           branches.forEach((b, i) => {
             reservas[b.id] = (reservasArrays[i] || []).map(r => ({

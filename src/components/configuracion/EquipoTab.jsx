@@ -26,46 +26,33 @@ export default function EquipoTab() {
   const [shareInfo, setShareInfo] = useState(null);
 
   async function save() {
-    if (!form.email.trim()) { addToast('Ingresá un email', 'error'); return; }
+    const emailClean = form.email.trim().toLowerCase();
+    if (!emailClean) { addToast('Ingresá un email', 'error'); return; }
     setSaving(true);
     try {
       const restaurantId = store.restaurantId;
       if (!restaurantId) { addToast('No se encontró el restaurante', 'error'); setSaving(false); return; }
+
+      // Verificar que el email no existe ya en el equipo de este restaurante
+      const yaExiste = (store.teamMembers || []).some(m => m.email.toLowerCase() === emailClean);
+      if (yaExiste) { addToast('Este email ya está en el equipo', 'error'); setSaving(false); return; }
+
+      // Un solo insert — base44.entities.TeamMember.create() llama a supabase directamente
       const created = await base44.entities.TeamMember.create({
         restaurant_id: restaurantId,
-        email: form.email,
-        nombre: form.nombre,
+        email: emailClean,
+        nombre: form.nombre?.trim() || '',
         rol: form.rol,
       });
       addTeamMember(created);
-      let inviteOk = false;
-      try {
-        // En Supabase: el usuario se registra con su email y el restaurante lo añade aquí
-        const { default: { supabase } } = await import('@/api/supabaseClient');
-        await supabase.from('team_members').insert({
-          restaurant_id: store.restaurantId,
-          email: form.email.trim().toLowerCase(),
-          nombre: form.nombre?.trim() || '',
-          rol: form.rol,
-        });
-        inviteOk = true;
-      } catch (err) {
-        console.error('[EquipoTab] inviteUser falló para', form.email, err);
-      }
 
       const appUrl = window.location.origin;
-
-      if (inviteOk) {
-        addToast('Invitación enviada — el usuario recibirá un email de acceso', 'success');
-      } else {
-        // Mostrar modal con link para compartir manualmente
-        setShareInfo({ nombre: form.nombre || form.email, email: form.email, url: appUrl });
-      }
+      setShareInfo({ nombre: form.nombre || emailClean, email: emailClean, url: appUrl });
       setShowModal(false);
       setForm({ nombre:'', email:'', rol:'Mozo' });
     } catch(err) {
       console.error(err);
-      addToast('Error al agregar miembro', 'error');
+      addToast('Error al agregar miembro — verificá que el email sea correcto', 'error');
     }
     setSaving(false);
   }

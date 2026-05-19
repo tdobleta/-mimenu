@@ -168,7 +168,7 @@ export default function Caja() {
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:10 }}>
             <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
               <span style={{ backgroundColor:'#E8F7F2', color:'#1D9E75', padding:'4px 12px', borderRadius:99, fontSize:12, fontWeight:600 }}>● Turno abierto</span>
-              <span style={{ fontSize:12, color:'#6B7280' }}>{TIPO_LABEL[turnoActivo.tipoTurno]} · hace <strong>{fmtElapsed(elapsed)}</strong></span>
+              <span style={{ fontSize:12, color:'#6B7280' }}>{TIPO_LABEL[turnoActivo.tipoTurno]} · hace <strong>{fmtElapsed(elapsed * 60000)}</strong></span>
               {(() => {
                 const hoy = new Date(); hoy.setHours(0,0,0,0);
                 const apertura = new Date(turnoActivo.abiertaAt); apertura.setHours(0,0,0,0);
@@ -281,7 +281,13 @@ export default function Caja() {
 
           {showRetiro && <AddRetiroModal onClose={()=>setShowRetiro(false)} />}
           {showClose && (() => {
-            const mesasAbiertas = (store.tables[store.branchId] || []).filter(t => t.status === 'ocupada' || t.status === 'demorada').length;
+            // Cuando branchId === 'todas', revisar todas las sucursales
+            const relevantBranchIds = store.branchId === 'todas'
+              ? Object.keys(store.tables || {})
+              : [store.branchId];
+            const mesasAbiertas = relevantBranchIds
+              .flatMap(bid => store.tables[bid] || [])
+              .filter(t => t.status === 'ocupada' || t.status === 'demorada').length;
             if (mesasAbiertas > 0) {
               return (
                 <div style={{position:'fixed',inset:0,zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(15,15,35,0.5)',backdropFilter:'blur(4px)'}}>

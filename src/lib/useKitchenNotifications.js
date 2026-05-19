@@ -64,7 +64,8 @@ export function useKitchenNotifications() {
     setNotifs(prev => {
       // Evitar duplicados dentro de 2 minutos
       if (prev.find(n => n.turnId === turn.id && Date.now() - n.ts < 120000)) return prev;
-      return [notif, ...prev];
+      // Limitar a 50 notificaciones para evitar memory leak en turnos largos
+      return [notif, ...prev].slice(0, 50);
     });
 
     // Sonido de alerta

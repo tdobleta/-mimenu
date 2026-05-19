@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useStore } from '@/lib/store';
 import { useToast } from '@/lib/toast';
@@ -22,6 +22,10 @@ export default function Salon() {
   const [showEditor, setShowEditor] = useState(false);
   const [activeBranchTab, setActiveBranchTab] = useState(null);
   const [abriendo, setAbriendo] = useState(null);
+
+  // Ref siempre actualizado para evitar stale closure en callbacks de Realtime
+  const storeRef = useRef(store);
+  useEffect(() => { storeRef.current = store; });
 
   useEffect(() => {
     if (!activeBranchTab && store.sucursales.length > 0) setActiveBranchTab(store.sucursales[0].id);
@@ -49,7 +53,9 @@ export default function Salon() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [displayBranch]);
 
-  // Realtime: sync comanda_lista instantly when kitchen marks order ready
+  // Realtime: sync comanda_lista instantly when kitchen marks order ready.
+  // Usamos storeRef para evitar stale closure — el store capturado al montar
+  // puede tener mesas sin turnId si los turns aún no cargaron del DB.
   useEffect(() => {
     if (!displayBranch) return;
     const channel = supabase
@@ -59,15 +65,19 @@ export default function Salon() {
         filter: `branch_id=eq.${displayBranch}`,
       }, (payload) => {
         const updated = payload.new;
-        const tables = store.getTables(displayBranch);
-        const tableMatch = tables.find(t => t.turnId === updated.id);
+        // storeRef.current es siempre el store más reciente (no el del montaje)
+        const s = storeRef.current;
+        const tables = s.getTables(displayBranch);
+        // Buscar la mesa por turnId primero; fallback por mesa_num si turnId aún no sincronizó
+        const tableMatch = tables.find(t => t.turnId === updated.id)
+          || tables.find(t => t.num === updated.mesa_num && t.status !== 'libre');
         if (!tableMatch) return;
         if (updated.comanda_lista !== undefined) {
-          store.setTableComandaLista(displayBranch, tableMatch.id, !!updated.comanda_lista);
+          s.setTableComandaLista(displayBranch, tableMatch.id, !!updated.comanda_lista);
         }
-        // Sync open/close state changes from other devices
+        // Sync cierre/anulación desde otro dispositivo
         if (updated.status === 'cerrada' || updated.status === 'anulada') {
-          store.closeTable(displayBranch, tableMatch.id);
+          s.closeTable(displayBranch, tableMatch.id);
         }
       })
       .subscribe();

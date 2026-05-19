@@ -134,6 +134,9 @@ export default function Cocina() {
   }, []);
 
   async function cambiarEstado(turnId, nuevoEstado) {
+    // Capturar estado original ANTES del optimistic update para poder revertir
+    const estadoAnterior = comandas.find(c => c.turn.id === turnId)?.turn?.cocina_estado || 'nueva';
+
     // Optimistic update on comandas array (not localStorage)
     setComandas(prev => prev.map(c =>
       c.turn.id === turnId ? { ...c, turn: { ...c.turn, cocina_estado: nuevoEstado } } : c
@@ -147,9 +150,9 @@ export default function Cocina() {
       });
     } catch(err) {
       console.error('Error actualizando estado cocina:', err);
-      // Revert optimistic update on error
+      // Revert al estado original (no al ya sobreescrito)
       setComandas(prev => prev.map(c =>
-        c.turn.id === turnId ? { ...c, turn: { ...c.turn, cocina_estado: c.turn.cocina_estado } } : c
+        c.turn.id === turnId ? { ...c, turn: { ...c.turn, cocina_estado: estadoAnterior } } : c
       ));
     }
 
