@@ -4,6 +4,20 @@ import { supabase } from '@/api/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
 import { useStore } from '@/lib/store';
 
+// ── Helper: actualizar estado via Edge Function (bypasses RLS) ──────────
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+
+async function updateCocinaEstado(turnId, branchId, updates) {
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/cocina-update`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ turn_id: turnId, branch_id: branchId, ...updates }),
+  });
+  const data = await res.json();
+  if (!data.ok) throw new Error(data.error || 'Error actualizando cocina');
+  return data;
+}
+
 const COLORS = {
   nueva:      { bg:'#FFFFFF', border:'#1D9E75', borderWidth:2,   headerBg:'#F0FBF7', headerText:'#111827', timerColor:'#1D9E75', pulse:true  },
   preparando: { bg:'#F0FBF7', border:'#1D9E75', borderWidth:1.5, headerBg:'#1D9E75', headerText:'white',   timerColor:'white',   pulse:false },
@@ -111,18 +125,12 @@ export default function CocinaDisplay() {
     ));
 
     try {
-      // Persiste en Supabase — no en localStorage
-      await supabase
-        .from('turns')
-        .update({ cocina_estado: nuevoEstado })
-        .eq('id', turnId);
+      // Persiste via Edge Function (SERVICE_ROLE_KEY, bypasses RLS)
+      const comanda = comandas.find(c => c.turn.id === turnId);
+      const bid = comanda?.turn?.branch_id || activeBranchId;
 
       if (nuevoEstado === 'lista') {
-        // Notifica al salón via realtime
-        await supabase
-          .from('turns')
-          .update({ comanda_lista: true })
-          .eq('id', turnId);
+        await updateCocinaEstado(turnId, bid, { cocina_estado: 'lista', comanda_lista: true });
 
         // Remover la comanda después de 90s
         if (removalTimers.current[turnId]) clearTimeout(removalTimers.current[turnId]);
@@ -131,11 +139,8 @@ export default function CocinaDisplay() {
           setItemsListos(prev => { const n={...prev}; delete n[turnId]; return n; });
           delete removalTimers.current[turnId];
         }, 90000);
-      } else if (nuevoEstado === 'preparando' || nuevoEstado === 'nueva') {
-        await supabase
-          .from('turns')
-          .update({ comanda_lista: false })
-          .eq('id', turnId);
+      } else {
+        await updateCocinaEstado(turnId, bid, { cocina_estado: nuevoEstado, comanda_lista: false });
       }
     } catch(err) {
       console.error('Error cambiando estado cocina:', err);
@@ -174,7 +179,7 @@ export default function CocinaDisplay() {
           {segundosDesdeUpdate !== null && <span style={{ color:'rgba(29,158,117,0.7)', fontWeight:400, fontSize:11 }}>· {segundosDesdeUpdate}s</span>}
         </div>
         <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-          
+          <span style={{ fontSize:12, color:'rgba(255,255,255,0.5)' }}>{user?.email||''}</span>
           <button onClick={() => supabase.auth.signOut().then(() => window.location.href='/login')}
             style={{ padding:'6px 12px', border:'0.5px solid rgba(255,255,255,0.15)', borderRadius:7, fontSize:12, color:'rgba(255,255,255,0.7)', backgroundColor:'transparent', cursor:'pointer' }}>
             Cerrar sesión
@@ -226,7 +231,7 @@ export default function CocinaDisplay() {
                         <span style={{ backgroundColor:'rgba(255,255,255,0.25)', color:'white', padding:'2px 8px', borderRadius:99, fontSize:10, fontWeight:800 }}>✓ LISTA</span>
                       )}
                     </div>
-                    
+                    {turn.mozo && <div style={{ fontSize:12, color:estado==='nueva'?'#6B7280':'rgba(255,255,255,0.85)', marginTop:4 }}>{turn.mozo}</div>}
                   </div>
                   <div style={{ textAlign:'right', flexShrink:0 }}>
                     <div style={{ fontSize:13, color:estado==='nueva'?'#9CA3AF':'rgba(255,255,255,0.85)' }}>{fmtHora(turn.opened_at)}</div>

@@ -25,6 +25,7 @@ import PublicReservation from './pages/public/PublicReservation';
 import Cocina from './pages/public/Cocina';
 import Configuracion from './pages/Configuracion';
 import CocinaDisplay from './pages/CocinaDisplay';
+import ControlCocina from './pages/ControlCocina';
 import OnboardingFlow from './pages/OnboardingFlow';
 import Login from './pages/Login';
 import POSView from './pages/POSView';
@@ -142,6 +143,7 @@ const RoutedApp = () => {
         <Route path="/stock" element={<RoleGuard roles={['Dueno','Encargado']}><Stock /></RoleGuard>} />
         <Route path="/conexion" element={<RoleGuard roles={['Dueno','Encargado']}><Conexion /></RoleGuard>} />
         <Route path="/reportes" element={<RoleGuard roles={['Dueno','Encargado']}><Reportes /></RoleGuard>} />
+        <Route path="/control-cocina" element={<RoleGuard roles={['Dueno','Encargado']}><ControlCocina /></RoleGuard>} />
         <Route path="/analiticas" element={<RoleGuard roles={['Dueno','Encargado']}><Analiticas /></RoleGuard>} />
         <Route path="/configuracion" element={<RoleGuard roles={['Dueno']}><Configuracion /></RoleGuard>} />
         <Route path="*" element={<PageNotFound />} />

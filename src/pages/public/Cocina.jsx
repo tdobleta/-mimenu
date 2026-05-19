@@ -78,8 +78,20 @@ export default function Cocina() {
     return () => clearInterval(t);
   }, []);
 
-  function cambiarEstado(turnId, nuevoEstado) {
+  async function cambiarEstado(turnId, nuevoEstado) {
+    // Optimistic UI update
     setEstadosLocales(prev => ({ ...prev, [turnId]: nuevoEstado }));
+
+    try {
+      const comanda_lista = nuevoEstado === 'lista';
+      await updateCocinaEstado(turnId, branchId, {
+        cocina_estado: nuevoEstado,
+        comanda_lista,
+      });
+    } catch(err) {
+      console.error('Error actualizando estado cocina:', err);
+    }
+
     if (nuevoEstado === 'lista') {
       if (removalTimers.current[turnId]) clearTimeout(removalTimers.current[turnId]);
       removalTimers.current[turnId] = setTimeout(() => {
