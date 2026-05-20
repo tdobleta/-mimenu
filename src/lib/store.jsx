@@ -141,17 +141,20 @@ export function AppProvider({ children }) {
           return;
         }
 
-        const menuItemsArrays = await Promise.all(
-          branches.map(b => base44.entities.MenuItem.filter({ branch_id: b.id }).catch(() => []))
-        );
+        const [menuItemsArrays, modGroupsArrays] = await Promise.all([
+          Promise.all(branches.map(b => base44.entities.MenuItem.filter({ branch_id: b.id }).catch(() => []))),
+          Promise.all(branches.map(b => supabase.from('modifier_groups').select('*').eq('branch_id', b.id).then(r => r.data || []).catch(() => []))),
+        ]);
         const menuItemsByBranch = {};
         branches.forEach((b, i) => {
+          const mods = modGroupsArrays[i] || [];
           menuItemsByBranch[b.id] = (menuItemsArrays[i] || []).map(item => ({
             id: item.id,
             nombre: item.nombre || '',
             precio: item.precio || 0,
             categoria: item.categoria || 'Principales',
             disponible: item.activo !== false,
+            modificadores: mods.filter(m => m.menu_item_id === item.id),
           }));
         });
         const teamMembersDb = await base44.entities.TeamMember.filter({ restaurant_id: restaurant.id }).catch(() => []);
@@ -699,6 +702,7 @@ export function AppProvider({ children }) {
         .map(t => ({ ...t, _ts: normTs(t.closed_at) }));
 
       const newCharts = {};
+      const newActivity = {};
       for (const bid of targetBranchIds) {
         const bTurns = allTurns.filter(t => t.branch_id === bid);
 
@@ -755,16 +759,14 @@ export function AppProvider({ children }) {
           rangeStartTs: startTs, rangeEndTs: endTs,
         };
 
-        // activity separada
-        setS(prev => ({
-          ...prev,
-          activity: { ...prev.activity, [bid]: activity },
-        }));
+        newActivity[bid] = activity;
       }
 
+      // Un solo setS para charts + activity + closedTurns (evita renders intermedios)
       setS(prev => ({
         ...prev,
-        charts: { ...prev.charts, ...newCharts },
+        activity:    { ...prev.activity, ...newActivity },
+        charts:      { ...prev.charts, ...newCharts },
         closedTurns: allTurns.slice(0, 500),
       }));
     } catch(err) {

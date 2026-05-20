@@ -82,7 +82,7 @@ export default function Caja() {
     async function load() {
       if (!turnoActivo || !branchId) { setTurnos([]); return; }
       try {
-        const all = await base44.entities.Turn.filter({ status: 'cerrada', branch_id: branchId }, '-closed_at', 200);
+        const all = await base44.entities.Turn.filter({ status: 'cerrada', branch_id: branchId }, '-closed_at', 5000);
         if (mounted) setTurnos((all||[]).filter(t => new Date(t.closed_at).getTime() >= (typeof turnoActivo.abiertaAt === 'string' ? new Date(turnoActivo.abiertaAt).getTime() : turnoActivo.abiertaAt)));
       } catch(e) {
         if (mounted) setTurnos([]);
@@ -121,7 +121,8 @@ export default function Caja() {
   return map;
 }, [turnos]);
 
-  const totalVentas = turnos.reduce((a,t) => a + (t.total_facturado||0), 0);
+  // Sumar propina al KPI — en el path de Salón la propina se guarda separada de total_facturado
+  const totalVentas = turnos.reduce((a,t) => a + (t.total_facturado||0) + (t.propina||0), 0);
   const ventasEfectivo = ventasPorMetodo['Efectivo']?.total || 0;
   const retiros = turnoActivo?.retiros || [];
   const retirosTotales = retiros.reduce((a,r) => a + (r.monto||0), 0);

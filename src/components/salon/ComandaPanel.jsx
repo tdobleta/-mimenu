@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useStore } from '@/lib/store';
 import { money, elapsedMin, fmtTableTime, tableTotal } from '@/lib/fmt';
 import CloseTableModal from './CloseTableModal';
-import { dbAddTurnItem, dbUpdateTurnItem } from '@/lib/posApi';
+import { dbAddTurnItem, dbUpdateTurnItem, dbSaveNota } from '@/lib/posApi';
 import { supabase } from '@/api/supabaseClient';
 import { base44 } from '@/api/base44Client';
 import { getPrinterConfig, printComanda } from '@/lib/printer';
@@ -93,6 +93,9 @@ export default function ComandaPanel({ table, branchId, onClose, addToast }) {
         const serverIds  = serverOrder.map(i => i.turnItemId).sort().join(',');
         const localQtys  = (table.order||[]).map(i => `${i.turnItemId}:${i.qty}`).sort().join(',');
         const serverQtys = serverOrder.map(i => `${i.turnItemId}:${i.qty}`).sort().join(',');
+        // No sobreescribir si hay ítems locales sin turnItemId (pendientes de sync a DB)
+        const localPending = (table.order || []).filter(i => !i.turnItemId);
+        if (localPending.length > 0) return;
         if (localIds !== serverIds || localQtys !== serverQtys) {
           store.updateTableOrder(branchId, table.id, serverOrder);
         }
@@ -108,7 +111,7 @@ export default function ComandaPanel({ table, branchId, onClose, addToast }) {
     }
     setEnviandoCocina(true);
     try {
-      await base44.entities.Turn.update(table.turnId, { enviado_cocina: true });
+      await base44.entities.Turn.update(table.turnId, { enviado_cocina: true, enviado_cocina_at: new Date().toISOString() });
       setYaEnviado(true);
       addToast('Comanda enviada a cocina ✓', 'success');
       const cfg = getPrinterConfig();
@@ -446,6 +449,10 @@ export default function ComandaPanel({ table, branchId, onClose, addToast }) {
                 const nota = notasModal.value.trim();
                 const key = notasModal.item.uid || notasModal.item.turnItemId || notasModal.item.itemId;
                 store.updateTableOrder(branchId, table.id, order.map(i => (i.uid || i.turnItemId || i.itemId) === key ? { ...i, nota } : i));
+                // Persistir en DB si el ítem ya fue guardado en server (tiene turnItemId)
+                if (notasModal.item.turnItemId) {
+                  dbSaveNota(notasModal.item.turnItemId, nota).catch(() => {});
+                }
                 setNotasModal(null);
               }} style={{ flex:1, padding:'8px 0', border:'none', borderRadius:8, background:G.teal, color:'white', fontSize:13, fontWeight:700, cursor:'pointer' }}>
                 Guardar

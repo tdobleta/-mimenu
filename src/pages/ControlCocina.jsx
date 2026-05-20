@@ -84,7 +84,7 @@ export default function ControlCocina() {
     loadComandas();
 
     const unsubTurns = subscribeToTurns(branchId, () => loadComandas());
-    const unsubItems = subscribeToTurnItems(() => loadComandas());
+    const unsubItems = subscribeToTurnItems(branchId, () => loadComandas());
 
     const fallback = setInterval(loadComandas, 30000);
     return () => { unsubTurns(); unsubItems(); clearInterval(fallback); };

@@ -22,7 +22,8 @@ export default function OpenShiftModal({ onClose }) {
   const [fondo, setFondo] = useState('');
   const [saving, setSaving] = useState(false);
 
-  const fondoNum = parseFloat(fondo) || 0;
+  // Eliminar puntos de miles (formato argentino: "10.000" = diez mil, no diez)
+  const fondoNum = parseFloat((fondo || '').replace(/\./g, '').replace(',', '.')) || 0;
   const branchId = store.branchId !== 'todas' ? store.branchId : store.sucursales[0]?.id;
   const tipoLabel = TIPOS.find(t => t.key === tipo)?.label || '';
 

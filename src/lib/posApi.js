@@ -1,33 +1,7 @@
 import { supabase } from '@/api/supabaseClient';
 
 // ── Turn (mesa) ───────────────────────────────────────────────────────────────
-
-export async function dbOpenTable({ branchId, mesaNum, mozo }) {
-  const { data, error } = await supabase
-    .from('turns')
-    .insert({
-      branch_id: branchId,
-      mesa_num: mesaNum,
-      mozo: mozo || '',
-      status: 'abierta',
-      total_facturado: 0,
-    })
-    .select()
-    .single();
-  if (error) throw error;
-  return data;
-}
-
-export async function dbCloseTable({ turnId, total, metodo }) {
-  const { data, error } = await supabase
-    .from('turns')
-    .update({ status: 'cerrada', closed_at: new Date().toISOString(), total_facturado: total, metodo_pago: metodo })
-    .eq('id', turnId)
-    .select()
-    .single();
-  if (error) throw error;
-  return data;
-}
+// Apertura y cierre se hacen vía base44.entities.Turn y cerrar_mesa_atomico RPC.
 
 export async function dbLoadActiveTurns(branchId) {
   const { data, error } = await supabase
@@ -55,7 +29,7 @@ export async function dbLoadClosedTurns({ branchId, since } = {}) {
 
 // ── TurnItem (ítems de la comanda) ────────────────────────────────────────────
 
-export async function dbAddTurnItem({ turnId, branchId, menuItemId, nombre, precio, qty }) {
+export async function dbAddTurnItem({ turnId, branchId, menuItemId, nombre, precio, qty, notas }) {
   const { data, error } = await supabase
     .from('turn_items')
     .insert({
@@ -65,11 +39,20 @@ export async function dbAddTurnItem({ turnId, branchId, menuItemId, nombre, prec
       menu_item_name: nombre,
       cantidad: qty,
       precio: precio || 0,
+      notas: notas || '',
     })
     .select()
     .single();
   if (error) throw error;
   return data;
+}
+
+export async function dbSaveNota(turnItemId, notas) {
+  const { error } = await supabase
+    .from('turn_items')
+    .update({ notas: notas || '' })
+    .eq('id', turnItemId);
+  if (error) throw error;
 }
 
 export async function dbUpdateTurnItem(turnItemId, cantidad) {

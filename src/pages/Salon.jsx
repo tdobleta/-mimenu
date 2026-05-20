@@ -8,6 +8,7 @@ import LayoutEditor from '../components/salon/LayoutEditor';
 import { dbLoadActiveTurns } from '@/lib/posApi';
 import { base44 } from '@/api/base44Client';
 import { subscribeToTurns } from '@/lib/realtimeManager';
+import { supabase } from '@/api/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
 import useUserRole from '@/lib/useUserRole';
 import { G, glass, glassDeep, glassLight, fontDisplay } from '@/lib/glass';
@@ -67,7 +68,25 @@ export default function Salon() {
       // Turno nuevo abierto desde otro dispositivo → marcar mesa como ocupada
       if (payload.eventType === 'INSERT') {
         const tableMatch = tables.find(t => t.num === updated.mesa_num && t.status === 'libre');
-        if (tableMatch) s.openTableWithTurn(displayBranch, tableMatch.id, updated.id, updated.mozo, updated.opened_at);
+        if (tableMatch) {
+          s.openTableWithTurn(displayBranch, tableMatch.id, updated.id, updated.mozo, updated.opened_at);
+          // Cargar ítems que pudieran existir (ej: mesa abierta desde POSView con items ya agregados)
+          supabase.from('turn_items').select('*').eq('turn_id', updated.id)
+            .then(({ data }) => {
+              if (!data?.length) return;
+              const order = data.map(it => ({
+                itemId:     it.menu_item_id || null,
+                nombre:     it.menu_item_name,
+                precio:     it.precio,
+                qty:        it.cantidad,
+                turnItemId: it.id,
+                notas:      it.notas || '',
+                libre:      !it.menu_item_id,
+              }));
+              s.updateTableOrder(displayBranch, tableMatch.id, order);
+            })
+            .catch(() => {});
+        }
         return;
       }
 
@@ -95,9 +114,25 @@ export default function Salon() {
       store.openTable(displayBranch, table.id, openedAt);
       addToast(`Mesa ${table.num} abierta`, 'success');
       const mozoNombre = store.teamMembers?.find(m => m.email === user?.email)?.nombre || user?.email || '';
-      base44.entities.Turn.create({ branch_id:displayBranch, mesa_num:table.num, status:'abierta', opened_at:new Date(openedAt).toISOString(), total_facturado:0, mozo:mozoNombre })
+      base44.entities.Turn.create({ branch_id:displayBranch, mesa_num:table.num, status:'abierta', opened_at:new Date(openedAt).toISOString(), total_facturado:0, mozo:mozoNombre, caja_shift_id: store.turnoActivo?.id || null })
         .then(turn => store.setTableTurnId(displayBranch, table.id, turn.id))
-        .catch(() => {})
+        .catch((err) => {
+          // UNIQUE constraint: otra tablet abrió la misma mesa simultáneamente
+          const isDuplicate = err?.code === '23505' || err?.message?.includes('unique');
+          if (isDuplicate) {
+            addToast(`Mesa ${table.num} ya fue abierta por otro mozo`, 'warning');
+            // Recargar el turno real desde DB para sincronizar la pantalla
+            dbLoadActiveTurns(displayBranch).then(turns => {
+              turns.forEach(t => {
+                const existing = store.getTables(displayBranch).find(tb => tb.num === t.mesa_num);
+                if (existing && existing.status === 'libre') {
+                  store.openTableWithTurn(displayBranch, existing.id, t.id, t.mozo, t.opened_at);
+                }
+              });
+            }).catch(() => {});
+          }
+          store.closeTable(displayBranch, table.id); // revertir apertura optimista local
+        })
         .finally(() => setAbriendo(null));
     } else {
       setSelectedTable(table.id);

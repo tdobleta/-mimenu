@@ -389,6 +389,9 @@ export default function POSView() {
   const [showFactura, setShowFactura] = useState(false);
   const [facturaDatos, setFacturaDatos] = useState(null);
   const rtRef = useRef(null);
+  // Guard para evitar race condition: si el usuario selecciona mesa A y luego B
+  // antes de que resuelva el await de A, descartamos el resultado de A.
+  const pendingTurnRef = useRef(null);
 
   const items = store.getMenuItems?store.getMenuItems(branchId):[];
   const cats = ['Todo',...new Set(items.map(i=>i.categoria).filter(Boolean))];
@@ -400,16 +403,20 @@ export default function POSView() {
   const total = order.reduce((s,i)=>s+(i.precio+(i.extra||0))*i.qty,0);
 
   async function handleSelectTurn(turn) {
+    // Registrar intent antes del await para detectar selección múltiple rápida
+    pendingTurnRef.current = turn.id;
     setSelectedTurn(turn);
     setLoadingOrder(true);
     try {
       const {data:its}=await supabase.from('turn_items').select('*').eq('turn_id',turn.id);
+      // Si el usuario seleccionó otra mesa mientras esperábamos, descartar este resultado
+      if(pendingTurnRef.current !== turn.id) return;
       if(its?.length>0){
         setOrder(its.map(it=>({uid:it.id,id:it.menu_item_id||null,nombre:it.menu_item_name,precio:it.precio,extra:0,qty:it.cantidad,nota:it.notas||'',sel:{},turnItemId:it.id,categoria:''})));
       } else { setOrder([]); }
 
       if(rtRef.current) rtRef.current();
-      rtRef.current = subscribeToTurnItems((payload) => {
+      rtRef.current = subscribeToTurnItems(branchId, (payload) => {
         if(payload.eventType !== 'INSERT') return;
         const it = payload.new;
         if(it.turn_id !== turn.id) return;
@@ -510,6 +517,7 @@ export default function POSView() {
         p_metodo: metodo,
         p_mozo: selectedTurn?.mozo || '',
         p_caja_shift_id: cajaId || null,
+        p_pagos_detalle: pagos?.length > 0 ? pagos : null,
       });
       if (rpcError) throw rpcError;
       if (!resultado?.ok) {

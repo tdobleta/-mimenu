@@ -48,6 +48,10 @@ export default function CocinaDisplay() {
   const [lastUpdate, setLastUpdate] = useState(null);
   const [, setTick] = useState(0);
   const removalTimers = useRef({});
+  // Ref siempre actualizado para evitar stale closure en cambiarEstado (async)
+  // Mismo patrón que storeRef en Salon.jsx
+  const comandasRef = useRef([]);
+  useEffect(() => { comandasRef.current = comandas; }, [comandas]);
 
   const loadCocina = useCallback(async () => {
     if (!activeBranchId) return;
@@ -92,7 +96,7 @@ export default function CocinaDisplay() {
     // Realtime: recargar cuando cambian turns o turn_items de esta branch
     // Usa singleton realtimeManager → comparte canal con otros componentes del mismo branch
     const unsubTurns = subscribeToTurns(activeBranchId, () => loadCocina());
-    const unsubItems = subscribeToTurnItems(() => loadCocina());
+    const unsubItems = subscribeToTurnItems(activeBranchId, () => loadCocina());
 
     // Fallback: polling cada 60s por si Realtime se desconecta
     const fallback = setInterval(loadCocina, 60000);
@@ -139,7 +143,7 @@ export default function CocinaDisplay() {
 
     try {
       // Persiste via Edge Function (SERVICE_ROLE_KEY, bypasses RLS)
-      const comanda = comandas.find(c => c.turn.id === turnId);
+      const comanda = comandasRef.current.find(c => c.turn.id === turnId);
       const bid = comanda?.turn?.branch_id || activeBranchId;
 
       if (nuevoEstado === 'lista') {

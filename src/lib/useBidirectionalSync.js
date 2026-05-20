@@ -56,7 +56,7 @@ export function useBidirectionalSync(branchId, onSync) {
     pullFromServer();
 
     const unsubTurns = subscribeToTurns(branchId, () => pullFromServer());
-    const unsubItems = subscribeToTurnItems(() => pullFromServer());
+    const unsubItems = subscribeToTurnItems(branchId, () => pullFromServer());
 
     const handleOnline = async () => {
       await registerBackgroundSync().catch(() => {});
