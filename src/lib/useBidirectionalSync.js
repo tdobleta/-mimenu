@@ -6,7 +6,7 @@
 
 import { useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/api/supabaseClient';
-import { subscribeToTurns, subscribeToTurnItems } from '@/lib/realtimeManager';
+import { subscribeToTurns, subscribeToTurnItems, registerActiveTurns } from '@/lib/realtimeManager';
 import { fetchTurnItemsBatch } from '@/lib/pagination';
 import { registerBackgroundSync } from '@/lib/offlineSync';
 
@@ -41,6 +41,7 @@ export function useBidirectionalSync(branchId, onSync) {
       }, {});
 
       onSync?.(turns.map(turn => ({ ...turn, items: itemsByTurn[turn.id] || [] })));
+      registerActiveTurns(branchId, turnIds);
       lastSyncRef.current = Date.now();
     } catch (err) {
       console.error('[bidirectionalSync]', err);
