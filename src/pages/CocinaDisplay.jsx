@@ -3,20 +3,18 @@ import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { useStore } from '@/lib/store';
 import { fetchTurnItemsBatch } from '@/lib/pagination';
-import { subscribeToTurns, subscribeToTurnItems } from '@/lib/realtimeManager';
+import { subscribeToTurns, subscribeToTurnItems, registerActiveTurns } from '@/lib/realtimeManager';
+import { supabase } from '@/api/supabaseClient';
 
-// ── Helper: actualizar estado via Edge Function (bypasses RLS) ──────────
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-
-async function updateCocinaEstado(turnId, branchId, updates) {
-  const res = await fetch(`${SUPABASE_URL}/functions/v1/cocina-update`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ turn_id: turnId, branch_id: branchId, ...updates }),
-  });
-  const data = await res.json();
-  if (!data.ok) throw new Error(data.error || 'Error actualizando cocina');
-  return data;
+// ── Helper: actualizar estado en Supabase directamente (mismo patrón que ControlCocina.marcarEntregada)
+// Reemplaza la llamada al Edge Function cocina-update que fallaba por falta de Authorization header
+async function updateCocinaEstado(turnId, _branchId, updates) {
+  const { cocina_estado, comanda_lista } = updates;
+  const updateData = {};
+  if (cocina_estado !== undefined) updateData.cocina_estado = cocina_estado;
+  if (typeof comanda_lista === 'boolean') updateData.comanda_lista = comanda_lista;
+  const { error } = await supabase.from('turns').update(updateData).eq('id', turnId);
+  if (error) throw error;
 }
 
 const COLORS = {
@@ -84,6 +82,7 @@ export default function CocinaDisplay() {
       }));
 
       setComandas(withItems);
+      registerActiveTurns(activeBranchId, turns.map(t => t.id));
       setLastUpdate(Date.now());
     } catch(err) { console.error('Error cargando cocina:', err); }
     setLoading(false);
