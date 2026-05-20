@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useStore } from '@/lib/store';
 import { supabase } from '@/api/supabaseClient';
-import { subscribeToTurns, subscribeToTurnItems } from '@/lib/realtimeManager';
+import { subscribeToTurns, subscribeToTurnItems, registerActiveTurns } from '@/lib/realtimeManager';
 import { G, glass, glassDeep, fontDisplay, fontUI } from '@/lib/glass';
 import { money } from '@/lib/fmt';
 
@@ -72,6 +72,7 @@ export default function ControlCocina() {
         // enviado_cocina_at = cuando llegó a cocina; fallback a opened_at para comandas viejas
         cocina_ref_ts: t.enviado_cocina_at || t.opened_at,
       })));
+      registerActiveTurns(branchId, (turns || []).map(t => t.id));
     } catch (e) {
       console.error('Error cargando comandas:', e);
     }
