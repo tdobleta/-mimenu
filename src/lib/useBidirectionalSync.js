@@ -6,13 +6,13 @@
 
 import { useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/api/supabaseClient';
+import { subscribeToTurns, subscribeToTurnItems } from '@/lib/realtimeManager';
 import { fetchTurnItemsBatch } from '@/lib/pagination';
 import { registerBackgroundSync } from '@/lib/offlineSync';
 
 export function useBidirectionalSync(branchId, onSync) {
   const lastSyncRef  = useRef(null);
   const isSyncingRef = useRef(false);
-  const channelRef   = useRef(null);
 
   // ── 1 query para turns + 1 query para TODOS los items (fix N+1) ───
   const pullFromServer = useCallback(async () => {
@@ -55,15 +55,8 @@ export function useBidirectionalSync(branchId, onSync) {
 
     pullFromServer();
 
-    const channel = supabase
-      .channel(`salon_rt_${branchId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'turns', filter: `branch_id=eq.${branchId}` },
-        () => pullFromServer())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'turn_items' },
-        () => pullFromServer())
-      .subscribe();
-
-    channelRef.current = channel;
+    const unsubTurns = subscribeToTurns(branchId, () => pullFromServer());
+    const unsubItems = subscribeToTurnItems(() => pullFromServer());
 
     const handleOnline = async () => {
       await registerBackgroundSync().catch(() => {});
@@ -78,7 +71,8 @@ export function useBidirectionalSync(branchId, onSync) {
     const interval = setInterval(() => { if (navigator.onLine) pullFromServer(); }, 60000);
 
     return () => {
-      supabase.removeChannel(channel);
+      unsubTurns();
+      unsubItems();
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('mimenu-sync-completed', handleSwSync);
       clearInterval(interval);

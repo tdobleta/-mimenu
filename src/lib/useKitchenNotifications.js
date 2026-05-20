@@ -3,9 +3,10 @@
 // y genera notificaciones para mozos y encargados.
 // v2 — con sonido de alerta y sin localStorage
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useStore } from '@/lib/store';
 import { subscribeToTurns } from '@/lib/realtimeManager';
+import { supabase } from '@/api/supabaseClient';
 
 // ── Sonido de alerta generado con Web Audio API ──────────────
 // No requiere archivo de audio externo
@@ -42,7 +43,6 @@ export function useKitchenNotifications() {
   const activeBranchId = store.branchId !== 'todas' ? store.branchId : store.sucursales?.[0]?.id;
   const [notifs, setNotifs] = useState([]);
   const [unread, setUnread] = useState(0);
-  const channelRef = useRef(null);
 
   // Contar no leídas
   useEffect(() => {
@@ -95,28 +95,15 @@ export function useKitchenNotifications() {
       Notification.requestPermission();
     }
 
-    const channel = supabase
-      .channel(`kitchen_notifs_${activeBranchId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'turns',
-          filter: `branch_id=eq.${activeBranchId}`,
-        },
-        (payload) => {
-          const turn = payload.new;
-          // Solo cuando comanda_lista cambia a true
-          if (turn.comanda_lista === true && payload.old?.comanda_lista !== true) {
-            addNotif(turn);
-          }
-        }
-      )
-      .subscribe();
+    const unsub = subscribeToTurns(activeBranchId, (payload) => {
+      if (payload.eventType !== 'UPDATE') return;
+      const turn = payload.new;
+      if (turn.comanda_lista === true && payload.old?.comanda_lista !== true) {
+        addNotif(turn);
+      }
+    });
 
-    channelRef.current = channel;
-    return () => { supabase.removeChannel(channel); };
+    return () => unsub();
   }, [activeBranchId, addNotif]);
 
   function markAllRead() {

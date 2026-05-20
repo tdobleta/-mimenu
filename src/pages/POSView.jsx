@@ -10,7 +10,7 @@ import { G } from '@/lib/glass';
 import { getCategoryColor } from '@/lib/menuCategories';
 import { enqueue } from '@/lib/offlineQueue';
 import { useBidirectionalSync } from '@/lib/useBidirectionalSync';
-import { subscribeToTurns } from '@/lib/realtimeManager';
+import { subscribeToTurns, subscribeToTurnItems } from '@/lib/realtimeManager';
 
 function cc(cat) { return getCategoryColor(cat); }
 function fmt(n) { return '$'+Number(n||0).toLocaleString('es-AR',{maximumFractionDigits:0}); }
@@ -408,19 +408,16 @@ export default function POSView() {
         setOrder(its.map(it=>({uid:it.id,id:it.menu_item_id||null,nombre:it.menu_item_name,precio:it.precio,extra:0,qty:it.cantidad,nota:it.notas||'',sel:{},turnItemId:it.id,categoria:''})));
       } else { setOrder([]); }
 
-      // Canal por SUCURSAL en lugar de por turno — evita 50 conexiones simultáneas
-      if(rtRef.current) supabase.removeChannel(rtRef.current);
-      const ch = supabase.channel('pos_branch_'+branchId)
-        .on('postgres_changes',{event:'INSERT',schema:'public',table:'turn_items',filter:'branch_id=eq.'+branchId},payload=>{
-          const it = payload.new;
-          // Solo procesar ítems del turno actualmente seleccionado
-          if(it.turn_id !== turn.id) return;
-          setOrder(prev=>{
-            if(prev.find(x=>x.turnItemId===it.id)) return prev;
-            return [...prev,{uid:it.id,id:it.menu_item_id||null,nombre:it.menu_item_name,precio:it.precio,extra:0,qty:it.cantidad,nota:it.notas||'',sel:{},turnItemId:it.id,categoria:''}];
-          });
-        }).subscribe();
-      rtRef.current=ch;
+      if(rtRef.current) rtRef.current();
+      rtRef.current = subscribeToTurnItems((payload) => {
+        if(payload.eventType !== 'INSERT') return;
+        const it = payload.new;
+        if(it.turn_id !== turn.id) return;
+        setOrder(prev=>{
+          if(prev.find(x=>x.turnItemId===it.id)) return prev;
+          return [...prev,{uid:it.id,id:it.menu_item_id||null,nombre:it.menu_item_name,precio:it.precio,extra:0,qty:it.cantidad,nota:it.notas||'',sel:{},turnItemId:it.id,categoria:''}];
+        });
+      });
     } catch(e){}
     setLoadingOrder(false);
   }
@@ -428,11 +425,11 @@ export default function POSView() {
   function handleDirecta(){setSelectedTurn({id:null,mesa_num:null,mozo:'',opened_at:Date.now()});setOrder([]);}
 
   function handleBack(){
-    if(rtRef.current)supabase.removeChannel(rtRef.current);
+    if(rtRef.current)rtRef.current();
     setSelectedTurn(null);setOrder([]);setCat('Todo');setQ('');
   }
 
-  useEffect(()=>()=>{if(rtRef.current)supabase.removeChannel(rtRef.current);},[]);
+  useEffect(()=>()=>{if(rtRef.current)rtRef.current();},[]);
 
   function handleAdd(item){
     if(item.modificadores?.length>0)setShowMod(item);

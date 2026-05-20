@@ -16,8 +16,9 @@ const PAGE_SIZE = 100;
  */
 export async function fetchClosedTurnsPaginated(branchId, startTs, endTs, maxRows = 500) {
   const results = [];
-  let cursor = null; // last closed_at visto
-  let page = 0;
+  // Cursor compuesto (closed_at, id) para evitar duplicar/saltear rows con mismo timestamp
+  let cursorTs = null;
+  let cursorId = null;
 
   while (results.length < maxRows) {
     let query = supabase
@@ -26,22 +27,26 @@ export async function fetchClosedTurnsPaginated(branchId, startTs, endTs, maxRow
       .eq('branch_id', branchId)
       .eq('status', 'cerrada')
       .order('closed_at', { ascending: false })
+      .order('id', { ascending: false })
       .limit(PAGE_SIZE);
 
     if (startTs) query = query.gte('closed_at', startTs);
     if (endTs)   query = query.lte('closed_at', endTs);
-    if (cursor)  query = query.lt('closed_at', cursor);
+    if (cursorTs && cursorId) {
+      // closed_at < cursorTs  OR  (closed_at = cursorTs AND id < cursorId)
+      query = query.or(`closed_at.lt.${cursorTs},and(closed_at.eq.${cursorTs},id.lt.${cursorId})`);
+    }
 
     const { data, error } = await query;
     if (error) throw error;
     if (!data?.length) break;
 
     results.push(...data);
-    cursor = data[data.length - 1].closed_at;
+    const last = data[data.length - 1];
+    cursorTs = last.closed_at;
+    cursorId = last.id;
 
-    // Si la página tiene menos de PAGE_SIZE, no hay más datos
     if (data.length < PAGE_SIZE) break;
-    page++;
   }
 
   return results;

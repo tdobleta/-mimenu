@@ -61,19 +61,24 @@ export default function Salon() {
     // Usa singleton realtimeManager → comparte canal con otros componentes del mismo branch
     const unsub = subscribeToTurns(displayBranch, (payload) => {
       const updated = payload.new;
-      // Solo procesar UPDATEs
-      if (payload.eventType !== 'UPDATE') return;
-      // storeRef.current es siempre el store más reciente (no el del montaje)
       const s = storeRef.current;
       const tables = s.getTables(displayBranch);
-      // Buscar la mesa por turnId primero; fallback por mesa_num si turnId aún no sincronizó
+
+      // Turno nuevo abierto desde otro dispositivo → marcar mesa como ocupada
+      if (payload.eventType === 'INSERT') {
+        const tableMatch = tables.find(t => t.num === updated.mesa_num && t.status === 'libre');
+        if (tableMatch) s.openTableWithTurn(displayBranch, tableMatch.id, updated.id, updated.mozo, updated.opened_at);
+        return;
+      }
+
+      if (payload.eventType !== 'UPDATE') return;
+
       const tableMatch = tables.find(t => t.turnId === updated.id)
         || tables.find(t => t.num === updated.mesa_num && t.status !== 'libre');
       if (!tableMatch) return;
       if (updated.comanda_lista !== undefined) {
         s.setTableComandaLista(displayBranch, tableMatch.id, !!updated.comanda_lista);
       }
-      // Sync cierre/anulación desde otro dispositivo
       if (updated.status === 'cerrada' || updated.status === 'anulada') {
         s.closeTable(displayBranch, tableMatch.id);
       }

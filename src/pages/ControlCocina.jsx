@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useStore } from '@/lib/store';
 import { supabase } from '@/api/supabaseClient';
-import { base44 } from '@/api/base44Client';
+import { subscribeToTurns, subscribeToTurnItems } from '@/lib/realtimeManager';
 import { G, glass, glassDeep, fontDisplay, fontUI } from '@/lib/glass';
 import { money } from '@/lib/fmt';
 
@@ -39,7 +39,6 @@ export default function ControlCocina() {
   const [comandas, setComandas] = useState([]);
   const [expandedId, setExpandedId] = useState(null);
   const [promedioPrep, setPromedioPrep] = useState(null);
-  const completedCountRef = useRef(0);
   const prepTimesRef = useRef([]);
   const [, setTick] = useState(0);
 
@@ -70,7 +69,8 @@ export default function ControlCocina() {
       setComandas((turns || []).map(t => ({
         ...t,
         items: allItems.filter(it => it.turn_id === t.id),
-        mins: minutesSince(t.opened_at),
+        // enviado_cocina_at = cuando llegó a cocina; fallback a opened_at para comandas viejas
+        cocina_ref_ts: t.enviado_cocina_at || t.opened_at,
       })));
     } catch (e) {
       console.error('Error cargando comandas:', e);
@@ -83,14 +83,11 @@ export default function ControlCocina() {
     if (!branchId) return;
     loadComandas();
 
-    const channel = supabase
-      .channel(`ctrl_cocina_${branchId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'turns', filter: `branch_id=eq.${branchId}` }, () => loadComandas())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'turn_items' }, () => loadComandas())
-      .subscribe();
+    const unsubTurns = subscribeToTurns(branchId, () => loadComandas());
+    const unsubItems = subscribeToTurnItems(() => loadComandas());
 
     const fallback = setInterval(loadComandas, 30000);
-    return () => { supabase.removeChannel(channel); clearInterval(fallback); };
+    return () => { unsubTurns(); unsubItems(); clearInterval(fallback); };
   }, [branchId, loadComandas]);
 
   // Tick cada segundo para actualizar tiempos
@@ -103,20 +100,17 @@ export default function ControlCocina() {
 
   async function marcarEntregada(turnId) {
     try {
-      await supabase.from('turns').update({ comanda_entregada: true, comanda_entregada_at: new Date().toISOString() }).eq('id', turnId);
+      await supabase.from('turns').update({
+        comanda_entregada: true,
+        comanda_entregada_at: new Date().toISOString(),
+        comanda_lista: false,
+      }).eq('id', turnId);
 
-      // Calcular tiempo de preparación para promedio
       const comanda = comandas.find(c => c.id === turnId);
-      if (comanda?.opened_at) {
-        const prepTime = minutesSince(comanda.opened_at);
-        prepTimesRef.current.push(prepTime);
-        completedCountRef.current++;
-
-        // Actualizar promedio cada 5 entregas
-        if (completedCountRef.current % 5 === 0 && prepTimesRef.current.length > 0) {
-          const avg = Math.round(prepTimesRef.current.reduce((a, b) => a + b, 0) / prepTimesRef.current.length);
-          setPromedioPrep(avg);
-        }
+      if (comanda?.cocina_ref_ts) {
+        prepTimesRef.current.push(minutesSince(comanda.cocina_ref_ts));
+        const avg = Math.round(prepTimesRef.current.reduce((a, b) => a + b, 0) / prepTimesRef.current.length);
+        setPromedioPrep(avg);
       }
 
       loadComandas();
@@ -130,7 +124,7 @@ export default function ControlCocina() {
   const activas = comandas.filter(c => c.cocina_estado !== 'lista' && !c.comanda_entregada);
   const listas = comandas.filter(c => c.cocina_estado === 'lista' && !c.comanda_entregada);
   const activeMesaNums = new Set(comandas.filter(c => !c.comanda_entregada).map(c => c.mesa_num));
-  const demoradas = activas.filter(c => minutesSince(c.opened_at) >= 15).length;
+  const demoradas = activas.filter(c => minutesSince(c.cocina_ref_ts) >= 15).length;
 
   // ── Render ───────────────────────────────────────────────────────────
 
@@ -158,7 +152,7 @@ export default function ControlCocina() {
           {allTables.map(t => {
             const hasComanda = activeMesaNums.has(t.num);
             const comanda = comandas.find(c => c.mesa_num === t.num && !c.comanda_entregada);
-            const mins = comanda ? minutesSince(comanda.opened_at) : 0;
+            const mins = comanda ? minutesSince(comanda.cocina_ref_ts) : 0;
             const isLista = comanda?.cocina_estado === 'lista';
             const mc = hasComanda ? (isLista ? { bg: '#FEE2E2', border: '#EF4444', text: '#991B1B' } : mesaColor(mins)) : { bg: 'rgba(243,244,246,0.8)', border: '#D1D5DB', text: '#9CA3AF' };
 
@@ -196,7 +190,7 @@ export default function ControlCocina() {
       {expandedId && (() => {
         const c = comandas.find(x => x.id === expandedId);
         if (!c) return null;
-        const mins = minutesSince(c.opened_at);
+        const mins = minutesSince(c.cocina_ref_ts);
         const mc = c.cocina_estado === 'lista' ? { bg: '#FEE2E2', border: '#EF4444', text: '#991B1B' } : mesaColor(mins);
         return (
           <div style={{ ...glassDeep({ padding: 0, overflow: 'hidden' }), border: `2px solid ${mc.border}` }}>
@@ -204,7 +198,7 @@ export default function ControlCocina() {
               <div>
                 <div style={{ fontSize: 24, fontWeight: 800, color: mc.text, fontFamily: fontDisplay }}>Mesa {c.mesa_num}</div>
                 <div style={{ fontSize: 12, color: mc.text, opacity: 0.7, marginTop: 2 }}>
-                  Enviada a las {fmtHora(c.opened_at)} · {fmtMin(mins)}
+                  Enviada a las {fmtHora(c.cocina_ref_ts)} · {fmtMin(mins)}
                 </div>
               </div>
               <button onClick={() => setExpandedId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: mc.text, fontSize: 20 }}>✕</button>
@@ -245,16 +239,16 @@ export default function ControlCocina() {
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {activas.filter(c => minutesSince(c.opened_at) >= 15).map(c => (
+              {activas.filter(c => minutesSince(c.cocina_ref_ts) >= 15).map(c => (
                 <div key={c.id} style={{ padding: '8px 10px', borderRadius: 8, background: '#DBEAFE', border: '1px solid #93C5FD', fontSize: 12 }}>
                   <div style={{ fontWeight: 700, color: '#1E40AF' }}>Mesa {c.mesa_num} demorada</div>
-                  <div style={{ color: '#3B82F6', marginTop: 2 }}>{fmtMin(minutesSince(c.opened_at))} en preparación</div>
+                  <div style={{ color: '#3B82F6', marginTop: 2 }}>{fmtMin(minutesSince(c.cocina_ref_ts))} en preparación</div>
                 </div>
               ))}
-              {activas.filter(c => minutesSince(c.opened_at) >= 8 && minutesSince(c.opened_at) < 15).map(c => (
+              {activas.filter(c => minutesSince(c.cocina_ref_ts) >= 8 && minutesSince(c.cocina_ref_ts) < 15).map(c => (
                 <div key={c.id} style={{ padding: '8px 10px', borderRadius: 8, background: '#FEF3C7', border: '1px solid #FDE68A', fontSize: 12 }}>
                   <div style={{ fontWeight: 700, color: '#92400E' }}>Mesa {c.mesa_num}</div>
-                  <div style={{ color: '#B45309', marginTop: 2 }}>{fmtMin(minutesSince(c.opened_at))} — atención</div>
+                  <div style={{ color: '#B45309', marginTop: 2 }}>{fmtMin(minutesSince(c.cocina_ref_ts))} — atención</div>
                 </div>
               ))}
             </div>
@@ -281,7 +275,7 @@ export default function ControlCocina() {
                   <div>
                     <div style={{ fontSize: 18, fontWeight: 800, color: '#991B1B', fontFamily: fontDisplay }}>Mesa {c.mesa_num}</div>
                     <div style={{ fontSize: 11, color: '#B91C1C', marginTop: 2 }}>
-                      {c.items.length} ítem{c.items.length !== 1 ? 's' : ''} · lista hace {fmtMin(minutesSince(c.opened_at))}
+                      {c.items.length} ítem{c.items.length !== 1 ? 's' : ''} · lista hace {fmtMin(minutesSince(c.cocina_ref_ts))}
                     </div>
                   </div>
                   <button
@@ -310,8 +304,8 @@ export default function ControlCocina() {
           </div>
           <div style={{ fontSize: 11, color: G.textFaint, marginTop: 8, textAlign: 'center' }}>
             {promedioPrep !== null
-              ? `Calculado de ${prepTimesRef.current.length} entregas`
-              : 'Se calcula cada 5 entregas completadas'
+              ? `Calculado de ${prepTimesRef.current.length} entrega${prepTimesRef.current.length !== 1 ? 's' : ''}`
+              : 'Se actualiza con cada entrega completada'
             }
           </div>
         </div>

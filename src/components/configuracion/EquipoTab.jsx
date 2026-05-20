@@ -4,7 +4,6 @@ import { useStore } from '@/lib/store';
 import { useToast } from '@/lib/toast';
 
 const ROLES = [
-  { key:'Dueno',     label:'Dueño',     desc:'Acceso total a todas las funciones y configuraciones.' },
   { key:'Encargado', label:'Encargado', desc:'Acceso a todas las vistas excepto Configuración.' },
   { key:'Mozo',      label:'Mozo',      desc:'Solo acceso al Salón y visualización de reservas.' },
   { key:'Cocinero',  label:'Cocinero',  desc:'Solo accede a la vista de cocina con las comandas en tiempo real.' },
@@ -52,7 +51,8 @@ export default function EquipoTab() {
       setForm({ nombre:'', email:'', rol:'Mozo' });
     } catch(err) {
       console.error(err);
-      addToast('Error al agregar miembro — verificá que el email sea correcto', 'error');
+      const isDuplicate = err?.code === '23505' || err?.message?.toLowerCase().includes('duplicate') || err?.message?.toLowerCase().includes('unique');
+      addToast(isDuplicate ? 'Este email ya existe en el sistema' : 'Error al agregar miembro — verificá que el email sea correcto', 'error');
     }
     setSaving(false);
   }

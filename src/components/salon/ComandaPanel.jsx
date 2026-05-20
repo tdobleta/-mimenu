@@ -74,7 +74,8 @@ export default function ComandaPanel({ table, branchId, onClose, addToast }) {
   const [enviandoCocina, setEnviandoCocina] = useState(false);
   const [yaEnviado, setYaEnviado] = useState(false);
   const [showFactura, setShowFactura] = useState(false);
-const [facturaDatos, setFacturaDatos] = useState(null);
+  const [facturaDatos, setFacturaDatos] = useState(null);
+  const [notasModal, setNotasModal] = useState(null); // { item, value } | null
 
   useEffect(() => { setYaEnviado(false); }, [table.turnId]);
 
@@ -378,13 +379,8 @@ const [facturaDatos, setFacturaDatos] = useState(null);
                       </div>
                       <div style={{ fontSize:11, color:G.textFaint }}>{money(item.precio)}</div>
                     </div>
-                    <button onClick={() => {
-                      const nota = prompt('Instrucciones (ej: sin sal, bien cocido, etc.)', item.nota || '');
-                      if (nota !== null) {
-                        const next = order.map(i => (i.uid || i.turnItemId || i.itemId) === (item.uid || item.turnItemId || item.itemId) ? { ...i, nota } : i);
-                        store.updateTableOrder(branchId, table.id, next);
-                      }
-                    }} style={{ background:'none', border:'1px solid rgba(0,0,0,0.08)', borderRadius:6, padding:'3px 8px', fontSize:10, color: item.nota ? G.teal : G.textFaint, cursor:'pointer', whiteSpace:'nowrap' }}>
+                    <button onClick={() => setNotasModal({ item, value: item.nota || '' })}
+                      style={{ background:'none', border:'1px solid rgba(0,0,0,0.08)', borderRadius:6, padding:'3px 8px', fontSize:10, color: item.nota ? G.teal : G.textFaint, cursor:'pointer', whiteSpace:'nowrap' }}>
                       {item.nota ? '✎ Editada' : '+ Instrucciones'}
                     </button>
                     <button onClick={() => changeQty(item.uid, -item.qty, item.turnItemId)} style={{ width:22, height:22, border:'1px solid rgba(0,0,0,0.08)', background:'white', borderRadius:6, cursor:'pointer', fontSize:13, color:G.textMuted, display:'flex', alignItems:'center', justifyContent:'center' }}>✕</button>
@@ -426,6 +422,38 @@ const [facturaDatos, setFacturaDatos] = useState(null);
           </button>
         </div>
       </div>
+
+      {notasModal && (
+        <div style={{ position:'fixed', inset:0, zIndex:999, display:'flex', alignItems:'center', justifyContent:'center', backgroundColor:'rgba(0,0,0,0.3)' }}
+          onClick={() => setNotasModal(null)}>
+          <div style={{ backgroundColor:'white', borderRadius:12, padding:20, width:300, maxWidth:'90vw', boxShadow:'0 8px 32px rgba(0,0,0,0.18)' }}
+            onClick={e => e.stopPropagation()}>
+            <div style={{ fontSize:14, fontWeight:700, color:G.text, marginBottom:4 }}>Instrucciones</div>
+            <div style={{ fontSize:12, color:G.textFaint, marginBottom:12 }}>{notasModal.item.nombre}</div>
+            <textarea
+              value={notasModal.value}
+              onChange={e => setNotasModal(prev => ({ ...prev, value: e.target.value }))}
+              placeholder="Ej: sin sal, bien cocido, aparte..."
+              autoFocus
+              style={{ width:'100%', padding:'8px 10px', border:'1px solid rgba(0,0,0,0.12)', borderRadius:8, fontSize:13, boxSizing:'border-box', resize:'vertical', minHeight:70, fontFamily:'inherit', outline:'none' }}
+            />
+            <div style={{ display:'flex', gap:8, marginTop:12 }}>
+              <button onClick={() => setNotasModal(null)}
+                style={{ flex:1, padding:'8px 0', border:'1px solid rgba(0,0,0,0.12)', borderRadius:8, background:'white', fontSize:13, cursor:'pointer', color:G.textMid }}>
+                Cancelar
+              </button>
+              <button onClick={() => {
+                const nota = notasModal.value.trim();
+                const key = notasModal.item.uid || notasModal.item.turnItemId || notasModal.item.itemId;
+                store.updateTableOrder(branchId, table.id, order.map(i => (i.uid || i.turnItemId || i.itemId) === key ? { ...i, nota } : i));
+                setNotasModal(null);
+              }} style={{ flex:1, padding:'8px 0', border:'none', borderRadius:8, background:G.teal, color:'white', fontSize:13, fontWeight:700, cursor:'pointer' }}>
+                Guardar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showClose && (
         <CloseTableModal table={table} total={total} branchId={branchId}
