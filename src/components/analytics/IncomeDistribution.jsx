@@ -22,12 +22,43 @@ function normalizeMethod(m) {
   return 'Otro';
 }
 
+// Desglosa pagos mixtos igual que Caja.jsx
+function parsePagos(t) {
+  // 1. pagos_detalle (nuevo campo JSONB) o pagos (campo legacy)
+  const raw = t.pagos_detalle || t.pagos;
+  if (raw) {
+    try {
+      const arr = Array.isArray(raw) ? raw : JSON.parse(raw);
+      if (Array.isArray(arr) && arr.length > 0) return arr;
+    } catch {}
+  }
+  const m = t.metodo_pago || '';
+  // 2. Pago simple
+  if (!m.toLowerCase().startsWith('mixto')) {
+    return [{ metodo: m, monto: t.total_facturado || 0 }];
+  }
+  // 3. Parsear string "Mixto (Efectivo $10.000 + Tarjeta $5.000)"
+  const inner = m.match(/\((.+)\)/)?.[1];
+  if (!inner) return [{ metodo: m, monto: t.total_facturado || 0 }];
+  const parts = inner.split('+').map(part => {
+    const trimmed = part.trim();
+    const match = trimmed.match(/^(.+?)\s+\$([\d.,]+)$/);
+    if (!match) return null;
+    const montoStr = match[2].replace(/\./g, '').replace(',', '.');
+    return { metodo: match[1].trim(), monto: Number(montoStr) };
+  }).filter(Boolean);
+  return parts.length > 0 ? parts : [{ metodo: m, monto: t.total_facturado || 0 }];
+}
+
 export default function IncomeDistribution({ periodTurns, periodItems, menuItemsDb }) {
   const payData = useMemo(() => {
     const map = {};
     periodTurns.forEach(t => {
-      const m = normalizeMethod(t.metodo_pago);
-      map[m] = (map[m]||0) + (t.total_facturado||0);
+      const pagos = parsePagos(t);
+      pagos.forEach(p => {
+        const name = normalizeMethod(p.metodo);
+        map[name] = (map[name]||0) + (Number(p.monto)||0);
+      });
     });
     const total = Object.values(map).reduce((a,b) => a+b, 0);
     return Object.entries(map)
