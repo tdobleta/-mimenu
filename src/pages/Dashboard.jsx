@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useDashboardStore } from '@/lib/storeSelectors';
 import { money, dateLong, elapsedMin, fmtElapsed } from '@/lib/fmt';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell, PieChart, Pie } from 'recharts';
+import { useNavigate } from 'react-router-dom';
 import AnalyticsActions from '../components/analytics/AnalyticsActions';
 import { G } from '@/lib/glass';
 import GuidedTour, { useTour } from '@/components/GuidedTour';
@@ -232,6 +233,7 @@ function CustomTooltip({ active, payload, label }) {
 export default function Dashboard() {
   const store = useDashboardStore();
   const { mostrar: mostrarTour, cerrar: cerrarTour } = useTour();
+  const navigate = useNavigate();
 
   // Rango por defecto: esta semana (lunes → hoy + 1)
   const defaultStart = getLunesDeHoy();
@@ -320,6 +322,31 @@ export default function Dashboard() {
 
   const periodoLabel = `${fmtDateShort(rangeStart)} → ${fmtDateShort(rangeEnd - 1)}`;
 
+  // ── Datos nuevos para Row 3 ──────────────────────────────────────────────────
+  const mesasCerradasCount = (store.closedTurns||[]).filter(t => (t._ts||0) >= rangeStart && (t._ts||0) < rangeEnd).length;
+  const itemsVendidos = (charts.topProducts||[]).reduce((a,p) => a + (p.unidades||0), 0);
+
+  const PAGO_COLORS = { Efectivo: G.teal, Tarjeta: G.violet, MercadoPago: G.blue, Transferencia: G.amber };
+  const formasPago = (() => {
+    const turnosFiltrados = (store.closedTurns||[]).filter(t => (t._ts||0) >= rangeStart && (t._ts||0) < rangeEnd);
+    const acc = {};
+    turnosFiltrados.forEach(t => {
+      let m = t.metodo_pago || 'Efectivo';
+      if (m.startsWith('Mixto') || !PAGO_COLORS[m]) m = 'Otros';
+      acc[m] = (acc[m]||0) + ((t.total_facturado||0) + (t.propina||0));
+    });
+    const total = Object.values(acc).reduce((a,b) => a+b, 0) || 1;
+    return Object.entries(acc).map(([nombre, monto]) => ({
+      nombre, monto, pct: Math.round((monto/total)*100),
+      color: PAGO_COLORS[nombre] || '#9CA3AF',
+    }));
+  })();
+
+  const horaChartData = Array.from({length:15}, (_,i) => {
+    const h = i + 9;
+    return { h: `${h}h`, val: porHora[h] || 0, isPico: h === horaPico };
+  });
+
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:24 }}>
       {mostrarTour && <GuidedTour onClose={cerrarTour} />}
@@ -344,10 +371,10 @@ export default function Dashboard() {
       <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr 1fr 1fr', gap:12 }}>
 
         {/* Hero */}
-        <div style={{ ...kpiCard({ padding:'20px 22px' }) }}>
+        <div style={{ ...kpiCard({ padding:'20px 22px', overflow:'hidden' }) }}>
           <div style={{ fontSize:10, fontWeight:700, color:G.textFaint, textTransform:'uppercase', letterSpacing:'0.10em', marginBottom:3 }}>Facturación del período</div>
           <div style={{ fontSize:11, color:G.textFaint, marginBottom:10 }}>{periodoLabel}</div>
-          <div style={{ fontSize:42, fontWeight:800, color:G.teal, letterSpacing:'-0.04em', fontFamily:FONT_UI, lineHeight:1 }}>
+          <div style={{ fontSize:42, fontWeight:800, color:G.text, letterSpacing:'-0.04em', fontFamily:FONT_UI, lineHeight:1 }}>
             {money(charts.facturacionHoy)}
           </div>
           <div style={{ display:'flex', alignItems:'center', gap:8, marginTop:8 }}>
@@ -356,18 +383,39 @@ export default function Dashboard() {
             </span>
             <span style={{ fontSize:12, color:G.textFaint }}>vs período anterior</span>
           </div>
-          {/* Sparkline */}
-          <div style={{ display:'flex', alignItems:'flex-end', gap:2, marginTop:14, height:28 }}>
-            {chartData.slice(-14).map((d, i) => {
-              const maxV = Math.max(...chartData.map(x=>x.actual||0), 1);
-              const h = Math.max(3, ((d.actual||0)/maxV)*28);
-              return <div key={i} style={{ flex:1, height:h, background: i === chartData.slice(-14).length-1 ? G.teal : `rgba(29,158,117,${0.12+i*0.05})`, borderRadius:2 }}/>;
-            })}
-          </div>
+          {/* SVG sparkline — line chart */}
+          {(() => {
+            const vals = chartData.slice(-7).map(d => d.actual||0);
+            if (vals.length < 2) return null;
+            const maxV = Math.max(...vals, 1);
+            const W = 110, H = 56;
+            const pts = vals.map((v,i) => [
+              (i/(vals.length-1))*W,
+              H - (v/maxV)*H*0.78 - H*0.08,
+            ]);
+            const linePath = pts.reduce((acc,[x,y],i) => acc+(i===0?`M${x.toFixed(1)},${y.toFixed(1)}`:`L${x.toFixed(1)},${y.toFixed(1)}`),'');
+            const areaPath = linePath+` L${W},${H} L0,${H} Z`;
+            return (
+              <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`}
+                style={{ position:'absolute', right:0, bottom:0, opacity:0.9 }}>
+                <defs>
+                  <linearGradient id="sparkArea" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={G.teal} stopOpacity={0.18}/>
+                    <stop offset="100%" stopColor={G.teal} stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <path d={areaPath} fill="url(#sparkArea)" />
+                <path d={linePath} fill="none" stroke={G.teal} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            );
+          })()}
         </div>
 
         {/* Ticket promedio */}
         <div style={{ ...kpiCard({ padding:'16px 18px' }) }}>
+          <div style={{ position:'absolute', top:14, right:14, width:32, height:32, borderRadius:'50%', background:'rgba(29,158,117,0.10)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={G.teal} strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></svg>
+          </div>
           <div style={{ fontSize:10, fontWeight:700, color:G.textFaint, textTransform:'uppercase', letterSpacing:'0.10em', marginBottom:6 }}>Ticket promedio</div>
           <div style={{ fontSize:32, fontWeight:800, color:G.violet, letterSpacing:'-0.03em', fontFamily:FONT_UI, lineHeight:1 }}>{money(charts.ticketPromedio)}</div>
           <div style={{ fontSize:11, color: ticketChange >= 0 ? G.teal : G.red, fontWeight:600, marginTop:4 }}>
@@ -377,6 +425,9 @@ export default function Dashboard() {
 
         {/* Mesas activas */}
         <div style={{ ...kpiCard({ padding:'16px 18px' }) }}>
+          <div style={{ position:'absolute', top:14, right:14, width:32, height:32, borderRadius:'50%', background:'rgba(55,138,221,0.10)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={G.blue} strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          </div>
           <div style={{ fontSize:10, fontWeight:700, color:G.textFaint, textTransform:'uppercase', letterSpacing:'0.10em', marginBottom:6 }}>Mesas activas</div>
           <div style={{ fontSize:32, fontWeight:800, color: demoradas > 0 ? G.red : G.blue, letterSpacing:'-0.03em', fontFamily:FONT_UI, lineHeight:1 }}>{activas}</div>
           <div style={{ fontSize:11, color: demoradas > 0 ? G.red : G.teal, fontWeight:600, marginTop:4 }}>
@@ -386,6 +437,9 @@ export default function Dashboard() {
 
         {/* Mesas en el período */}
         <div style={{ ...kpiCard({ padding:'16px 18px' }) }}>
+          <div style={{ position:'absolute', top:14, right:14, width:32, height:32, borderRadius:'50%', background:'rgba(239,159,39,0.10)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={G.amber} strokeWidth="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+          </div>
           <div style={{ fontSize:10, fontWeight:700, color:G.textFaint, textTransform:'uppercase', letterSpacing:'0.10em', marginBottom:6 }}>Mesas cerradas</div>
           <div style={{ fontSize:32, fontWeight:800, color:G.amber, letterSpacing:'-0.03em', fontFamily:FONT_UI, lineHeight:1 }}>
             {(store.closedTurns||[]).filter(t => (t._ts||0) >= rangeStart && (t._ts||0) < rangeEnd).length}
@@ -394,51 +448,51 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* ── Gráfico principal ── */}
-      <div style={{ ...kpiCard({ padding:'20px 22px' }) }}>
-        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16, flexWrap:'wrap', gap:8 }}>
-          <div>
-            <div style={{ fontSize:14, fontWeight:700, color:G.text, fontFamily:FONT_UI }}>Facturación comparativa</div>
-            <div style={{ fontSize:12, color:G.textFaint, marginTop:2 }}>
-              {periodoLabel} vs período anterior ({fmtDateShort(rangeStart - (rangeEnd - rangeStart))} → {fmtDateShort(rangeStart - 1)})
+      {/* ── Row 2: Chart + Productos ── */}
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 360px', gap:14 }}>
+
+        {/* Chart — izquierda */}
+        <div style={{ ...kpiCard({ padding:'20px 22px' }) }}>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16, flexWrap:'wrap', gap:8 }}>
+            <div>
+              <div style={{ fontSize:14, fontWeight:700, color:G.text, fontFamily:FONT_UI }}>Facturación comparativa</div>
+              <div style={{ fontSize:12, color:G.textFaint, marginTop:2 }}>
+                {periodoLabel} vs período anterior ({fmtDateShort(rangeStart - (rangeEnd - rangeStart))} → {fmtDateShort(rangeStart - 1)})
+              </div>
             </div>
           </div>
+          <ResponsiveContainer width="100%" height={240}>
+            <AreaChart data={chartData} margin={{ top:5, right:5, bottom:0, left:0 }}>
+              <defs>
+                <linearGradient id="gradActual" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor={G.teal} stopOpacity={0.20}/>
+                  <stop offset="95%" stopColor={G.teal} stopOpacity={0.02}/>
+                </linearGradient>
+                <linearGradient id="gradAnterior" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor={G.violet} stopOpacity={0.10}/>
+                  <stop offset="95%" stopColor={G.violet} stopOpacity={0}/>
+                </linearGradient>
+              </defs>
+              <CartesianGrid stroke="#F1F5F9" vertical={false} />
+              <XAxis dataKey="day" tick={{ fontSize:11, fill:G.textFaint }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize:11, fill:G.textFaint }} axisLine={false} tickLine={false} width={50}
+                tickFormatter={v => v>=1000000?`$${(v/1000000).toFixed(1)}M`:v>=1000?`$${Math.round(v/1000)}k`:`$${v}`} />
+              <Tooltip content={<CustomTooltip />} cursor={{ stroke:'#E2E8F0', strokeWidth:1 }} />
+              <Area type="monotone" dataKey="actual"   stroke={G.teal}   strokeWidth={3}   fill="url(#gradActual)"   name="Período seleccionado" dot={false} activeDot={{ r:4, fill:G.teal, strokeWidth:0 }} />
+              <Area type="monotone" dataKey="anterior" stroke={G.violet} strokeWidth={1.5} fill="url(#gradAnterior)" name="Período anterior" dot={false} strokeDasharray="4 2" activeDot={{ r:3, fill:G.violet, strokeWidth:0 }} />
+            </AreaChart>
+          </ResponsiveContainer>
+          <div style={{ display:'flex', gap:20, marginTop:12 }}>
+            {[[G.teal,'Período seleccionado',false],[G.violet,'Período anterior',true]].map(([c,l,dashed]) => (
+              <div key={l} style={{ display:'flex', alignItems:'center', gap:6 }}>
+                <div style={{ width:18, height:2.5, background:c, borderRadius:99, opacity:dashed?0.5:1 }} />
+                <span style={{ fontSize:11, color:G.textMuted, fontFamily:FONT_UI }}>{l}</span>
+              </div>
+            ))}
+          </div>
         </div>
-        <ResponsiveContainer width="100%" height={240}>
-          <AreaChart data={chartData} margin={{ top:5, right:5, bottom:0, left:0 }}>
-            <defs>
-              <linearGradient id="gradActual" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor={G.teal} stopOpacity={0.20}/>
-                <stop offset="95%" stopColor={G.teal} stopOpacity={0.02}/>
-              </linearGradient>
-              <linearGradient id="gradAnterior" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor={G.violet} stopOpacity={0.10}/>
-                <stop offset="95%" stopColor={G.violet} stopOpacity={0}/>
-              </linearGradient>
-            </defs>
-            <CartesianGrid stroke="#F1F5F9" vertical={false} />
-            <XAxis dataKey="day" tick={{ fontSize:11, fill:G.textFaint }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fontSize:11, fill:G.textFaint }} axisLine={false} tickLine={false} width={50}
-              tickFormatter={v => v>=1000000?`$${(v/1000000).toFixed(1)}M`:v>=1000?`$${Math.round(v/1000)}k`:`$${v}`} />
-            <Tooltip content={<CustomTooltip />} cursor={{ stroke:'#E2E8F0', strokeWidth:1 }} />
-            <Area type="monotone" dataKey="actual"   stroke={G.teal}   strokeWidth={3}   fill="url(#gradActual)"   name="Período seleccionado" dot={false} activeDot={{ r:4, fill:G.teal, strokeWidth:0 }} />
-            <Area type="monotone" dataKey="anterior" stroke={G.violet} strokeWidth={1.5} fill="url(#gradAnterior)" name="Período anterior" dot={false} strokeDasharray="4 2" activeDot={{ r:3, fill:G.violet, strokeWidth:0 }} />
-          </AreaChart>
-        </ResponsiveContainer>
-        <div style={{ display:'flex', gap:20, marginTop:12 }}>
-          {[[G.teal,'Período seleccionado',false],[G.violet,'Período anterior',true]].map(([c,l,dashed]) => (
-            <div key={l} style={{ display:'flex', alignItems:'center', gap:6 }}>
-              <div style={{ width:18, height:2.5, background:c, borderRadius:99, opacity:dashed?0.5:1 }} />
-              <span style={{ fontSize:11, color:G.textMuted, fontFamily:FONT_UI }}>{l}</span>
-            </div>
-          ))}
-        </div>
-      </div>
 
-      {/* ── Bottom 3 cols ── */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(280px, 1fr))', gap:12 }}>
-
-        {/* Top productos */}
+        {/* Top productos — derecha */}
         <div style={{ ...kpiCard({ padding:'16px 20px' }) }}>
           <div style={{ fontSize:10, fontWeight:700, color:G.textMuted, textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:14, fontFamily:FONT_UI }}>Top productos del período</div>
           {(!charts.topProducts || charts.topProducts.length === 0)
@@ -467,61 +521,97 @@ export default function Dashboard() {
                 })}
               </div>
           }
+          <button onClick={() => navigate('/reportes')}
+            style={{ marginTop:14, width:'100%', padding:'7px 0', background:'none', border:'none', fontSize:12, color:G.teal, fontWeight:600, cursor:'pointer', textAlign:'center' }}>
+            Ver todos los productos →
+          </button>
         </div>
 
-        {/* Ticket promedio detalle */}
+      </div>
+
+      {/* ── Row 3: Resumen Rápido + Ticket por hora + Forma de Pago ── */}
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:12 }}>
+
+        {/* ── CARD 1: Resumen Rápido ── */}
         <div style={{ ...kpiCard({ padding:'16px 20px' }) }}>
-          <div style={{ fontSize:10, fontWeight:700, color:G.textMuted, textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:10, fontFamily:FONT_UI }}>Ticket promedio</div>
-          <div style={{ fontSize:36, fontWeight:800, color:G.violet, fontFamily:FONT_UI, letterSpacing:'-0.03em', marginBottom:2 }}>
-            {money(charts.ticketPromedio)}
-          </div>
-          <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:14 }}>
-            <span style={{ fontSize:11, fontWeight:700, color: ticketChange >= 0 ? G.teal : G.red, background: ticketChange >= 0 ? 'rgba(29,158,117,0.10)' : 'rgba(226,75,74,0.10)', padding:'2px 8px', borderRadius:99 }}>
-              {ticketChange >= 0 ? '↑' : '↓'} {Math.abs(ticketChange)}%
-            </span>
-            <span style={{ fontSize:11, color:G.textFaint }}>vs mismo período anterior</span>
-          </div>
-          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+          <div style={{ fontSize:10, fontWeight:700, color:G.textMuted, textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:14, fontFamily:FONT_UI }}>Resumen rápido</div>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
             {[
-              { label:'Este período',     val:charts.ticketPromedio,  color:G.violet },
-              { label:'Período anterior', val:charts.ticketAnterior||0, color:'rgba(127,119,221,0.4)' },
-            ].map(row => (
-              <div key={row.label}>
-                <div style={{ display:'flex', justifyContent:'space-between', marginBottom:4 }}>
-                  <span style={{ fontSize:11, color:G.textMuted }}>{row.label}</span>
-                  <span style={{ fontSize:12, fontWeight:700, color:G.text }}>{money(row.val)}</span>
+              { color:G.teal,   bg:'rgba(29,158,117,0.08)',  value: mesasCerradasCount, label:'Ventas totales',
+                icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg> },
+              { color:G.violet, bg:'rgba(127,119,221,0.08)', value: itemsVendidos, label:'Ítems vendidos',
+                icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> },
+              { color:G.blue,   bg:'rgba(55,138,221,0.08)',  value: activas, label:'Mesas activas',
+                icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg> },
+              { color:G.amber,  bg:'rgba(239,159,39,0.08)',  value: horaPico ? `${String(horaPico).padStart(2,'0')}:00` : '--', label:'Hora pico',
+                icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> },
+            ].map(item => (
+              <div key={item.label} style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                <div style={{ width:28, height:28, borderRadius:8, background:item.bg, display:'flex', alignItems:'center', justifyContent:'center', color:item.color }}>
+                  {item.icon}
                 </div>
-                <div style={{ height:4, background:'#F1F5F9', borderRadius:99, overflow:'hidden' }}>
-                  <div style={{ height:'100%', width:`${charts.ticketPromedio > 0 ? Math.min((row.val/(Math.max(charts.ticketPromedio,charts.ticketAnterior||1)*1.1))*100,100) : 0}%`, background:row.color, borderRadius:99 }} />
-                </div>
+                <div style={{ fontSize:20, fontWeight:800, color:G.text, letterSpacing:'-0.02em', lineHeight:1.1, fontFamily:FONT_UI }}>{item.value}</div>
+                <div style={{ fontSize:11, color:G.textMuted, fontFamily:FONT_UI }}>{item.label}</div>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Hora pico */}
+        {/* ── CARD 2: Ticket por hora ── */}
         <div style={{ ...kpiCard({ padding:'16px 20px' }) }}>
-          <div style={{ fontSize:10, fontWeight:700, color:G.textMuted, textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:10, fontFamily:FONT_UI }}>Hora pico</div>
-          {horas.length === 0
-            ? <p style={{ fontSize:12, color:G.textFaint, margin:0 }}>Sin datos para el período seleccionado.</p>
-            : <>
-                <div style={{ fontSize:32, fontWeight:800, color:G.amber, fontFamily:FONT_UI, letterSpacing:'-0.02em', marginBottom:2 }}>
-                  {`${String(horaPico).padStart(2,'0')}:00`}
-                </div>
-                <div style={{ fontSize:11, color:G.textFaint, marginBottom:14 }}>
-                  {money(porHora[horaPico] || 0)} en ese horario
-                </div>
-                <div style={{ display:'flex', alignItems:'flex-end', gap:3, height:48 }}>
-                  {horas.map(h => (
-                    <div key={h} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:2 }}>
-                      <div style={{ width:'100%', height:Math.max(3,(porHora[h]/maxHoraVal)*44), background:h===horaPico?G.amber:'#F1F5F9', borderRadius:3 }}/>
-                      <span style={{ fontSize:9, color:G.textFaint }}>{h}h</span>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:4 }}>
+            <div style={{ fontSize:10, fontWeight:700, color:G.textMuted, textTransform:'uppercase', letterSpacing:'0.07em', fontFamily:FONT_UI }}>Ticket por hora</div>
+            {horaPico !== null && (
+              <div style={{ textAlign:'right' }}>
+                <div style={{ fontSize:16, fontWeight:800, color:G.text, letterSpacing:'-0.02em', fontFamily:FONT_UI }}>{money(porHora[horaPico]||0)}</div>
+                <div style={{ fontSize:10, color:G.textFaint }}>{`${String(horaPico).padStart(2,'0')}:00 pico`}</div>
+              </div>
+            )}
+          </div>
+          <ResponsiveContainer width="100%" height={120}>
+            <BarChart data={horaChartData} margin={{top:4,right:0,bottom:0,left:-20}}>
+              <CartesianGrid stroke="#F1F5F9" vertical={false} />
+              <XAxis dataKey="h" tick={{fontSize:9, fill:G.textFaint}} axisLine={false} tickLine={false} interval={1} />
+              <YAxis tick={{fontSize:9, fill:G.textFaint}} axisLine={false} tickLine={false}
+                tickFormatter={v => v>=1000?`$${Math.round(v/1000)}k`:''} />
+              <Tooltip formatter={v => [money(v), 'Facturación']}
+                contentStyle={{background:'#FFF', border:'1px solid #E2E8F0', borderRadius:8, fontSize:11}} />
+              <Bar dataKey="val" radius={[3,3,0,0]}>
+                {horaChartData.map((entry,i) => (
+                  <Cell key={i} fill={entry.isPico ? G.teal : '#E2E8F0'} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* ── CARD 3: Forma de Pago ── */}
+        <div style={{ ...kpiCard({ padding:'16px 20px' }) }}>
+          <div style={{ fontSize:10, fontWeight:700, color:G.textMuted, textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:12, fontFamily:FONT_UI }}>Forma de pago</div>
+          {formasPago.length === 0
+            ? <p style={{fontSize:12, color:G.textFaint, margin:0}}>Sin datos.</p>
+            : <div style={{ display:'flex', alignItems:'center', gap:16 }}>
+                <PieChart width={100} height={100}>
+                  <Pie data={formasPago} cx={50} cy={50} innerRadius={28} outerRadius={44}
+                    paddingAngle={2} dataKey="monto" startAngle={90} endAngle={-270}>
+                    {formasPago.map((entry,i) => <Cell key={i} fill={entry.color} />)}
+                  </Pie>
+                </PieChart>
+                <div style={{ display:'flex', flexDirection:'column', gap:7, flex:1 }}>
+                  {formasPago.map(p => (
+                    <div key={p.nombre} style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                      <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                        <span style={{ width:8, height:8, borderRadius:'50%', background:p.color, display:'inline-block', flexShrink:0 }} />
+                        <span style={{ fontSize:11, color:G.textMid, fontFamily:FONT_UI }}>{p.nombre}</span>
+                      </div>
+                      <span style={{ fontSize:11, fontWeight:700, color:G.text, fontFamily:FONT_UI }}>{p.pct}%</span>
                     </div>
                   ))}
                 </div>
-              </>
+              </div>
           }
         </div>
+
       </div>
 
     </div>
