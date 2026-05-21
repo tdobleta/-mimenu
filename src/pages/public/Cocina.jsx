@@ -54,7 +54,12 @@ export default function Cocina() {
   const [loading, setLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState(null);
   const [, setTick] = useState(0);
+  const [expanded, setExpanded] = useState({});
   const removalTimers = useRef({});
+
+  function toggleExpanded(turnId) {
+    setExpanded(prev => ({ ...prev, [turnId]: !prev[turnId] }));
+  }
 
   async function loadCocina() {
     try {
@@ -238,6 +243,8 @@ export default function Cocina() {
           {visibles.map(({ turn, items }) => {
             const estado = turn.cocina_estado || 'nueva';
             const c = COLORS[estado] || COLORS.nueva;
+            const tieneNotas = items.some(it => it.notas && it.notas.trim() !== '');
+            const isOpen = !!expanded[turn.id];
             return (
               <div key={turn.id} style={{
                 borderRadius:12, overflow:'hidden',
@@ -245,8 +252,11 @@ export default function Cocina() {
                 backgroundColor:c.bg,
                 boxShadow: c.pulse ? '0 0 0 4px rgba(29,158,117,0.15)' : '0 2px 8px rgba(0,0,0,0.12)',
               }}>
-                {/* Header */}
-                <div style={{ backgroundColor:c.headerBg, padding:'14px 16px', display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:10 }}>
+                {/* Header — tappable si hay notas */}
+                <div
+                  onClick={() => tieneNotas && toggleExpanded(turn.id)}
+                  style={{ backgroundColor:c.headerBg, padding:'14px 16px', display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:10, cursor: tieneNotas ? 'pointer' : 'default', userSelect:'none' }}
+                >
                   <div style={{ minWidth:0 }}>
                     <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:2 }}>
                       <div style={{ fontSize:28, fontWeight:800, color: c.headerText, lineHeight:1 }}>Mesa {turn.mesa_num}</div>
@@ -255,9 +265,14 @@ export default function Cocina() {
                       )}
                     </div>
                   </div>
-                  <div style={{ textAlign:'right', flexShrink:0 }}>
-                    <div style={{ fontSize:13, color: estado==='nueva' ? '#9CA3AF' : 'rgba(255,255,255,0.85)' }}>{fmtHora(turn.opened_at)}</div>
-                    <div style={{ fontSize:22, fontWeight:700, color:c.timerColor, lineHeight:1.2 }}>{fmtElapsed(turn.opened_at)}</div>
+                  <div style={{ display:'flex', alignItems:'center', gap:8, flexShrink:0 }}>
+                    <div style={{ textAlign:'right' }}>
+                      <div style={{ fontSize:13, color: estado==='nueva' ? '#9CA3AF' : 'rgba(255,255,255,0.85)' }}>{fmtHora(turn.opened_at)}</div>
+                      <div style={{ fontSize:22, fontWeight:700, color:c.timerColor, lineHeight:1.2 }}>{fmtElapsed(turn.opened_at)}</div>
+                    </div>
+                    {tieneNotas && (
+                      <span style={{ fontSize:20, color: c.headerText === 'white' ? 'rgba(255,255,255,0.75)' : '#6B7280', lineHeight:1, display:'inline-block', transition:'transform .2s', transform: isOpen ? 'rotate(0deg)' : 'rotate(-90deg)' }}>▾</span>
+                    )}
                   </div>
                 </div>
 
@@ -266,14 +281,21 @@ export default function Cocina() {
                   {items.length === 0 ? (
                     <div style={{ fontSize:13, color:'#9CA3AF', padding:'8px 0', textAlign:'center' }}>Sin ítems</div>
                   ) : items.map(item => (
-                    <div key={item.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'6px 0', borderBottom:'0.5px solid rgba(0,0,0,0.06)', gap:10 }}>
-                      <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap', minWidth:0 }}>
-                        <span style={{ fontSize:15, fontWeight:500, color:'#111827' }}>{item.menu_item_name || 'Ítem'}</span>
-                        {(item.menu_item_id == null || (typeof item.menu_item_id === 'string' && item.menu_item_id.startsWith('libre_'))) && (
-                          <span style={{ backgroundColor:'#FFEDD5', color:'#F97316', padding:'1px 6px', borderRadius:99, fontSize:9, fontWeight:700, letterSpacing:'0.3px' }}>LIBRE</span>
-                        )}
+                    <div key={item.id}>
+                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'6px 0', borderBottom: (!isOpen || !item.notas || item.notas.trim() === '') ? '0.5px solid rgba(0,0,0,0.06)' : 'none', gap:10 }}>
+                        <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap', minWidth:0 }}>
+                          <span style={{ fontSize:15, fontWeight:500, color:'#111827' }}>{item.menu_item_name || 'Ítem'}</span>
+                          {(item.menu_item_id == null || (typeof item.menu_item_id === 'string' && item.menu_item_id.startsWith('libre_'))) && (
+                            <span style={{ backgroundColor:'#FFEDD5', color:'#F97316', padding:'1px 6px', borderRadius:99, fontSize:9, fontWeight:700, letterSpacing:'0.3px' }}>LIBRE</span>
+                          )}
+                        </div>
+                        <span style={{ fontSize:20, fontWeight:800, color:'#111827', flexShrink:0 }}>×{item.cantidad || 1}</span>
                       </div>
-                      <span style={{ fontSize:20, fontWeight:800, color:'#111827', flexShrink:0 }}>×{item.cantidad || 1}</span>
+                      {isOpen && item.notas && item.notas.trim() !== '' && (
+                        <div style={{ fontSize:12, color:'#92600A', background:'#FFFBEB', border:'1px solid #FDE68A', borderRadius:6, padding:'4px 8px', margin:'2px 0 6px 0', lineHeight:1.4, borderBottom:'0.5px solid rgba(0,0,0,0.06)' }}>
+                          📝 {item.notas.trim()}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
