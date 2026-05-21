@@ -503,16 +503,20 @@ export default function ComandaPanel({ table, branchId, onClose, addToast }) {
                   p_caja_shift_id: cajaShiftId || null,
                   p_pagos_detalle: pagos?.length > 0 ? pagos : null,
                 });
-                if (rpcError) throw rpcError;
-                if (!resultado?.ok) {
-                  if (resultado?.error === 'turno_ya_cerrado') {
+                if (rpcError) {
+                  // cerrar_mesa_atomico lanza RAISE EXCEPTION si el turno no existe o ya está cerrado.
+                  // Supabase lo retorna como rpcError con code P0001.
+                  const msgLower = rpcError.message?.toLowerCase() || '';
+                  if (msgLower.includes('ya cerrado') || rpcError.code === 'P0001') {
                     addToast('Esta mesa ya fue cerrada por otro dispositivo.', 'warning');
                     store.closeTable(branchId, table.id);
                     setShowClose(false); onClose(); setCerrando(false);
                     return;
                   }
-                  throw new Error(resultado?.error || 'Error al cerrar mesa');
+                  throw rpcError;
                 }
+                // Si llegamos aquí sin error, cerrar_mesa_atomico tuvo éxito.
+                // resultado es la fila de turns actualizada — no hay campo .ok que verificar.
               } else {
                 // Venta directa sin turn previo — crear turn cerrado
                 const turn = await base44.entities.Turn.create({ branch_id:branchId, mesa_num:table.num, status:'cerrada', opened_at:table.openedAt ? new Date(table.openedAt).toISOString() : new Date().toISOString(), closed_at:new Date().toISOString(), total_facturado:finalTotal, descuento:discAmount||0, propina:propinaAmount||0, metodo_pago:method, mozo:table.mozo||'', ...(cajaShiftId?{caja_shift_id:cajaShiftId}:{}) });

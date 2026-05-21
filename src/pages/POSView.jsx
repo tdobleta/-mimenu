@@ -519,15 +519,17 @@ export default function POSView() {
         p_caja_shift_id: cajaId || null,
         p_pagos_detalle: pagos?.length > 0 ? pagos : null,
       });
-      if (rpcError) throw rpcError;
-      if (!resultado?.ok) {
-        if (resultado?.error === 'turno_ya_cerrado') {
+      if (rpcError) {
+        // cerrar_mesa_atomico lanza RAISE EXCEPTION si el turno no existe o ya está cerrado.
+        const msgLower = rpcError.message?.toLowerCase() || '';
+        if (msgLower.includes('ya cerrado') || rpcError.code === 'P0001') {
           addToast('Esta mesa ya fue cerrada por otro dispositivo.', 'warning');
           setShowCobro(false);
           return;
         }
-        throw new Error(resultado?.error || 'Error al cerrar mesa');
+        throw rpcError;
       }
+      // Si llegamos aquí sin error, cerrar_mesa_atomico tuvo éxito (resultado = turns row).
       // Actualizar cache de caja desde DB (ya actualizado por la transacción)
       if (cajaId) {
         try {
