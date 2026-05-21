@@ -15,7 +15,7 @@ CREATE OR REPLACE FUNCTION cerrar_mesa_atomico(
   p_caja_shift_id  uuid    DEFAULT NULL,
   p_pagos_detalle  jsonb   DEFAULT NULL
 )
-RETURNS json AS $$
+RETURNS turns AS $$
 DECLARE
   v_turn turns%ROWTYPE;
   v_nuevo_total numeric;
@@ -27,7 +27,9 @@ BEGIN
   FOR UPDATE;
 
   IF NOT FOUND THEN
-    RETURN json_build_object('ok', false, 'error', 'turno_ya_cerrado');
+    -- RAISE EXCEPTION → llega como rpcError en el frontend (código P0001)
+    -- Frontend detecta: rpcError.message.includes('ya cerrado') || rpcError.code === 'P0001'
+    RAISE EXCEPTION 'turno ya cerrado' USING ERRCODE = 'P0001';
   END IF;
 
   UPDATE turns SET
@@ -39,11 +41,12 @@ BEGIN
     mozo            = p_mozo,
     caja_shift_id   = COALESCE(p_caja_shift_id, caja_shift_id),   -- FIX: antes no se seteaba
     pagos_detalle   = COALESCE(p_pagos_detalle, pagos_detalle)    -- NUEVO: desglose mixto
-  WHERE id = p_turn_id;
+  WHERE id = p_turn_id
+  RETURNING * INTO v_turn;
 
   -- Actualizar acumulado del turno de caja (lógica existente preservada)
   IF p_caja_shift_id IS NOT NULL THEN
-    SELECT COALESCE(SUM(total_facturado + propina), 0) INTO v_nuevo_total
+    SELECT COALESCE(SUM(total_facturado + COALESCE(propina, 0)), 0) INTO v_nuevo_total
     FROM turns
     WHERE caja_shift_id = p_caja_shift_id AND status = 'cerrada';
 
@@ -52,7 +55,7 @@ BEGIN
     WHERE id = p_caja_shift_id;
   END IF;
 
-  RETURN json_build_object('ok', true);
+  RETURN v_turn;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 

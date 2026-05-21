@@ -340,7 +340,7 @@ export default function ComandaPanel({ table, branchId, onClose, addToast }) {
           <div>
             <div style={{ fontSize:11, color:G.textMuted, marginBottom:3 }}>Descripción</div>
             <input value={freeForm.nombre} onChange={e => setFreeForm(f => ({ ...f, nombre:e.target.value }))} placeholder="Ej: Porción especial del chef"
-              style={{ width:'100%', padding:'8px 10px', border:'1px solid rgba(255,255,255,0.7)', background:'rgba(255,255,255,0.6)', borderRadius:9, fontSize:13, boxSizing:'border-box', outline:'none', backdropFilter:'blur(8px)' }} />
+              style={{ width:'100%', padding:'8px 10px', border:'1px solid rgba(0,0,0,0.15)', background:'white', borderRadius:9, fontSize:13, boxSizing:'border-box', outline:'none' }} />
           </div>
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
             <div>
@@ -348,12 +348,12 @@ export default function ComandaPanel({ table, branchId, onClose, addToast }) {
               <div style={{ position:'relative' }}>
                 <span style={{ position:'absolute', left:10, top:'50%', transform:'translateY(-50%)', fontSize:13, color:G.textFaint }}>$</span>
                 <input type="number" value={freeForm.precio} onChange={e => setFreeForm(f => ({ ...f, precio:e.target.value }))} placeholder="0"
-                  style={{ width:'100%', padding:'8px 10px 8px 22px', border:'1px solid rgba(255,255,255,0.7)', background:'rgba(255,255,255,0.6)', borderRadius:9, fontSize:13, boxSizing:'border-box', outline:'none' }} />
+                  style={{ width:'100%', padding:'8px 10px 8px 22px', border:'1px solid rgba(0,0,0,0.15)', background:'white', borderRadius:9, fontSize:13, boxSizing:'border-box', outline:'none' }} />
               </div>
             </div>
             <div>
               <div style={{ fontSize:11, color:G.textMuted, marginBottom:3 }}>Cantidad</div>
-              <div style={{ display:'flex', alignItems:'center', gap:4, border:'1px solid rgba(255,255,255,0.7)', background:'rgba(255,255,255,0.6)', borderRadius:9, padding:'2px 4px' }}>
+              <div style={{ display:'flex', alignItems:'center', gap:4, border:'1px solid rgba(0,0,0,0.15)', background:'white', borderRadius:9, padding:'2px 4px' }}>
                 <button onClick={() => setFreeForm(f => ({ ...f, qty:Math.max(1,(f.qty||1)-1) }))} style={{ width:26, height:26, border:'none', background:'none', cursor:'pointer', fontSize:16, color:G.textMuted }}>−</button>
                 <input type="number" value={freeForm.qty} onChange={e => setFreeForm(f => ({ ...f, qty:Math.max(1,Number(e.target.value)||1) }))}
                   style={{ flex:1, minWidth:0, textAlign:'center', border:'none', outline:'none', fontSize:13, fontWeight:700, padding:'5px 0', background:'transparent' }} />

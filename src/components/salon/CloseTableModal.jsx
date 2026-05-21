@@ -82,7 +82,7 @@ export default function CloseTableModal({ table, total, branchId, onClose, onCon
   }
 
   return (
-    <div style={{ position:'fixed', top:0, left:0, right:0, bottom:0, zIndex:9999, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(15,15,35,0.45)', padding:8 }}
+    <div style={{ position:'fixed', top:0, left:0, right:0, bottom:0, zIndex:9999, display:'flex', alignItems:'flex-start', justifyContent:'center', background:'rgba(15,15,35,0.45)', padding:'20px 8px' }}
       onClick={onClose}>
       <div style={{
         background:'#FFFFFF',
@@ -91,13 +91,13 @@ export default function CloseTableModal({ table, total, branchId, onClose, onCon
         border:'1px solid rgba(0,0,0,0.08)',
         boxShadow:'0 24px 64px rgba(60,60,160,0.16)',
         borderRadius:20,
-        width:440, maxWidth:'92vw', maxHeight:'96vh', overflowY:'auto', padding:'20px 22px',
+        width:440, maxWidth:'92vw', maxHeight:'96vh', overflowY:'auto', padding:'14px 16px',
         fontFamily:"'DM Sans', system-ui, sans-serif",
       }} onClick={e => e.stopPropagation()}>
 
         {/* Header */}
-        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
-          <span style={{ fontSize:17, fontWeight:700, color:'#1a1a2e', fontFamily:"'Playfair Display', Georgia, serif" }}>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
+          <span style={{ fontSize:15, fontWeight:700, color:'#1a1a2e', fontFamily:"'Playfair Display', Georgia, serif" }}>
             Cerrar mesa {table.num}
           </span>
           <button onClick={onClose} style={{ color:'#9BA3B8', background:'none', border:'none', cursor:'pointer', display:'flex' }}>
@@ -106,7 +106,7 @@ export default function CloseTableModal({ table, total, branchId, onClose, onCon
         </div>
 
         {/* Resumen de ítems */}
-        <div style={{ background:'rgba(0,0,0,0.04)', borderRadius:12, padding:12, marginBottom:14 }}>
+        <div style={{ background:'rgba(0,0,0,0.04)', borderRadius:10, padding:10, marginBottom:10 }}>
           {(table.order||[]).length === 0
             ? <div style={{ fontSize:12, color:'#9BA3B8' }}>Sin ítems</div>
             : (table.order||[]).map(it => (
@@ -119,7 +119,7 @@ export default function CloseTableModal({ table, total, branchId, onClose, onCon
         </div>
 
         {/* Descuento toggle */}
-        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom: disc ? 10 : 14 }}>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom: disc ? 6 : 10 }}>
           <span style={{ fontSize:13, color:'#374151' }}>Aplicar descuento</span>
           <button onClick={() => setDisc(!disc)}
             style={{ position:'relative', width:40, height:22, borderRadius:99, border:'none', cursor:'pointer', transition:'background .2s', background: disc ? '#1D9E75' : '#E5E7EB', padding:2 }}>
@@ -145,7 +145,7 @@ export default function CloseTableModal({ table, total, branchId, onClose, onCon
         )}
 
         {/* Propina */}
-        <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:14, padding:'10px 12px', background:'rgba(239,159,39,0.08)', border:'1px solid rgba(239,159,39,0.25)', borderRadius:10 }}>
+        <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:10, padding:'8px 10px', background:'rgba(239,159,39,0.08)', border:'1px solid rgba(239,159,39,0.25)', borderRadius:10 }}>
           <div style={{ display:'flex', alignItems:'center', gap:6, flex:1 }}>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#EF9F27" strokeWidth="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
             <span style={{ fontSize:13, color:'#92600A', fontWeight:500 }}>Propina</span>
@@ -159,8 +159,8 @@ export default function CloseTableModal({ table, total, branchId, onClose, onCon
         </div>
 
         {/* Métodos de pago */}
-        <div style={{ fontSize:10, fontWeight:700, color:'#9BA3B8', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:8 }}>Método de pago</div>
-        <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginBottom:12 }}>
+        <div style={{ fontSize:10, fontWeight:700, color:'#9BA3B8', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6 }}>Método de pago</div>
+        <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginBottom:8 }}>
           {METHODS.map(m => {
             const color = METHOD_COLOR[m];
             const isM1 = method1 === m;
@@ -194,7 +194,7 @@ export default function CloseTableModal({ table, total, branchId, onClose, onCon
 
         {/* Pago mixto */}
         {mixMode && (
-          <div style={{ display:'flex', flexDirection:'column', gap:8, marginBottom:12, padding:12, background:'rgba(0,0,0,0.04)', borderRadius:10 }}>
+          <div style={{ display:'flex', flexDirection:'column', gap:6, marginBottom:8, padding:10, background:'rgba(0,0,0,0.04)', borderRadius:10 }}>
             {[
               { m:method1, val:amount1, setVal:(v)=>{ setAmount1(v); setAmount2(String(Math.max(0, totalConPropina-(Number(v)||0)))); } },
               { m:method2, val:amount2, setVal:(v)=>{ setAmount2(v); setAmount1(String(Math.max(0, totalConPropina-(Number(v)||0)))); } },
@@ -218,7 +218,7 @@ export default function CloseTableModal({ table, total, branchId, onClose, onCon
         )}
 
         {/* Resumen final */}
-        <div style={{ borderTop:'1px solid rgba(0,0,0,0.08)', paddingTop:12, marginBottom:16, display:'flex', flexDirection:'column', gap:5 }}>
+        <div style={{ borderTop:'1px solid rgba(0,0,0,0.08)', paddingTop:8, marginBottom:10, display:'flex', flexDirection:'column', gap:5 }}>
           <div style={{ display:'flex', justifyContent:'space-between', fontSize:13, color:'#6B7280' }}>
             <span>Subtotal</span><span>{money(total)}</span>
           </div>
@@ -247,11 +247,11 @@ export default function CloseTableModal({ table, total, branchId, onClose, onCon
 
         {/* Botones */}
         <div style={{ display:'flex', gap:8 }}>
-          <button onClick={onClose} style={{ flex:1, padding:'11px 0', border:'1px solid rgba(0,0,0,0.10)', borderRadius:12, fontSize:13, color:'#374151', background:'rgba(255,255,255,0.7)', cursor:'pointer' }}>
+          <button onClick={onClose} style={{ flex:1, padding:'9px 0', border:'1px solid rgba(0,0,0,0.10)', borderRadius:12, fontSize:13, color:'#374151', background:'rgba(255,255,255,0.7)', cursor:'pointer' }}>
             Cancelar
           </button>
           <button disabled={!montosCuadran || printing} onClick={handleConfirm}
-            style={{ flex:2, padding:'11px 0', border:'none', borderRadius:12, fontSize:13, fontWeight:700, color:'white', background:'#1D9E75', cursor: (!montosCuadran || printing) ? 'not-allowed' : 'pointer', opacity: (!montosCuadran || printing) ? 0.5 : 1, boxShadow:'0 4px 14px rgba(29,158,117,0.28)' }}>
+            style={{ flex:2, padding:'9px 0', border:'none', borderRadius:12, fontSize:13, fontWeight:700, color:'white', background:'#1D9E75', cursor: (!montosCuadran || printing) ? 'not-allowed' : 'pointer', opacity: (!montosCuadran || printing) ? 0.5 : 1, boxShadow:'0 4px 14px rgba(29,158,117,0.28)' }}>
             {printing ? 'Imprimiendo...' : 'Confirmar y cerrar mesa'}
           </button>
         </div>
@@ -260,3 +260,4 @@ export default function CloseTableModal({ table, total, branchId, onClose, onCon
     </div>
   );
 }
+
