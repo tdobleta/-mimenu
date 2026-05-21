@@ -66,11 +66,9 @@ export default function Topbar({ onMobile }) {
       alignItems: 'center',
       padding: '0 20px',
       gap: 12,
-      background: 'rgba(255,255,255,0.55)',
-      backdropFilter: 'blur(20px) saturate(160%)',
-      WebkitBackdropFilter: 'blur(20px) saturate(160%)',
-      borderBottom: '1px solid rgba(255,255,255,0.65)',
-      boxShadow: '0 2px 16px rgba(80,80,180,0.05)',
+      background: '#FFFFFF',
+      borderBottom: '1px solid #E2E8F0',
+      boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
       flexShrink: 0,
       position: 'relative',
       zIndex: 5,
@@ -107,10 +105,10 @@ export default function Topbar({ onMobile }) {
           {open && (
             <div style={{
               position:'absolute', top:42, left:'50%', transform:'translateX(-50%)',
-              background:'rgba(255,255,255,0.90)', backdropFilter:'blur(20px)', WebkitBackdropFilter:'blur(20px)',
-              border:'1px solid rgba(255,255,255,0.9)', borderRadius:14, padding:'4px 0',
+              background:'#FFFFFF',
+              border:'1px solid #E2E8F0', borderRadius:14, padding:'4px 0',
               minWidth:220, zIndex:999,
-              boxShadow:'0 8px 32px rgba(60,60,160,0.12)',
+              boxShadow:'0 4px 6px -1px rgba(0,0,0,0.07), 0 2px 4px -1px rgba(0,0,0,0.05)',
             }}>
               {sucursales.map(su => (
                 <button key={su.id} onClick={() => { setBranchId(su.id); setOpen(false); }}
@@ -178,10 +176,10 @@ export default function Topbar({ onMobile }) {
           {userMenuOpen && (
             <div style={{
               position:'absolute', top:42, right:0,
-              background:'rgba(255,255,255,0.92)', backdropFilter:'blur(20px)', WebkitBackdropFilter:'blur(20px)',
-              border:'1px solid rgba(255,255,255,0.9)', borderRadius:14, padding:'4px 0',
+              background:'#FFFFFF',
+              border:'1px solid #E2E8F0', borderRadius:14, padding:'4px 0',
               minWidth:190, zIndex:999,
-              boxShadow:'0 8px 32px rgba(60,60,160,0.12)',
+              boxShadow:'0 4px 6px -1px rgba(0,0,0,0.07), 0 2px 4px -1px rgba(0,0,0,0.05)',
             }}>
               <div style={{ padding:'12px 16px', borderBottom:'0.5px solid rgba(0,0,0,0.06)' }}>
                 <div style={{ fontSize:13, fontWeight:600, color:G.text }}>{userName}</div>

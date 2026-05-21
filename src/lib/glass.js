@@ -16,45 +16,39 @@ export const G = {
   redLight:    '#FCEBEB',
   coral:       '#D85A30',
   coralLight:  '#FAECE7',
-  text:        '#1a1a2e',
-  textMid:     '#374151',
-  textMuted:   '#6B7280',
-  textFaint:   '#9BA3B8',
+  text:        '#0F172A',
+  textMid:     '#334155',
+  textMuted:   '#64748B',
+  textFaint:   '#94A3B8',
 };
 
 // Fondo global de la app
-export const APP_BG = 'linear-gradient(140deg, #eef2ff 0%, #f8fffc 35%, #fdf4ff 70%, #fff8f0 100%)';
+export const APP_BG = '#F1F5F9';
 
-// Card glass estándar
+// Card estándar
 export const glass = (extra = {}) => ({
-  background: 'rgba(255,255,255,0.55)',
-  backdropFilter: 'blur(20px) saturate(160%)',
-  WebkitBackdropFilter: 'blur(20px) saturate(160%)',
-  border: '1px solid rgba(255,255,255,0.78)',
-  boxShadow: '0 4px 24px rgba(80,80,180,0.06), inset 0 1px 0 rgba(255,255,255,0.95)',
-  borderRadius: 18,
-  ...extra,
-});
-
-// Card glass más prominente (panels grandes)
-export const glassDeep = (extra = {}) => ({
-  background: 'rgba(255,255,255,0.45)',
-  backdropFilter: 'blur(28px) saturate(190%)',
-  WebkitBackdropFilter: 'blur(28px) saturate(190%)',
-  border: '1px solid rgba(255,255,255,0.70)',
-  boxShadow: '0 8px 40px rgba(60,60,160,0.08), inset 0 1px 0 rgba(255,255,255,0.98), 0 1px 2px rgba(0,0,0,0.03)',
-  borderRadius: 22,
-  ...extra,
-});
-
-// Card glass sutil (inner cards, pills)
-export const glassLight = (extra = {}) => ({
-  background: 'rgba(255,255,255,0.65)',
-  backdropFilter: 'blur(12px)',
-  WebkitBackdropFilter: 'blur(12px)',
-  border: '1px solid rgba(255,255,255,0.85)',
-  boxShadow: '0 2px 12px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,1)',
+  background: '#FFFFFF',
+  border: '1px solid #E2E8F0',
+  boxShadow: '0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)',
   borderRadius: 12,
+  ...extra,
+});
+
+// Panel prominente (panels grandes)
+export const glassDeep = (extra = {}) => ({
+  background: '#FFFFFF',
+  border: '1px solid #E2E8F0',
+  boxShadow: '0 4px 6px -1px rgba(0,0,0,0.07), 0 2px 4px -1px rgba(0,0,0,0.05)',
+  borderRadius: 16,
+  ...extra,
+});
+
+// Inner card / pill sutil
+export const glassLight = (extra = {}) => ({
+  background: '#F8FAFC',
+  border: '1px solid #E2E8F0',
+  boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+  borderRadius: 8,
   ...extra,
 });
 

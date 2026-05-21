@@ -16,12 +16,6 @@ export default function Layout() {
       fontFamily: "'DM Sans', sans-serif",
       position: 'relative',
     }}>
-      {/* Blobs decorativos de fondo */}
-      <div style={{ position:'fixed', top:-140, right:-100, width:560, height:560, borderRadius:'50%', background:'radial-gradient(circle, rgba(127,119,221,0.12) 0%, transparent 70%)', pointerEvents:'none', zIndex:0 }} />
-      <div style={{ position:'fixed', bottom:-120, left:-80, width:500, height:500, borderRadius:'50%', background:'radial-gradient(circle, rgba(29,158,117,0.10) 0%, transparent 70%)', pointerEvents:'none', zIndex:0 }} />
-      <div style={{ position:'fixed', top:'35%', left:'38%', width:380, height:380, borderRadius:'50%', background:'radial-gradient(circle, rgba(239,159,39,0.06) 0%, transparent 70%)', pointerEvents:'none', zIndex:0 }} />
-      <div style={{ position:'fixed', top:'60%', right:'15%', width:280, height:280, borderRadius:'50%', background:'radial-gradient(circle, rgba(55,138,221,0.07) 0%, transparent 70%)', pointerEvents:'none', zIndex:0 }} />
-
       {/* Sidebar desktop */}
       <div className="hidden md:flex flex-shrink-0" style={{ width: 220, position:'relative', zIndex:10 }}>
         <Sidebar />

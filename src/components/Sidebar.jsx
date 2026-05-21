@@ -37,19 +37,16 @@ export default function Sidebar({ onClose }) {
 
   return (
     <div style={{
-      background: 'rgba(255,255,255,0.45)',
-      backdropFilter: 'blur(28px) saturate(180%)',
-      WebkitBackdropFilter: 'blur(28px) saturate(180%)',
-      borderRight: '1px solid rgba(255,255,255,0.65)',
-      boxShadow: '4px 0 32px rgba(80,80,180,0.06)',
+      background: '#0D1117',
+      borderRight: '1px solid #21262D',
       display: 'flex',
       flexDirection: 'column',
       height: '100%',
       width: '100%',
     }}>
       {/* Logo */}
-      <div style={{ height:58, display:'flex', alignItems:'center', paddingLeft:20, borderBottom:'1px solid rgba(255,255,255,0.5)', flexShrink:0 }}>
-        <span style={{ fontSize:20, fontWeight:700, letterSpacing:'-0.5px', fontFamily:"'Playfair Display', Georgia, serif", color:'#1a1a2e' }}>
+      <div style={{ height:58, display:'flex', alignItems:'center', paddingLeft:20, borderBottom:'1px solid #21262D', flexShrink:0 }}>
+        <span style={{ fontSize:20, fontWeight:700, letterSpacing:'-0.5px', fontFamily:"'Playfair Display', Georgia, serif", color:'#F0F6FF' }}>
           mi<span style={{ color: G.teal }}>menú</span>
         </span>
       </div>
@@ -62,19 +59,20 @@ export default function Sidebar({ onClose }) {
             display: 'flex',
             alignItems: 'center',
             gap: 10,
-            padding: '9px 13px',
-            borderRadius: 12,
+            padding: active ? '9px 13px 9px 11px' : '9px 13px',
+            borderRadius: 8,
             textDecoration: 'none',
             fontSize: 13,
             fontWeight: active ? 600 : 400,
             transition: 'all .15s',
-            background: active ? 'rgba(29,158,117,0.13)' : 'transparent',
-            color: active ? G.teal : G.textMuted,
-            border: active ? '1px solid rgba(29,158,117,0.22)' : '1px solid transparent',
-            boxShadow: active ? '0 2px 10px rgba(29,158,117,0.10)' : 'none',
+            background: active ? 'rgba(29,158,117,0.12)' : 'transparent',
+            color: active ? '#FFFFFF' : '#8B949E',
+            border: 'none',
+            borderLeft: active ? '2px solid #1D9E75' : '2px solid transparent',
+            boxShadow: 'none',
           };
-          const onEnter = e => { if (!active) { e.currentTarget.style.background='rgba(255,255,255,0.55)'; e.currentTarget.style.color=G.textMid; } };
-          const onLeave = e => { if (!active) { e.currentTarget.style.background='transparent'; e.currentTarget.style.color=G.textMuted; } };
+          const onEnter = e => { if (!active) { e.currentTarget.style.background='rgba(255,255,255,0.06)'; e.currentTarget.style.color='#E6EDF3'; } };
+          const onLeave = e => { if (!active) { e.currentTarget.style.background='transparent'; e.currentTarget.style.color='#8B949E'; } };
 
           if (item.external) {
             return (
@@ -97,9 +95,9 @@ export default function Sidebar({ onClose }) {
       </nav>
 
       {/* Footer */}
-      <div style={{ padding:'14px 16px', borderTop:'1px solid rgba(255,255,255,0.5)' }}>
-        <div style={{ fontSize:10, color:G.textFaint, marginBottom:2, letterSpacing:'0.04em' }}>versión 1.0.0</div>
-        <div style={{ fontSize:12, color:G.textMid, fontWeight:600, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
+      <div style={{ padding:'14px 16px', borderTop:'1px solid #21262D' }}>
+        <div style={{ fontSize:10, color:'#484F58', marginBottom:2, letterSpacing:'0.04em' }}>versión 1.0.0</div>
+        <div style={{ fontSize:12, color:'#8B949E', fontWeight:600, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
           {restaurante.nombre}
         </div>
       </div>
