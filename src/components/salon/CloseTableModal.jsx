@@ -82,16 +82,14 @@ export default function CloseTableModal({ table, total, branchId, onClose, onCon
   }
 
   return (
-    <div style={{ position:'fixed', top:0, left:0, right:0, bottom:0, zIndex:9999, display:'flex', alignItems:'flex-start', justifyContent:'center', background:'rgba(15,15,35,0.45)', padding:'20px 8px' }}
+    <div style={{ position:'fixed', top:0, left:0, right:0, bottom:0, zIndex:9999, display:'flex', alignItems:'flex-start', justifyContent:'center', background:'rgba(15,15,35,0.45)', padding:'8px 8px', overflow:'hidden' }}
       onClick={onClose}>
       <div style={{
         background:'#FFFFFF',
-        
-        
         border:'1px solid rgba(0,0,0,0.08)',
         boxShadow:'0 24px 64px rgba(60,60,160,0.16)',
         borderRadius:20,
-        width:440, maxWidth:'92vw', maxHeight:'96vh', overflowY:'auto', padding:'14px 16px',
+        width:440, maxWidth:'92vw', maxHeight:'100%', overflowY:'auto', WebkitOverflowScrolling:'touch', padding:'14px 16px',
         fontFamily:"'DM Sans', system-ui, sans-serif",
       }} onClick={e => e.stopPropagation()}>
 
