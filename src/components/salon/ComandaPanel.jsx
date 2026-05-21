@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useStore } from '@/lib/store';
 import { money, elapsedMin, fmtTableTime, tableTotal } from '@/lib/fmt';
 import CloseTableModal from './CloseTableModal';
