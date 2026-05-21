@@ -68,7 +68,7 @@ export default function OpenShiftModal({ onClose }) {
 
   return (
     <div style={{ position:'fixed', inset:0, zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', backgroundColor:'rgba(0,0,0,0.4)' }} onClick={saving?undefined:onClose}>
-      <div style={{ backgroundColor:'white', borderRadius:12, width:420, maxWidth:'95vw', padding:24 }} onClick={e=>e.stopPropagation()}>
+      <div style={{ background:'#FFFFFF', border:'1px solid #E2E8F0', boxShadow:'0 8px 32px rgba(0,0,0,0.12)', borderRadius:14, width:420, maxWidth:'95vw', padding:24 }} onClick={e=>e.stopPropagation()}>
         <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:18 }}>
           <div style={{ width:34, height:34, borderRadius:'50%', backgroundColor:'#E8F7F2', display:'flex', alignItems:'center', justifyContent:'center' }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1D9E75" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
@@ -80,7 +80,7 @@ export default function OpenShiftModal({ onClose }) {
         <div style={{ display:'flex', flexDirection:'column', gap:6, marginBottom:16 }}>
           {TIPOS.map(t => (
             <button key={t.key} onClick={()=>setTipo(t.key)}
-              style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 14px', borderRadius:99, fontSize:13, cursor:'pointer', backgroundColor: tipo===t.key?'#E8F7F2':'white', color: tipo===t.key?'#1D9E75':'#374151', border: tipo===t.key?'1.5px solid #1D9E75':'0.5px solid rgba(0,0,0,0.12)', fontWeight: tipo===t.key?600:400 }}>
+              style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 14px', borderRadius:99, fontSize:13, cursor:'pointer', backgroundColor: tipo===t.key?'#E8F7F2':'white', color: tipo===t.key?'#1D9E75':'#374151', border: tipo===t.key?'1.5px solid #1D9E75':'1px solid #E2E8F0', fontWeight: tipo===t.key?600:400 }}>
               <span>{t.label}</span>
               <span style={{ fontSize:11, color: tipo===t.key?'#1D9E75':'#9CA3AF' }}>{t.horario}</span>
             </button>
@@ -91,7 +91,7 @@ export default function OpenShiftModal({ onClose }) {
         <div style={{ position:'relative', marginBottom:6 }}>
           <span style={{ position:'absolute', left:12, top:'50%', transform:'translateY(-50%)', fontSize:18, color:'#6B7280', fontWeight:500 }}>$</span>
           <input type="number" value={fondo} onChange={e=>setFondo(e.target.value)} placeholder="0"
-            style={{ width:'100%', padding:'12px 12px 12px 28px', border:'0.5px solid rgba(0,0,0,0.12)', borderRadius:7, fontSize:18, fontWeight:600, boxSizing:'border-box' }} />
+            style={{ width:'100%', padding:'12px 12px 12px 28px', border:'1px solid #E2E8F0', borderRadius:8, fontSize:18, fontWeight:600, boxSizing:'border-box' }} />
         </div>
         <div style={{ fontSize:11, color:'#9CA3AF', marginBottom:14, lineHeight:'15px' }}>
           El dinero en efectivo que hay en el cajón al empezar el turno (cambio, efectivo previo)
@@ -102,8 +102,8 @@ export default function OpenShiftModal({ onClose }) {
         </div>
 
         <div style={{ display:'flex', gap:8 }}>
-          <button onClick={onClose} disabled={saving} style={{ flex:1, padding:'10px 0', border:'0.5px solid rgba(0,0,0,0.12)', borderRadius:7, fontSize:13, color:'#374151', backgroundColor:'white', cursor:saving?'not-allowed':'pointer' }}>Cancelar</button>
-          <button onClick={confirm} disabled={saving} style={{ flex:1, padding:'10px 0', border:'none', borderRadius:7, fontSize:13, color:'white', backgroundColor:'#1D9E75', cursor:saving?'not-allowed':'pointer', opacity:saving?0.6:1 }}>
+          <button onClick={onClose} disabled={saving} style={{ flex:1, padding:'10px 0', border:'1px solid #E2E8F0', borderRadius:8, fontSize:13, color:'#374151', background:'#FFFFFF', cursor:saving?'not-allowed':'pointer' }}>Cancelar</button>
+          <button onClick={confirm} disabled={saving} style={{ flex:1, padding:'10px 0', border:'none', borderRadius:8, fontSize:13, color:'white', backgroundColor:'#1D9E75', cursor:saving?'not-allowed':'pointer', opacity:saving?0.6:1 }}>
             {saving?'Abriendo...':'Abrir turno'}
           </button>
         </div>

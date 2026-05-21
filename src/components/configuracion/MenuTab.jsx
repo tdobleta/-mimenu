@@ -135,16 +135,16 @@ export default function MenuTab() {
       {CATS.map(cat => bycat[cat].length > 0 && (
         <div key={cat}>
           <div style={{ fontSize:11, fontWeight:700, color:'#9CA3AF', textTransform:'uppercase', letterSpacing:'0.6px', marginBottom:8 }}>{cat}</div>
-          <div style={{ backgroundColor:'white', border:'0.5px solid rgba(0,0,0,0.08)', borderRadius:10, overflow:'hidden' }}>
+          <div style={{ background:'#FFFFFF', border:'1px solid #E2E8F0', boxShadow:'0 1px 3px rgba(0,0,0,0.06)', borderRadius:12, overflow:'hidden' }}>
             {bycat[cat].map((it, idx) => (
-              <div key={it.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 16px', borderBottom: idx<bycat[cat].length-1?'0.5px solid rgba(0,0,0,0.05)':'none' }}>
+              <div key={it.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 16px', borderBottom: idx<bycat[cat].length-1?'1px solid #F1F5F9':'none' }}>
                 <span style={{ flex:1, fontSize:13, fontWeight:500, color:'#111827' }}>{it.nombre}</span>
                 <span style={{ fontSize:14, fontWeight:600, color:'#1D9E75', minWidth:80, textAlign:'right' }}>{money(it.precio)}</span>
                 <button onClick={() => toggleDisponible(it)} style={{ padding:'2px 8px', borderRadius:99, fontSize:11, fontWeight:600, cursor:'pointer', border:'none', backgroundColor:it.disponible?'#E8F7F2':'#F3F4F6', color:it.disponible?'#1D9E75':'#9CA3AF', whiteSpace:'nowrap' }}>
                   {it.disponible?'Disponible':'No disponible'}
                 </button>
-                <button onClick={()=>openEdit(it)} style={{ padding:'4px 10px', border:'0.5px solid rgba(0,0,0,0.12)', borderRadius:6, fontSize:12, cursor:'pointer', color:'#374151' }}>Editar</button>
-                <button onClick={()=>setDelConfirm(it)} style={{ padding:'4px 10px', border:'0.5px solid rgba(239,68,68,0.2)', borderRadius:6, fontSize:12, cursor:'pointer', color:'#EF4444' }}>Eliminar</button>
+                <button onClick={()=>openEdit(it)} style={{ padding:'4px 10px', border:'1px solid #E2E8F0', borderRadius:6, fontSize:12, cursor:'pointer', color:'#374151' }}>Editar</button>
+                <button onClick={()=>setDelConfirm(it)} style={{ padding:'4px 10px', border:'1px solid rgba(239,68,68,0.3)', borderRadius:6, fontSize:12, cursor:'pointer', color:'#EF4444' }}>Eliminar</button>
               </div>
             ))}
           </div>
@@ -153,7 +153,7 @@ export default function MenuTab() {
 
       {modal && (
         <div style={{ position:'fixed', inset:0, zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', backgroundColor:'rgba(0,0,0,0.4)' }} onClick={()=>setModal(null)}>
-          <div style={{ backgroundColor:'white', borderRadius:12, width:400, padding:24 }} onClick={e=>e.stopPropagation()}>
+          <div style={{ background:'#FFFFFF', border:'1px solid #E2E8F0', boxShadow:'0 8px 32px rgba(0,0,0,0.12)', borderRadius:14, width:400, padding:24 }} onClick={e=>e.stopPropagation()}>
             <div style={{ display:'flex', justifyContent:'space-between', marginBottom:16 }}>
               <span style={{ fontSize:15, fontWeight:600 }}>{modal==='add'?'Nuevo plato':'Editar plato'}</span>
               <button onClick={()=>setModal(null)} style={{ color:'#9CA3AF', background:'none', border:'none', cursor:'pointer', display:'flex' }}>
@@ -162,23 +162,23 @@ export default function MenuTab() {
             </div>
             <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
               <div><div style={{ fontSize:12, color:'#6B7280', marginBottom:4 }}>Nombre</div>
-                <input value={form.nombre} onChange={e=>setForm(f=>({...f,nombre:e.target.value}))} style={{ width:'100%', padding:'7px 10px', border:'0.5px solid rgba(0,0,0,0.12)', borderRadius:7, fontSize:13 }} /></div>
+                <input value={form.nombre} onChange={e=>setForm(f=>({...f,nombre:e.target.value}))} style={{ width:'100%', padding:'7px 10px', border:'1px solid #E2E8F0', borderRadius:8, fontSize:13 }} /></div>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
                 <div><div style={{ fontSize:12, color:'#6B7280', marginBottom:4 }}>Precio</div>
-                  <input type="number" value={form.precio} onChange={e=>setForm(f=>({...f,precio:e.target.value}))} style={{ width:'100%', padding:'7px 10px', border:'0.5px solid rgba(0,0,0,0.12)', borderRadius:7, fontSize:13 }} /></div>
+                  <input type="number" value={form.precio} onChange={e=>setForm(f=>({...f,precio:e.target.value}))} style={{ width:'100%', padding:'7px 10px', border:'1px solid #E2E8F0', borderRadius:8, fontSize:13 }} /></div>
                 <div><div style={{ fontSize:12, color:'#6B7280', marginBottom:4 }}>Categoría</div>
-                  <select value={form.categoria} onChange={e=>setForm(f=>({...f,categoria:e.target.value}))} style={{ width:'100%', padding:'7px 10px', border:'0.5px solid rgba(0,0,0,0.12)', borderRadius:7, fontSize:13, backgroundColor:'white' }}>
+                  <select value={form.categoria} onChange={e=>setForm(f=>({...f,categoria:e.target.value}))} style={{ width:'100%', padding:'7px 10px', border:'1px solid #E2E8F0', borderRadius:8, fontSize:13, background:'#FFFFFF' }}>
                     {CATS.map(c=><option key={c}>{c}</option>)}</select></div>
               </div>
               <div>
                 <div style={{ fontSize:12, color:'#6B7280', marginBottom:6 }}>Imagen del plato (opcional)</div>
                 {form.imagen_url && (
                   <div style={{ position:'relative', marginBottom:8 }}>
-                    <img src={form.imagen_url} alt="preview" style={{ width:'100%', height:120, objectFit:'cover', borderRadius:8, border:'0.5px solid rgba(0,0,0,0.1)' }} />
+                    <img src={form.imagen_url} alt="preview" style={{ width:'100%', height:120, objectFit:'cover', borderRadius:8, border:'1px solid #E2E8F0' }} />
                     <button onClick={()=>setForm(f=>({...f,imagen_url:''}))} style={{ position:'absolute', top:6, right:6, background:'rgba(0,0,0,0.5)', border:'none', borderRadius:'50%', width:22, height:22, color:'white', cursor:'pointer', fontSize:13, display:'flex', alignItems:'center', justifyContent:'center' }}>×</button>
                   </div>
                 )}
-                <label style={{ display:'flex', alignItems:'center', gap:8, padding:'7px 12px', border:'0.5px dashed rgba(0,0,0,0.2)', borderRadius:7, cursor:'pointer', fontSize:12, color:'#6B7280' }}>
+                <label style={{ display:'flex', alignItems:'center', gap:8, padding:'7px 12px', border:'1px dashed #D1D5DB', borderRadius:8, cursor:'pointer', fontSize:12, color:'#6B7280' }}>
                   {uploadingImg ? 'Subiendo...' : '+ Seleccionar imagen'}
                   <input type="file" accept="image/*" style={{ display:'none' }} disabled={uploadingImg} onChange={async e => {
                     const file = e.target.files?.[0];
@@ -194,20 +194,20 @@ export default function MenuTab() {
               </label>
             </div>
             <div style={{ display:'flex', gap:8, marginTop:16 }}>
-              <button onClick={()=>setModal(null)} style={{ flex:1, padding:'9px 0', border:'0.5px solid rgba(0,0,0,0.12)', borderRadius:7, fontSize:13, cursor:'pointer' }}>Cancelar</button>
-              <button onClick={save} disabled={saving} style={{ flex:1, padding:'9px 0', border:'none', borderRadius:7, fontSize:13, color:'white', backgroundColor:'#1D9E75', cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.6 : 1 }}>Guardar</button>
+              <button onClick={()=>setModal(null)} style={{ flex:1, padding:'9px 0', border:'1px solid #E2E8F0', borderRadius:8, fontSize:13, cursor:'pointer' }}>Cancelar</button>
+              <button onClick={save} disabled={saving} style={{ flex:1, padding:'9px 0', border:'none', borderRadius:8, fontSize:13, color:'white', backgroundColor:'#1D9E75', cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.6 : 1 }}>Guardar</button>
             </div>
           </div>
         </div>
       )}
       {delConfirm && (
         <div style={{ position:'fixed', inset:0, zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', backgroundColor:'rgba(0,0,0,0.4)' }} onClick={()=>setDelConfirm(null)}>
-          <div style={{ backgroundColor:'white', borderRadius:10, padding:24, width:320 }} onClick={e=>e.stopPropagation()}>
+          <div style={{ background:'#FFFFFF', border:'1px solid #E2E8F0', boxShadow:'0 8px 32px rgba(0,0,0,0.12)', borderRadius:12, padding:24, width:320 }} onClick={e=>e.stopPropagation()}>
             <p style={{ fontSize:14, color:'#111827', marginBottom:4 }}>¿Eliminar <strong>{delConfirm.nombre}</strong>?</p>
             <p style={{ fontSize:12, color:'#9CA3AF', marginBottom:16 }}>Esta acción no se puede deshacer.</p>
             <div style={{ display:'flex', gap:8 }}>
-              <button onClick={()=>setDelConfirm(null)} style={{ flex:1, padding:'9px 0', border:'0.5px solid rgba(0,0,0,0.12)', borderRadius:7, fontSize:13, cursor:'pointer' }}>Cancelar</button>
-              <button onClick={confirmDelete} style={{ flex:1, padding:'9px 0', border:'none', borderRadius:7, fontSize:13, color:'white', backgroundColor:'#EF4444', cursor:'pointer' }}>Eliminar</button>
+              <button onClick={()=>setDelConfirm(null)} style={{ flex:1, padding:'9px 0', border:'1px solid #E2E8F0', borderRadius:8, fontSize:13, cursor:'pointer' }}>Cancelar</button>
+              <button onClick={confirmDelete} style={{ flex:1, padding:'9px 0', border:'none', borderRadius:8, fontSize:13, color:'white', backgroundColor:'#EF4444', cursor:'pointer' }}>Eliminar</button>
             </div>
           </div>
         </div>

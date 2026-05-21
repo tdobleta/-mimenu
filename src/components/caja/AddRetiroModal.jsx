@@ -50,30 +50,30 @@ export default function AddRetiroModal({ onClose }) {
 
   return (
     <div style={{ position:'fixed', inset:0, zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', backgroundColor:'rgba(0,0,0,0.4)' }} onClick={saving?undefined:onClose}>
-      <div style={{ backgroundColor:'white', borderRadius:12, width:380, maxWidth:'95vw', padding:24 }} onClick={e=>e.stopPropagation()}>
+      <div style={{ background:'#FFFFFF', border:'1px solid #E2E8F0', boxShadow:'0 8px 32px rgba(0,0,0,0.12)', borderRadius:14, width:380, maxWidth:'95vw', padding:24 }} onClick={e=>e.stopPropagation()}>
         <div style={{ fontSize:16, fontWeight:600, color:'#111827', marginBottom:14 }}>Registrar retiro de caja</div>
 
         <div style={{ fontSize:12, color:'#6B7280', marginBottom:6 }}>Concepto</div>
         <select value={concepto} onChange={e=>setConcepto(e.target.value)}
-          style={{ width:'100%', padding:'8px 10px', border:'0.5px solid rgba(0,0,0,0.12)', borderRadius:7, fontSize:13, backgroundColor:'white', marginBottom:concepto==='Otro'?8:14, boxSizing:'border-box' }}>
+          style={{ width:'100%', padding:'8px 10px', border:'1px solid #E2E8F0', borderRadius:8, fontSize:13, background:'#FFFFFF', marginBottom:concepto==='Otro'?8:14, boxSizing:'border-box' }}>
           {CONCEPTOS.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
         {concepto === 'Otro' && (
           <input value={otroTexto} onChange={e=>setOtroTexto(e.target.value)} placeholder="Describí el concepto"
-            style={{ width:'100%', padding:'8px 10px', border:'0.5px solid rgba(0,0,0,0.12)', borderRadius:7, fontSize:13, marginBottom:14, boxSizing:'border-box' }} />
+            style={{ width:'100%', padding:'8px 10px', border:'1px solid #E2E8F0', borderRadius:8, fontSize:13, marginBottom:14, boxSizing:'border-box' }} />
         )}
 
         <div style={{ fontSize:12, color:'#6B7280', marginBottom:6 }}>Monto</div>
         <div style={{ position:'relative', marginBottom:18 }}>
           <span style={{ position:'absolute', left:12, top:'50%', transform:'translateY(-50%)', fontSize:16, color:'#6B7280', fontWeight:500 }}>$</span>
           <input type="number" value={monto} onChange={e=>setMonto(e.target.value)} placeholder="0"
-            style={{ width:'100%', padding:'10px 12px 10px 28px', border:'0.5px solid rgba(0,0,0,0.12)', borderRadius:7, fontSize:16, fontWeight:600, boxSizing:'border-box' }} />
+            style={{ width:'100%', padding:'10px 12px 10px 28px', border:'1px solid #E2E8F0', borderRadius:8, fontSize:16, fontWeight:600, boxSizing:'border-box' }} />
         </div>
 
         <div style={{ display:'flex', gap:8 }}>
-          <button onClick={onClose} disabled={saving} style={{ flex:1, padding:'10px 0', border:'0.5px solid rgba(0,0,0,0.12)', borderRadius:7, fontSize:13, color:'#374151', backgroundColor:'white', cursor:'pointer' }}>Cancelar</button>
+          <button onClick={onClose} disabled={saving} style={{ flex:1, padding:'10px 0', border:'1px solid #E2E8F0', borderRadius:8, fontSize:13, color:'#374151', background:'#FFFFFF', cursor:'pointer' }}>Cancelar</button>
           <button onClick={confirm} disabled={saving || montoNum<=0 || !conceptoFinal}
-            style={{ flex:1, padding:'10px 0', border:'none', borderRadius:7, fontSize:13, color:'white', backgroundColor:'#1D9E75', cursor:'pointer', opacity:(saving||montoNum<=0||!conceptoFinal)?0.5:1 }}>
+            style={{ flex:1, padding:'10px 0', border:'none', borderRadius:8, fontSize:13, color:'white', backgroundColor:'#1D9E75', cursor:'pointer', opacity:(saving||montoNum<=0||!conceptoFinal)?0.5:1 }}>
             {saving?'Guardando...':'Registrar'}
           </button>
         </div>

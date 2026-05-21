@@ -71,7 +71,7 @@ export default function SucursalesTab() {
         </button>
       </div>
       {sucursales.map(s => (
-        <div key={s.id} style={{ backgroundColor:'white', border:'0.5px solid rgba(0,0,0,0.08)', borderRadius:10, padding:20 }}>
+        <div key={s.id} style={{ background:'#FFFFFF', border:'1px solid #E2E8F0', boxShadow:'0 1px 3px rgba(0,0,0,0.06)', borderRadius:12, padding:20 }}>
           <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between' }}>
             <div>
               <div style={{ fontSize:15, fontWeight:600, color:'#111827' }}>{s.nombre}</div>
@@ -82,20 +82,20 @@ export default function SucursalesTab() {
               </div>
             </div>
             <div style={{ display:'flex', gap:8 }}>
-              <button onClick={() => open(s)} style={{ padding:'6px 12px', border:'0.5px solid rgba(0,0,0,0.12)', borderRadius:7, fontSize:12, cursor:'pointer', color:'#374151', backgroundColor:'white' }}>Configurar</button>
-              <Link to="/salon" style={{ padding:'6px 12px', border:'0.5px solid rgba(0,0,0,0.12)', borderRadius:7, fontSize:12, cursor:'pointer', color:'#374151', backgroundColor:'white', textDecoration:'none' }}>Ver salón</Link>
+              <button onClick={() => open(s)} style={{ padding:'6px 12px', border:'1px solid #E2E8F0', borderRadius:8, fontSize:12, cursor:'pointer', color:'#374151', background:'#FFFFFF' }}>Configurar</button>
+              <Link to="/salon" style={{ padding:'6px 12px', border:'1px solid #E2E8F0', borderRadius:8, fontSize:12, cursor:'pointer', color:'#374151', background:'#FFFFFF', textDecoration:'none' }}>Ver salón</Link>
             </div>
           </div>
           {editing === s.id && (
-            <div style={{ marginTop:16, paddingTop:16, borderTop:'0.5px solid rgba(0,0,0,0.06)', display:'flex', flexDirection:'column', gap:12 }}>
+            <div style={{ marginTop:16, paddingTop:16, borderTop:'1px solid #F1F5F9', display:'flex', flexDirection:'column', gap:12 }}>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
                 <div>
                   <div style={{ fontSize:12, color:'#6B7280', marginBottom:4 }}>Nombre</div>
-                  <input value={form.nombre} onChange={e=>setForm(f=>({...f,nombre:e.target.value}))} style={{ width:'100%', padding:'7px 10px', border:'0.5px solid rgba(0,0,0,0.12)', borderRadius:7, fontSize:13 }} />
+                  <input value={form.nombre} onChange={e=>setForm(f=>({...f,nombre:e.target.value}))} style={{ width:'100%', padding:'7px 10px', border:'1px solid #E2E8F0', borderRadius:8, fontSize:13 }} />
                 </div>
                 <div>
                   <div style={{ fontSize:12, color:'#6B7280', marginBottom:4 }}>Dirección</div>
-                  <input value={form.direccion} onChange={e=>setForm(f=>({...f,direccion:e.target.value}))} style={{ width:'100%', padding:'7px 10px', border:'0.5px solid rgba(0,0,0,0.12)', borderRadius:7, fontSize:13 }} />
+                  <input value={form.direccion} onChange={e=>setForm(f=>({...f,direccion:e.target.value}))} style={{ width:'100%', padding:'7px 10px', border:'1px solid #E2E8F0', borderRadius:8, fontSize:13 }} />
                 </div>
               </div>
               <div>
@@ -105,7 +105,7 @@ export default function SucursalesTab() {
                     const active = form.franjas?.includes(fr);
                     return (
                       <button key={fr} onClick={()=>toggleFranja(fr)}
-                        style={{ padding:'4px 12px', borderRadius:6, fontSize:12, cursor:'pointer', transition:'all .15s', backgroundColor:active?'#1D9E75':'white', color:active?'white':'#374151', border:active?'none':'0.5px solid rgba(0,0,0,0.12)' }}>
+                        style={{ padding:'4px 12px', borderRadius:6, fontSize:12, cursor:'pointer', transition:'all .15s', backgroundColor:active?'#1D9E75':'white', color:active?'white':'#374151', border:active?'none':'1px solid #E2E8F0' }}>
                         {fr}
                       </button>
                     );
@@ -113,8 +113,8 @@ export default function SucursalesTab() {
                 </div>
               </div>
               <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
-                <button onClick={()=>setEditing(null)} style={{ padding:'7px 14px', border:'0.5px solid rgba(0,0,0,0.12)', borderRadius:7, fontSize:13, cursor:'pointer', color:'#374151', backgroundColor:'white' }}>Cancelar</button>
-                <button onClick={save} style={{ padding:'7px 14px', border:'none', borderRadius:7, fontSize:13, color:'white', backgroundColor:'#1D9E75', cursor:'pointer' }}>Guardar</button>
+                <button onClick={()=>setEditing(null)} style={{ padding:'7px 14px', border:'1px solid #E2E8F0', borderRadius:8, fontSize:13, cursor:'pointer', color:'#374151', background:'#FFFFFF' }}>Cancelar</button>
+                <button onClick={save} style={{ padding:'7px 14px', border:'none', borderRadius:8, fontSize:13, color:'white', backgroundColor:'#1D9E75', cursor:'pointer' }}>Guardar</button>
               </div>
             </div>
           )}
@@ -123,7 +123,7 @@ export default function SucursalesTab() {
 
       {showAdd && (
         <div style={{ position:'fixed', inset:0, zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', backgroundColor:'rgba(0,0,0,0.4)' }} onClick={()=>!creating && setShowAdd(false)}>
-          <div style={{ backgroundColor:'white', borderRadius:12, width:420, maxWidth:'95vw', padding:24 }} onClick={e=>e.stopPropagation()}>
+          <div style={{ background:'#FFFFFF', border:'1px solid #E2E8F0', boxShadow:'0 8px 32px rgba(0,0,0,0.12)', borderRadius:14, width:420, maxWidth:'95vw', padding:24 }} onClick={e=>e.stopPropagation()}>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
               <span style={{ fontSize:15, fontWeight:600, color:'#111827' }}>Agregar sucursal</span>
               <button onClick={()=>!creating && setShowAdd(false)} style={{ color:'#9CA3AF', background:'none', border:'none', cursor:'pointer', display:'flex' }}>
@@ -133,17 +133,17 @@ export default function SucursalesTab() {
             <div style={{ display:'flex', flexDirection:'column', gap:12, marginBottom:16 }}>
               <div>
                 <div style={{ fontSize:12, color:'#6B7280', marginBottom:4 }}>Nombre <span style={{ color:'#EF4444' }}>*</span></div>
-                <input value={newForm.nombre} onChange={e=>setNewForm(f=>({...f,nombre:e.target.value}))} placeholder="Ej: Centro" style={{ width:'100%', padding:'8px 10px', border:'0.5px solid rgba(0,0,0,0.12)', borderRadius:7, fontSize:13, boxSizing:'border-box' }} />
+                <input value={newForm.nombre} onChange={e=>setNewForm(f=>({...f,nombre:e.target.value}))} placeholder="Ej: Centro" style={{ width:'100%', padding:'8px 10px', border:'1px solid #E2E8F0', borderRadius:8, fontSize:13, boxSizing:'border-box' }} />
               </div>
               <div>
                 <div style={{ fontSize:12, color:'#6B7280', marginBottom:4 }}>Dirección (opcional)</div>
-                <input value={newForm.direccion} onChange={e=>setNewForm(f=>({...f,direccion:e.target.value}))} placeholder="Ej: Av. Corrientes 1234" style={{ width:'100%', padding:'8px 10px', border:'0.5px solid rgba(0,0,0,0.12)', borderRadius:7, fontSize:13, boxSizing:'border-box' }} />
+                <input value={newForm.direccion} onChange={e=>setNewForm(f=>({...f,direccion:e.target.value}))} placeholder="Ej: Av. Corrientes 1234" style={{ width:'100%', padding:'8px 10px', border:'1px solid #E2E8F0', borderRadius:8, fontSize:13, boxSizing:'border-box' }} />
               </div>
             </div>
             <div style={{ display:'flex', gap:8 }}>
-              <button onClick={()=>setShowAdd(false)} disabled={creating} style={{ flex:1, padding:'9px 0', border:'0.5px solid rgba(0,0,0,0.12)', borderRadius:7, fontSize:13, cursor:creating?'not-allowed':'pointer', color:'#374151', backgroundColor:'white' }}>Cancelar</button>
+              <button onClick={()=>setShowAdd(false)} disabled={creating} style={{ flex:1, padding:'9px 0', border:'1px solid #E2E8F0', borderRadius:8, fontSize:13, cursor:creating?'not-allowed':'pointer', color:'#374151', background:'#FFFFFF' }}>Cancelar</button>
               <button onClick={createBranch} disabled={!newForm.nombre.trim() || creating}
-                style={{ flex:1, padding:'9px 0', border:'none', borderRadius:7, fontSize:13, color:'white', backgroundColor:'#1D9E75', cursor:(!newForm.nombre.trim()||creating)?'not-allowed':'pointer', opacity:(!newForm.nombre.trim()||creating)?0.6:1 }}>
+                style={{ flex:1, padding:'9px 0', border:'none', borderRadius:8, fontSize:13, color:'white', backgroundColor:'#1D9E75', cursor:(!newForm.nombre.trim()||creating)?'not-allowed':'pointer', opacity:(!newForm.nombre.trim()||creating)?0.6:1 }}>
                 {creating ? 'Creando...' : 'Crear sucursal'}
               </button>
             </div>

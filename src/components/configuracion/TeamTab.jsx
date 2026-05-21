@@ -67,11 +67,11 @@ export default function TeamTab({ restaurant }) {
         </button>
       </div>
 
-      <div style={{ backgroundColor:'white', border:'0.5px solid rgba(0,0,0,0.08)', borderRadius:10, overflow:'hidden' }}>
+      <div style={{ background:'#FFFFFF', border:'1px solid #E2E8F0', boxShadow:'0 1px 3px rgba(0,0,0,0.06)', borderRadius:12, overflow:'hidden' }}>
         {members.length === 0 ? (
           <div style={{ padding:32, textAlign:'center', fontSize:13, color:'#9CA3AF' }}>No hay miembros en el equipo todavía.</div>
         ) : members.map(m => (
-          <div key={m.id} style={{ display:'flex', alignItems:'center', padding:'12px 16px', borderBottom:'0.5px solid rgba(0,0,0,0.05)', gap:12 }}>
+          <div key={m.id} style={{ display:'flex', alignItems:'center', padding:'12px 16px', borderBottom:'1px solid #F1F5F9', gap:12 }}>
             <div style={{ width:36, height:36, borderRadius:'50%', backgroundColor:'#E1F5EE', display:'flex', alignItems:'center', justifyContent:'center', fontSize:13, fontWeight:600, color:'#0F6E56', flexShrink:0 }}>
               {(m.nombre || m.email).charAt(0).toUpperCase()}
             </div>
@@ -83,7 +83,7 @@ export default function TeamTab({ restaurant }) {
               {ROL_LABELS[m.rol] || m.rol}
             </span>
             <button onClick={() => handleRemove(m)}
-              style={{ padding:'4px 8px', border:'0.5px solid rgba(239,68,68,0.3)', borderRadius:6, fontSize:12, color:'#EF4444', backgroundColor:'white', cursor:'pointer' }}>
+              style={{ padding:'4px 8px', border:'1px solid rgba(239,68,68,0.3)', borderRadius:6, fontSize:12, color:'#EF4444', background:'#FFFFFF', cursor:'pointer' }}>
               Eliminar
             </button>
           </div>

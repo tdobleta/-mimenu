@@ -88,8 +88,8 @@ export default function ShiftHistory() {
           <button key={f.key} onClick={()=>setFiltroTipo(f.key)}
             style={{
               padding:'6px 14px', fontSize:12, fontWeight:500, borderRadius:99, cursor:'pointer',
-              border: filtroTipo===f.key ? 'none' : '0.5px solid rgba(0,0,0,0.12)',
-              backgroundColor: filtroTipo===f.key ? '#1D9E75' : 'white',
+              border: filtroTipo===f.key ? 'none' : '1px solid #E2E8F0',
+              background: filtroTipo===f.key ? '#1D9E75' : '#FFFFFF',
               color: filtroTipo===f.key ? 'white' : '#374151',
             }}>
             {f.label}
@@ -98,7 +98,7 @@ export default function ShiftHistory() {
       </div>
 
       {grouped.length === 0 ? (
-        <div style={{ backgroundColor:'white', border:'0.5px solid rgba(0,0,0,0.08)', borderRadius:10, padding:'40px 20px', textAlign:'center' }}>
+        <div style={{ background:'#FFFFFF', border:'1px solid #E2E8F0', boxShadow:'0 1px 3px rgba(0,0,0,0.06)', borderRadius:12, padding:'40px 20px', textAlign:'center' }}>
           <div style={{ fontSize:14, color:'#374151', fontWeight:500 }}>No hay turnos cerrados todavía</div>
           <div style={{ fontSize:12, color:'#9CA3AF', marginTop:4 }}>Cuando cierres tu primer turno aparecerá acá.</div>
         </div>
@@ -124,9 +124,9 @@ export default function ShiftHistory() {
               const nombreCard = s.nombre_turno || ('Caja ' + (TIPO_LABEL[s.tipo_turno] || s.tipo_turno || ''));
 
               return (
-                <div key={s.id} style={{ backgroundColor:'white', border:'0.5px solid rgba(0,0,0,0.08)', borderRadius:8, overflow:'hidden', margin:'6px 0' }}>
+                <div key={s.id} style={{ background:'#FFFFFF', border:'1px solid #E2E8F0', boxShadow:'0 1px 3px rgba(0,0,0,0.06)', borderRadius:10, overflow:'hidden', margin:'6px 0' }}>
                   <button onClick={()=>setExpanded(isExp?null:s.id)}
-                    style={{ width:'100%', padding:'12px 16px', display:'flex', alignItems:'center', gap:14, border:'none', backgroundColor:'white', cursor:'pointer', textAlign:'left', flexWrap:'wrap' }}>
+                    style={{ width:'100%', padding:'12px 16px', display:'flex', alignItems:'center', gap:14, border:'none', background:'#FFFFFF', cursor:'pointer', textAlign:'left', flexWrap:'wrap' }}>
                     <span style={{ fontSize:13, fontWeight:600, color:'#111827' }}>{nombreCard}</span>
                     <span style={{ fontSize:12, color:'#9CA3AF' }}>{fmtTime(s.abierto_at)} → {fmtTime(s.cerrado_at)}</span>
                     <div style={{ flex:1 }} />
@@ -138,7 +138,7 @@ export default function ShiftHistory() {
                   </button>
 
                   {isExp && (
-                    <div style={{ padding:'12px 16px', borderTop:'0.5px solid rgba(0,0,0,0.06)', backgroundColor:'#F9FAFB', display:'flex', flexDirection:'column', gap:10 }}>
+                    <div style={{ padding:'12px 16px', borderTop:'1px solid #F1F5F9', background:'#F8FAFC', display:'flex', flexDirection:'column', gap:10 }}>
                       <Detail label="Fondo inicial" value={money(s.fondo_inicial||0)} />
                       <Detail label="Total facturado" value={money(s.total_facturado_turno||0)} color="#1D9E75" />
                       <Detail label="Total retiros" value={`-${money(totalRetiros)}`} color="#F97316" />
