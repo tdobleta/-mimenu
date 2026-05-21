@@ -91,12 +91,19 @@ export default function Analiticas() {
   const periodStart = getPeriodStart(period);
   const periodEnd = Date.now();
 
-  const periodTurns = useMemo(() => allTurns.filter(t => t.closed_at && t.closed_at >= periodStart), [allTurns, periodStart]);
+  const periodTurns = useMemo(() => allTurns.filter(t => {
+    if (!t.closed_at) return false;
+    return new Date(t.closed_at).getTime() >= periodStart;
+  }), [allTurns, periodStart]);
   const periodTurnIds = useMemo(() => new Set(periodTurns.map(t => t.id)), [periodTurns]);
   const periodItems = useMemo(() => allItems.filter(it => periodTurnIds.has(it.turn_id)), [allItems, periodTurnIds]);
 
   const prevStart = periodStart - (periodEnd - periodStart);
-  const prevTurns = useMemo(() => allTurns.filter(t => t.closed_at && t.closed_at >= prevStart && t.closed_at < periodStart), [allTurns, prevStart, periodStart]);
+  const prevTurns = useMemo(() => allTurns.filter(t => {
+    if (!t.closed_at) return false;
+    const ts = new Date(t.closed_at).getTime();
+    return ts >= prevStart && ts < periodStart;
+  }), [allTurns, prevStart, periodStart]);
 
   const reservas = store.getReservas();
 

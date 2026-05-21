@@ -21,7 +21,7 @@ function foodCostColor(pct) {
   return G.red;
 }
 
-const TABS = ['Menú', 'Ingredientes', 'Recetas', 'Food Cost', 'Movimientos'];
+const TABS = ['Menú', 'Stock', 'Recetas', 'Food Cost', 'Movimientos'];
 
 const ST_BADGE = {
   ok:          { bg:'rgba(29,158,117,0.10)', c:G.teal,  label:'OK'        },
@@ -245,7 +245,7 @@ export default function Stock() {
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:10 }}>
         <h1 style={{ fontSize:22, fontWeight:700, color:G.text, margin:0, fontFamily:fontDisplay, letterSpacing:'-0.02em' }}>Stock y Costos</h1>
         <div style={{ display:'flex', gap:8 }}>
-          {tab === 'Ingredientes' && (
+          {tab === 'Stock' && (
             <button onClick={() => setShowAdd(true)} style={{ padding:'8px 18px', background:G.teal, border:'none', borderRadius:11, fontSize:13, fontWeight:700, color:'white', cursor:'pointer', boxShadow:`0 4px 12px rgba(29,158,117,0.25)` }}>
               + Ingrediente
             </button>
@@ -288,8 +288,8 @@ export default function Stock() {
       {/* ── MENÚ ── */}
       {tab === 'Menú' && <MenuTab />}
 
-      {/* ── INGREDIENTES ── */}
-      {tab === 'Ingredientes' && (
+      {/* ── STOCK ── */}
+      {tab === 'Stock' && (
         <div style={{ ...glassDeep({ overflow:'hidden', padding:0 }) }}>
           {stock.length === 0 ? (
             <div style={{ textAlign:'center', padding:'40px 20px', color:G.textFaint, fontSize:13 }}>
@@ -461,7 +461,7 @@ export default function Stock() {
       {tab === 'Food Cost' && (
         <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
           <div style={{ ...glassLight({ padding:'12px 18px', borderRadius:14, fontSize:12, color:'#92600A', background:'rgba(239,159,39,0.08)', border:'1px solid rgba(239,159,39,0.2)' }) }}>
-            Food cost saludable para gastronomía: <strong>20–35%</strong>. Por encima de 35% el plato pierde margen. Configurá los precios mayoristas en la pestaña Ingredientes.
+            Food cost saludable para gastronomía: <strong>20–35%</strong>. Por encima de 35% el plato pierde margen. Configurá los precios mayoristas en la pestaña Stock.
           </div>
 
           <div style={{ ...glassDeep({ overflow:'hidden', padding:0 }) }}>
