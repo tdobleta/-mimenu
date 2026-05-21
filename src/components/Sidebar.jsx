@@ -24,6 +24,15 @@ const NAV = [
   { path:'/public/cocina', label:'Vista Cocina', external:true, icon:<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 13.87A4 4 0 0 1 7.41 6a5.11 5.11 0 0 1 1.05-1.54 5 5 0 0 1 7.08 0A5.11 5.11 0 0 1 16.59 6 4 4 0 0 1 18 13.87V21H6Z"/><line x1="6" y1="17" x2="18" y2="17"/></svg> },
 ];
 
+// Agrupación visual — sin impacto en lógica ni permisos
+const NAV_GROUPS = [
+  { label: null,          paths: ['/'] },
+  { label: 'Operaciones', paths: ['/salon', '/caja', '/reservas'] },
+  { label: 'Datos',       paths: ['/stock', '/reportes', '/analiticas'] },
+  { label: 'Sistema',     paths: ['/conexion', '/configuracion'] },
+  { label: 'Cocina',      paths: ['/control-cocina', '/public/cocina'] },
+];
+
 export default function Sidebar({ onClose }) {
   const loc = useLocation();
   const store = useStore();
@@ -51,54 +60,76 @@ export default function Sidebar({ onClose }) {
         </span>
       </div>
 
-      {/* Nav */}
-      <nav style={{ flex:1, padding:'10px 8px', display:'flex', flexDirection:'column', gap:1, overflowY:'auto' }}>
-        {navItems.map(item => {
-          const active = item.path === '/' ? loc.pathname === '/' : loc.pathname.startsWith(item.path.split('?')[0]);
-          const baseStyle = {
-            display: 'flex',
-            alignItems: 'center',
-            gap: 10,
-            padding: active ? '9px 13px 9px 11px' : '9px 13px',
-            borderRadius: 8,
-            textDecoration: 'none',
-            fontSize: 13,
-            fontWeight: active ? 600 : 400,
-            transition: 'all .15s',
-            background: active ? 'rgba(29,158,117,0.12)' : 'transparent',
-            color: active ? '#FFFFFF' : '#8B949E',
-            border: 'none',
-            borderLeft: active ? '2px solid #1D9E75' : '2px solid transparent',
-            boxShadow: 'none',
-          };
-          const onEnter = e => { if (!active) { e.currentTarget.style.background='rgba(255,255,255,0.06)'; e.currentTarget.style.color='#E6EDF3'; } };
-          const onLeave = e => { if (!active) { e.currentTarget.style.background='transparent'; e.currentTarget.style.color='#8B949E'; } };
-
-          if (item.external) {
-            return (
-              <a key={item.path} href={item.path} target="_blank" rel="noopener noreferrer" onClick={onClose}
-                style={baseStyle} onMouseEnter={onEnter} onMouseLeave={onLeave}>
-                {item.icon}
-                <span style={{ flex:1 }}>{item.label}</span>
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ opacity:0.4 }}><path d="M7 17L17 7M17 7H7M17 7V17"/></svg>
-              </a>
-            );
-          }
+      {/* Nav — agrupado */}
+      <nav style={{ flex:1, padding:'10px 8px', display:'flex', flexDirection:'column', gap:0, overflowY:'auto' }}>
+        {NAV_GROUPS.map((group, gi) => {
+          const groupItems = navItems.filter(item => group.paths.includes(item.path.split('?')[0]));
+          if (groupItems.length === 0) return null;
           return (
-            <Link key={item.path} to={item.path} onClick={onClose}
-              style={baseStyle} onMouseEnter={onEnter} onMouseLeave={onLeave}>
-              {item.icon}
-              {item.label}
-            </Link>
+            <div key={gi}>
+              {/* Label de grupo (no se muestra para el primero) */}
+              {gi > 0 && (
+                <div style={{ padding:'10px 10px 3px' }}>
+                  <span style={{ fontSize:9.5, fontWeight:700, color:'#484F58', textTransform:'uppercase', letterSpacing:'0.09em' }}>
+                    {group.label}
+                  </span>
+                </div>
+              )}
+              {/* Items del grupo */}
+              <div style={{ display:'flex', flexDirection:'column', gap:1 }}>
+                {groupItems.map(item => {
+                  const active = item.path === '/' ? loc.pathname === '/' : loc.pathname.startsWith(item.path.split('?')[0]);
+                  const baseStyle = {
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
+                    padding: active ? '8px 12px 8px 10px' : '8px 12px',
+                    borderRadius: 8,
+                    textDecoration: 'none',
+                    fontSize: 13,
+                    fontWeight: active ? 600 : 400,
+                    transition: 'all .15s',
+                    background: active ? 'rgba(29,158,117,0.12)' : 'transparent',
+                    color: active ? '#FFFFFF' : '#8B949E',
+                    border: 'none',
+                    borderLeft: active ? '2px solid #1D9E75' : '2px solid transparent',
+                    boxShadow: 'none',
+                  };
+                  const onEnter = e => { if (!active) { e.currentTarget.style.background='rgba(255,255,255,0.06)'; e.currentTarget.style.color='#E6EDF3'; } };
+                  const onLeave = e => { if (!active) { e.currentTarget.style.background='transparent'; e.currentTarget.style.color='#8B949E'; } };
+
+                  if (item.external) {
+                    return (
+                      <a key={item.path} href={item.path} target="_blank" rel="noopener noreferrer" onClick={onClose}
+                        style={baseStyle} onMouseEnter={onEnter} onMouseLeave={onLeave}>
+                        {item.icon}
+                        <span style={{ flex:1 }}>{item.label}</span>
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ opacity:0.4 }}><path d="M7 17L17 7M17 7H7M17 7V17"/></svg>
+                      </a>
+                    );
+                  }
+                  return (
+                    <Link key={item.path} to={item.path} onClick={onClose}
+                      style={baseStyle} onMouseEnter={onEnter} onMouseLeave={onLeave}>
+                      {item.icon}
+                      {item.label}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
           );
         })}
       </nav>
 
       {/* Footer */}
       <div style={{ padding:'14px 16px', borderTop:'1px solid #21262D' }}>
-        <div style={{ fontSize:10, color:'#484F58', marginBottom:2, letterSpacing:'0.04em' }}>versión 1.0.0</div>
-        <div style={{ fontSize:12, color:'#8B949E', fontWeight:600, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
-          {restaurante.nombre}
+        <div style={{ fontSize:10, color:'#484F58', marginBottom:6, letterSpacing:'0.04em' }}>versión 1.0.0</div>
+        <div style={{ display:'flex', alignItems:'center', gap:7 }}>
+          <span style={{ width:6, height:6, borderRadius:'50%', background:'#1D9E75', flexShrink:0 }} />
+          <span style={{ fontSize:12, color:'#8B949E', fontWeight:600, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
+            {restaurante.nombre}
+          </span>
         </div>
       </div>
     </div>
