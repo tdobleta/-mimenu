@@ -6,6 +6,7 @@ import TableCard from '../components/salon/TableCard';
 import ComandaPanel from '../components/salon/ComandaPanel';
 import LayoutEditor from '../components/salon/LayoutEditor';
 import { dbLoadActiveTurns } from '@/lib/posApi';
+import { fetchTurnItemsBatch } from '@/lib/pagination';
 import { base44 } from '@/api/base44Client';
 import { subscribeToTurns } from '@/lib/realtimeManager';
 import { supabase } from '@/api/supabaseClient';
@@ -43,12 +44,33 @@ export default function Salon() {
   const selTable= selectedTable ? tables.find(t => t.id === selectedTable) : null;
 
   useEffect(() => {
-    dbLoadActiveTurns(displayBranch).then(turns => {
+    dbLoadActiveTurns(displayBranch).then(async turns => {
+      // 1. Sync estado de mesas en el store
+      const turnTableMap = []; // { turnId, tableId }
       turns.forEach(t => {
         const existing = store.getTables(displayBranch).find(tb => tb.num === t.mesa_num);
-        if (existing && existing.status === 'libre') store.openTableWithTurn(displayBranch, existing.id, t.id, t.mozo, t.opened_at);
-        // Sync comanda_lista and cocina_estado on load
-        if (existing && t.comanda_lista !== undefined) store.setTableComandaLista(displayBranch, existing.id, !!t.comanda_lista);
+        if (!existing) return;
+        if (existing.status === 'libre') store.openTableWithTurn(displayBranch, existing.id, t.id, t.mozo, t.opened_at);
+        if (t.comanda_lista !== undefined) store.setTableComandaLista(displayBranch, existing.id, !!t.comanda_lista);
+        turnTableMap.push({ turnId: t.id, tableId: existing.id });
+      });
+      // 2. Cargar ítems de todos los turns activos en una sola query (fix: notas desaparecen al recargar)
+      if (!turnTableMap.length) return;
+      const allItems = await fetchTurnItemsBatch(turnTableMap.map(x => x.turnId));
+      const byTurn = {};
+      allItems.forEach(it => { if (!byTurn[it.turn_id]) byTurn[it.turn_id] = []; byTurn[it.turn_id].push(it); });
+      turnTableMap.forEach(({ turnId, tableId }) => {
+        const items = byTurn[turnId] || [];
+        if (!items.length) return;
+        store.updateTableOrder(displayBranch, tableId, items.map(it => ({
+          itemId:     it.menu_item_id || null,
+          nombre:     it.menu_item_name,
+          precio:     it.precio,
+          qty:        it.cantidad,
+          turnItemId: it.id,
+          nota:       it.notas || '',   // columna DB 'notas' → campo local 'nota'
+          libre:      !it.menu_item_id,
+        })));
       });
     }).catch(() => {});
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -80,7 +102,7 @@ export default function Salon() {
                 precio:     it.precio,
                 qty:        it.cantidad,
                 turnItemId: it.id,
-                notas:      it.notas || '',
+                nota:       it.notas || '',   // columna DB 'notas' → campo local 'nota'
                 libre:      !it.menu_item_id,
               }));
               s.updateTableOrder(displayBranch, tableMatch.id, order);

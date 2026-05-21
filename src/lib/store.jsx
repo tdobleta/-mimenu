@@ -416,6 +416,12 @@ export function AppProvider({ children }) {
   const setOrderItemTurnItemId = (bid, tid, itemId, turnItemId) => setS(p => ({
     ...p, tables: { ...p.tables, [bid]: p.tables[bid].map(t => t.id === tid ? { ...t, order: (t.order||[]).map(i => i.itemId === itemId ? { ...i, turnItemId } : i) } : t) }
   }));
+  // Igual que setOrderItemTurnItemId pero busca por uid (único por ítem, no por menuItemId)
+  const setOrderItemTurnItemIdByUid = (bid, tid, uid, turnItemId) => setS(p => ({
+    ...p, tables: { ...p.tables, [bid]: (p.tables[bid] || []).map(t =>
+      t.id === tid ? { ...t, order: (t.order||[]).map(i => i.uid === uid ? { ...i, turnItemId } : i) } : t
+    )}
+  }));
   const updateTableOrder = (bid, tid, order) => setS(p => ({
     ...p, tables: { ...p.tables, [bid]: p.tables[bid].map(t => t.id === tid ? { ...t, order } : t) }
   }));
@@ -813,7 +819,7 @@ export function AppProvider({ children }) {
 
   const ctx = {
     ...s, setBranchId, updateRestaurante,
-    openTable, closeTable, openTableWithTurn, setTableTurnId, setTableComandaLista, setOrderItemTurnItemId,
+    openTable, closeTable, openTableWithTurn, setTableTurnId, setTableComandaLista, setOrderItemTurnItemId, setOrderItemTurnItemIdByUid,
     updateTableOrder, saveLayout,
     addReservation, updateReservation,
     addStockItem, updateStockItem, deleteStockItem,

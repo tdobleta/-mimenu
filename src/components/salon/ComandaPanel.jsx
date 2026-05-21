@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useStore } from '@/lib/store';
 import { money, elapsedMin, fmtTableTime, tableTotal } from '@/lib/fmt';
 import CloseTableModal from './CloseTableModal';
-import { dbAddTurnItem, dbUpdateTurnItem, dbSaveNota } from '@/lib/posApi';
+import { dbAddTurnItem, dbUpdateTurnItem, dbSaveNota, dbLoadTurnItems } from '@/lib/posApi';
 import { supabase } from '@/api/supabaseClient';
 import { base44 } from '@/api/base44Client';
 import { getPrinterConfig, printComanda } from '@/lib/printer';
@@ -76,6 +76,8 @@ export default function ComandaPanel({ table, branchId, onClose, addToast }) {
   const [showFactura, setShowFactura] = useState(false);
   const [facturaDatos, setFacturaDatos] = useState(null);
   const [notasModal, setNotasModal] = useState(null); // { item, value } | null
+  // Notas escritas antes de que el .then() de dbAddTurnItem resuelva (race condition)
+  const pendingNotesRef = useRef({});  // { [uid]: nota }
 
   useEffect(() => { setYaEnviado(false); }, [table.turnId]);
 
@@ -86,9 +88,18 @@ export default function ComandaPanel({ table, branchId, onClose, addToast }) {
     if (!table.turnId) return;
     const interval = setInterval(async () => {
       try {
-        const items = await base44.entities.TurnItem.filter({ turn_id: table.turnId });
+        // dbLoadTurnItems usa Supabase directo (select *) — garantiza campo 'notas'
+        const items = await dbLoadTurnItems(table.turnId);
         if (!items || items.length === 0) return;
-        const serverOrder = items.map(it => ({ itemId:it.menu_item_id||null, nombre:it.menu_item_name, precio:it.precio, qty:it.cantidad, turnItemId:it.id, libre:!it.menu_item_id }));
+        const serverOrder = items.map(it => ({
+          itemId:     it.menu_item_id || null,
+          nombre:     it.menu_item_name,
+          precio:     it.precio,
+          qty:        it.cantidad,
+          turnItemId: it.id,
+          nota:       it.notas || '',   // mapear columna DB 'notas' → campo local 'nota'
+          libre:      !it.menu_item_id,
+        }));
         const localIds   = (table.order||[]).map(i => i.turnItemId).sort().join(',');
         const serverIds  = serverOrder.map(i => i.turnItemId).sort().join(',');
         const localQtys  = (table.order||[]).map(i => `${i.turnItemId}:${i.qty}`).sort().join(',');
@@ -160,10 +171,16 @@ export default function ComandaPanel({ table, branchId, onClose, addToast }) {
     if (table.turnId) {
         const tryAdd = (retries) => dbAddTurnItem({ turnId:table.turnId, branchId, menuItemId:item.id, nombre:item.nombre, precio:item.precio, qty:1 })
           .then(ti => {
-            const updated = [...next];
-            const idx = updated.findIndex(i => i.uid === uid);
-            if (idx >= 0) updated[idx] = { ...updated[idx], turnItemId: ti.id };
-            store.updateTableOrder(branchId, table.id, updated);
+            // setOrderItemTurnItemIdByUid usa setS(p => ...) — siempre lee el estado actual,
+            // no el snapshot 'next' capturado al inicio de addItem(). Esto evita la race
+            // condition donde el .then() sobreescribía notas o ítems agregados después.
+            store.setOrderItemTurnItemIdByUid(branchId, table.id, uid, ti.id);
+            // Si el usuario escribió una nota antes de que DB respondiera, guardarla ahora
+            const pendingNota = pendingNotesRef.current[uid];
+            if (pendingNota) {
+              dbSaveNota(ti.id, pendingNota).catch(() => {});
+              delete pendingNotesRef.current[uid];
+            }
           })
           .catch(err => {
             if (retries > 0) setTimeout(() => tryAdd(retries - 1), 1500);
@@ -452,6 +469,9 @@ export default function ComandaPanel({ table, branchId, onClose, addToast }) {
                 // Persistir en DB si el ítem ya fue guardado en server (tiene turnItemId)
                 if (notasModal.item.turnItemId) {
                   dbSaveNota(notasModal.item.turnItemId, nota).catch(() => {});
+                } else if (notasModal.item.uid) {
+                  // DB aún no respondió — guardar en ref; se persistirá cuando llegue el turnItemId
+                  pendingNotesRef.current[notasModal.item.uid] = nota;
                 }
                 setNotasModal(null);
               }} style={{ flex:1, padding:'8px 0', border:'none', borderRadius:8, background:G.teal, color:'white', fontSize:13, fontWeight:700, cursor:'pointer' }}>
