@@ -155,6 +155,7 @@ export function AppProvider({ children }) {
             categoria: item.categoria || 'Principales',
             disponible: item.activo !== false,
             modificadores: mods.filter(m => m.menu_item_id === item.id),
+          imagen_url: item.imagen_url || null,
           }));
         });
         const teamMembersDb = await base44.entities.TeamMember.filter({ restaurant_id: restaurant.id }).catch(() => []);

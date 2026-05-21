@@ -28,6 +28,7 @@ export default function MenuTab() {
         precio: item.precio || 0,
         categoria: item.categoria || DEFAULT_CATEGORY,
         disponible: item.activo !== false,
+        imagen_url: item.imagen_url || null,
       })));
     } catch(e) {}
   }
