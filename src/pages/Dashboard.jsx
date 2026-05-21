@@ -3,29 +3,20 @@ import { useDashboardStore } from '@/lib/storeSelectors';
 import { money, dateLong, elapsedMin, fmtElapsed } from '@/lib/fmt';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import AnalyticsActions from '../components/analytics/AnalyticsActions';
-import { G, fontDisplay } from '@/lib/glass';
+import { G } from '@/lib/glass';
 import GuidedTour, { useTour } from '@/components/GuidedTour';
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
-const card = (extra = {}) => ({
-  background: 'rgba(255,255,255,0.58)',
-  backdropFilter: 'blur(24px) saturate(180%)',
-  WebkitBackdropFilter: 'blur(24px) saturate(180%)',
-  border: '1px solid rgba(255,255,255,0.72)',
-  boxShadow: '0 2px 8px rgba(0,0,0,0.04), 0 8px 32px rgba(80,80,180,0.06), inset 0 1px 0 rgba(255,255,255,0.9)',
-  borderRadius: 22, position: 'relative', overflow: 'hidden', ...extra,
+const FONT_UI = "'DM Sans', system-ui, sans-serif";
+const kpiCard = (extra = {}) => ({
+  background: '#FFFFFF',
+  border: '1px solid #E2E8F0',
+  boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+  borderRadius: 14,
+  position: 'relative',
+  overflow: 'hidden',
+  ...extra,
 });
-const heroCard = (extra = {}) => ({
-  background: 'rgba(255,255,255,0.62)',
-  backdropFilter: 'blur(32px) saturate(200%)',
-  WebkitBackdropFilter: 'blur(32px) saturate(200%)',
-  border: '1px solid rgba(255,255,255,0.78)',
-  boxShadow: '0 4px 16px rgba(0,0,0,0.04), 0 16px 56px rgba(80,80,180,0.08), inset 0 1px 0 rgba(255,255,255,0.95)',
-  borderRadius: 26, position: 'relative', overflow: 'hidden', ...extra,
-});
-function Orb({ color, size = 120, top, right, left, bottom, opacity = 0.12 }) {
-  return <div style={{ position:'absolute', width:size, height:size, borderRadius:'50%', background:`radial-gradient(circle, ${color} 0%, transparent 70%)`, top, right, left, bottom, opacity, pointerEvents:'none' }} />;
-}
 
 // ── Helpers de fecha ──────────────────────────────────────────────────────────
 const DAY_MS = 86400000;
@@ -136,7 +127,7 @@ function DateRangePicker({ startTs, endTs, onChange }) {
     <div ref={ref} style={{ position:'relative', fontFamily:"'DM Sans',system-ui,sans-serif" }}>
       {/* Trigger */}
       <button onClick={() => { setOpen(v => !v); setSelecting('start'); }}
-        style={{ display:'flex', alignItems:'center', gap:8, padding:'7px 14px', background:'rgba(255,255,255,0.75)', border:'1.5px solid rgba(255,255,255,0.85)', borderRadius:12, cursor:'pointer', fontSize:13, color:G.text, fontWeight:500, boxShadow:'0 2px 8px rgba(0,0,0,0.06)', minWidth:180 }}>
+        style={{ display:'flex', alignItems:'center', gap:8, padding:'6px 12px', background:'#FFFFFF', border:'1px solid #E2E8F0', borderRadius:8, cursor:'pointer', fontSize:13, color:G.text, fontWeight:500, boxShadow:'0 1px 2px rgba(0,0,0,0.04)', minWidth:180 }}>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={G.teal} strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
         <span>{rangeLabel}</span>
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={G.textFaint} strokeWidth="2" style={{ marginLeft:'auto' }}><polyline points="6 9 12 15 18 9"/></svg>
@@ -144,7 +135,7 @@ function DateRangePicker({ startTs, endTs, onChange }) {
 
       {/* Dropdown */}
       {open && (
-        <div style={{ position:'absolute', top:46, right:0, zIndex:500, background:'rgba(255,255,255,0.97)', backdropFilter:'blur(24px)', border:'1px solid rgba(255,255,255,0.9)', borderRadius:18, boxShadow:'0 16px 48px rgba(0,0,0,0.15)', display:'flex', overflow:'hidden', minWidth:520 }}>
+        <div style={{ position:'absolute', top:46, right:0, zIndex:500, background:'#FFFFFF', border:'1px solid #E2E8F0', borderRadius:12, boxShadow:'0 8px 24px rgba(0,0,0,0.10)', display:'flex', overflow:'hidden', minWidth:520 }}>
 
           {/* Presets */}
           <div style={{ width:160, borderRight:'1px solid rgba(0,0,0,0.06)', padding:'12px 8px', display:'flex', flexDirection:'column', gap:2 }}>
@@ -225,7 +216,7 @@ function DateRangePicker({ startTs, endTs, onChange }) {
 function CustomTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null;
   return (
-    <div style={{ background:'rgba(255,255,255,0.97)', backdropFilter:'blur(16px)', border:'1px solid rgba(255,255,255,0.9)', borderRadius:14, padding:'10px 14px', fontSize:12, minWidth:150, boxShadow:'0 8px 32px rgba(0,0,0,0.12)' }}>
+    <div style={{ background:'#FFFFFF', border:'1px solid #E2E8F0', borderRadius:10, padding:'10px 14px', fontSize:12, minWidth:150, boxShadow:'0 4px 6px -1px rgba(0,0,0,0.07), 0 2px 4px -1px rgba(0,0,0,0.05)', fontFamily:FONT_UI }}>
       <div style={{ color:G.textFaint, marginBottom:5, fontSize:11, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.06em' }}>{label}</div>
       {payload.map(p => (
         <div key={p.name} style={{ display:'flex', justifyContent:'space-between', gap:20, fontWeight:700, color:p.color, marginTop:2 }}>
@@ -336,7 +327,7 @@ export default function Dashboard() {
       {/* ── Header ── */}
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:10 }}>
         <div>
-          <h1 style={{ fontSize:26, fontWeight:700, color:G.text, margin:0, fontFamily:fontDisplay, letterSpacing:'-0.03em' }}>Dashboard</h1>
+          <h1 style={{ fontSize:20, fontWeight:700, color:G.text, margin:0, fontFamily:FONT_UI, letterSpacing:'-0.02em', lineHeight:1.2 }}>Dashboard</h1>
           <div style={{ fontSize:12, color:G.textFaint, marginTop:3 }}>{dateLong(new Date())}</div>
         </div>
         <div style={{ display:'flex', alignItems:'center', gap:10 }}>
@@ -350,130 +341,125 @@ export default function Dashboard() {
       </div>
 
       {/* ── Hero + KPIs ── */}
-      <div style={{ display:'grid', gridTemplateColumns:'1.8fr 1fr 1fr 1fr', gap:14 }}>
+      <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr 1fr 1fr', gap:12 }}>
 
         {/* Hero */}
-        <div style={{ ...heroCard({ padding:'26px 28px', background:'linear-gradient(135deg, rgba(255,255,255,0.68) 0%, rgba(241,255,250,0.55) 100%)' }) }}>
-          <Orb color={G.teal} size={200} top={-60} right={-60} opacity={0.10} />
-          <div style={{ fontSize:10, fontWeight:700, color:G.textFaint, textTransform:'uppercase', letterSpacing:'0.10em', marginBottom:4 }}>Facturación del período</div>
-          <div style={{ fontSize:11, color:G.textFaint, marginBottom:8 }}>{periodoLabel}</div>
-          <div style={{ fontSize:40, fontWeight:800, color:G.teal, letterSpacing:'-0.04em', fontFamily:fontDisplay, lineHeight:1 }}>
+        <div style={{ ...kpiCard({ padding:'20px 22px' }) }}>
+          <div style={{ fontSize:10, fontWeight:700, color:G.textFaint, textTransform:'uppercase', letterSpacing:'0.10em', marginBottom:3 }}>Facturación del período</div>
+          <div style={{ fontSize:11, color:G.textFaint, marginBottom:10 }}>{periodoLabel}</div>
+          <div style={{ fontSize:42, fontWeight:800, color:G.teal, letterSpacing:'-0.04em', fontFamily:FONT_UI, lineHeight:1 }}>
             {money(charts.facturacionHoy)}
           </div>
-          <div style={{ display:'flex', alignItems:'center', gap:8, marginTop:10 }}>
+          <div style={{ display:'flex', alignItems:'center', gap:8, marginTop:8 }}>
             <span style={{ fontSize:12, fontWeight:700, color: revChange >= 0 ? G.teal : G.red, background: revChange >= 0 ? 'rgba(29,158,117,0.10)' : 'rgba(226,75,74,0.10)', padding:'3px 9px', borderRadius:99 }}>
               {revChange >= 0 ? '↑' : '↓'} {Math.abs(revChange)}%
             </span>
             <span style={{ fontSize:12, color:G.textFaint }}>vs período anterior</span>
           </div>
           {/* Sparkline */}
-          <div style={{ display:'flex', alignItems:'flex-end', gap:2, marginTop:16, height:32 }}>
+          <div style={{ display:'flex', alignItems:'flex-end', gap:2, marginTop:14, height:28 }}>
             {chartData.slice(-14).map((d, i) => {
               const maxV = Math.max(...chartData.map(x=>x.actual||0), 1);
-              const h = Math.max(3, ((d.actual||0)/maxV)*32);
-              return <div key={i} style={{ flex:1, height:h, background: i === chartData.slice(-14).length-1 ? G.teal : `rgba(29,158,117,${0.15+i*0.04})`, borderRadius:2 }}/>;
+              const h = Math.max(3, ((d.actual||0)/maxV)*28);
+              return <div key={i} style={{ flex:1, height:h, background: i === chartData.slice(-14).length-1 ? G.teal : `rgba(29,158,117,${0.12+i*0.05})`, borderRadius:2 }}/>;
             })}
           </div>
         </div>
 
         {/* Ticket promedio */}
-        <div style={{ ...card({ padding:'22px 22px' }) }}>
-          <Orb color={G.violet} size={120} top={-30} right={-30} opacity={0.10} />
-          <div style={{ fontSize:10, fontWeight:700, color:G.textFaint, textTransform:'uppercase', letterSpacing:'0.10em', marginBottom:8 }}>Ticket promedio</div>
-          <div style={{ fontSize:28, fontWeight:800, color:G.violet, letterSpacing:'-0.03em', fontFamily:fontDisplay, lineHeight:1.1 }}>{money(charts.ticketPromedio)}</div>
-          <div style={{ fontSize:11, color: ticketChange >= 0 ? G.teal : G.red, fontWeight:600, opacity:0.9, marginTop:6 }}>
+        <div style={{ ...kpiCard({ padding:'16px 18px' }) }}>
+          <div style={{ fontSize:10, fontWeight:700, color:G.textFaint, textTransform:'uppercase', letterSpacing:'0.10em', marginBottom:6 }}>Ticket promedio</div>
+          <div style={{ fontSize:32, fontWeight:800, color:G.violet, letterSpacing:'-0.03em', fontFamily:FONT_UI, lineHeight:1 }}>{money(charts.ticketPromedio)}</div>
+          <div style={{ fontSize:11, color: ticketChange >= 0 ? G.teal : G.red, fontWeight:600, marginTop:4 }}>
             {ticketChange >= 0 ? '↑' : '↓'} {Math.abs(ticketChange)}% vs anterior
           </div>
         </div>
 
         {/* Mesas activas */}
-        <div style={{ ...card({ padding:'22px 22px' }) }}>
-          <Orb color={demoradas > 0 ? G.red : G.blue} size={120} top={-30} right={-30} opacity={0.10} />
-          <div style={{ fontSize:10, fontWeight:700, color:G.textFaint, textTransform:'uppercase', letterSpacing:'0.10em', marginBottom:8 }}>Mesas activas</div>
-          <div style={{ fontSize:28, fontWeight:800, color: demoradas > 0 ? G.red : G.blue, letterSpacing:'-0.03em', fontFamily:fontDisplay, lineHeight:1.1 }}>{activas}</div>
-          <div style={{ fontSize:11, color: demoradas > 0 ? G.red : G.teal, fontWeight:600, opacity:0.9, marginTop:6 }}>
+        <div style={{ ...kpiCard({ padding:'16px 18px' }) }}>
+          <div style={{ fontSize:10, fontWeight:700, color:G.textFaint, textTransform:'uppercase', letterSpacing:'0.10em', marginBottom:6 }}>Mesas activas</div>
+          <div style={{ fontSize:32, fontWeight:800, color: demoradas > 0 ? G.red : G.blue, letterSpacing:'-0.03em', fontFamily:FONT_UI, lineHeight:1 }}>{activas}</div>
+          <div style={{ fontSize:11, color: demoradas > 0 ? G.red : G.teal, fontWeight:600, marginTop:4 }}>
             {demoradas > 0 ? `${demoradas} demorada${demoradas>1?'s':''}` : 'Todo en orden'}
           </div>
         </div>
 
         {/* Mesas en el período */}
-        <div style={{ ...card({ padding:'22px 22px' }) }}>
-          <Orb color={G.amber} size={120} top={-30} right={-30} opacity={0.10} />
-          <div style={{ fontSize:10, fontWeight:700, color:G.textFaint, textTransform:'uppercase', letterSpacing:'0.10em', marginBottom:8 }}>Mesas cerradas</div>
-          <div style={{ fontSize:28, fontWeight:800, color:G.amber, letterSpacing:'-0.03em', fontFamily:fontDisplay, lineHeight:1.1 }}>
+        <div style={{ ...kpiCard({ padding:'16px 18px' }) }}>
+          <div style={{ fontSize:10, fontWeight:700, color:G.textFaint, textTransform:'uppercase', letterSpacing:'0.10em', marginBottom:6 }}>Mesas cerradas</div>
+          <div style={{ fontSize:32, fontWeight:800, color:G.amber, letterSpacing:'-0.03em', fontFamily:FONT_UI, lineHeight:1 }}>
             {(store.closedTurns||[]).filter(t => (t._ts||0) >= rangeStart && (t._ts||0) < rangeEnd).length}
           </div>
-          <div style={{ fontSize:11, color:G.textFaint, fontWeight:500, marginTop:6 }}>{rangeLabel}</div>
+          <div style={{ fontSize:11, color:G.textFaint, fontWeight:500, marginTop:4 }}>{rangeLabel}</div>
         </div>
       </div>
 
       {/* ── Gráfico principal ── */}
-      <div style={{ ...heroCard({ padding:'26px 28px' }) }}>
-        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20, flexWrap:'wrap', gap:8 }}>
+      <div style={{ ...kpiCard({ padding:'20px 22px' }) }}>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16, flexWrap:'wrap', gap:8 }}>
           <div>
-            <div style={{ fontSize:16, fontWeight:700, color:G.text, fontFamily:fontDisplay }}>Facturación comparativa</div>
+            <div style={{ fontSize:14, fontWeight:700, color:G.text, fontFamily:FONT_UI }}>Facturación comparativa</div>
             <div style={{ fontSize:12, color:G.textFaint, marginTop:2 }}>
               {periodoLabel} vs período anterior ({fmtDateShort(rangeStart - (rangeEnd - rangeStart))} → {fmtDateShort(rangeStart - 1)})
             </div>
           </div>
         </div>
-        <ResponsiveContainer width="100%" height={260}>
+        <ResponsiveContainer width="100%" height={240}>
           <AreaChart data={chartData} margin={{ top:5, right:5, bottom:0, left:0 }}>
             <defs>
               <linearGradient id="gradActual" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor={G.teal} stopOpacity={0.18}/>
-                <stop offset="95%" stopColor={G.teal} stopOpacity={0}/>
+                <stop offset="5%" stopColor={G.teal} stopOpacity={0.20}/>
+                <stop offset="95%" stopColor={G.teal} stopOpacity={0.02}/>
               </linearGradient>
               <linearGradient id="gradAnterior" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor={G.violet} stopOpacity={0.10}/>
                 <stop offset="95%" stopColor={G.violet} stopOpacity={0}/>
               </linearGradient>
             </defs>
-            <CartesianGrid stroke="rgba(0,0,0,0.04)" vertical={false} />
+            <CartesianGrid stroke="#F1F5F9" vertical={false} />
             <XAxis dataKey="day" tick={{ fontSize:11, fill:G.textFaint }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fontSize:11, fill:G.textFaint }} axisLine={false} tickLine={false}
+            <YAxis tick={{ fontSize:11, fill:G.textFaint }} axisLine={false} tickLine={false} width={50}
               tickFormatter={v => v>=1000000?`$${(v/1000000).toFixed(1)}M`:v>=1000?`$${Math.round(v/1000)}k`:`$${v}`} />
-            <Tooltip content={<CustomTooltip />} cursor={{ stroke:'rgba(0,0,0,0.06)', strokeWidth:1 }} />
-            <Area type="monotone" dataKey="actual"   stroke={G.teal}   strokeWidth={2.5} fill="url(#gradActual)"   name="Período seleccionado" dot={false} activeDot={{ r:5, fill:G.teal, strokeWidth:0 }} />
-            <Area type="monotone" dataKey="anterior" stroke={G.violet} strokeWidth={1.5} fill="url(#gradAnterior)" name="Período anterior" dot={false} strokeDasharray="4 2" activeDot={{ r:4, fill:G.violet, strokeWidth:0 }} />
+            <Tooltip content={<CustomTooltip />} cursor={{ stroke:'#E2E8F0', strokeWidth:1 }} />
+            <Area type="monotone" dataKey="actual"   stroke={G.teal}   strokeWidth={3}   fill="url(#gradActual)"   name="Período seleccionado" dot={false} activeDot={{ r:4, fill:G.teal, strokeWidth:0 }} />
+            <Area type="monotone" dataKey="anterior" stroke={G.violet} strokeWidth={1.5} fill="url(#gradAnterior)" name="Período anterior" dot={false} strokeDasharray="4 2" activeDot={{ r:3, fill:G.violet, strokeWidth:0 }} />
           </AreaChart>
         </ResponsiveContainer>
-        <div style={{ display:'flex', gap:20, marginTop:14 }}>
+        <div style={{ display:'flex', gap:20, marginTop:12 }}>
           {[[G.teal,'Período seleccionado',false],[G.violet,'Período anterior',true]].map(([c,l,dashed]) => (
-            <div key={l} style={{ display:'flex', alignItems:'center', gap:7 }}>
-              <div style={{ width:20, height:2.5, background:c, borderRadius:99, opacity:dashed?0.6:1 }} />
-              <span style={{ fontSize:11, color:G.textMuted }}>{l}</span>
+            <div key={l} style={{ display:'flex', alignItems:'center', gap:6 }}>
+              <div style={{ width:18, height:2.5, background:c, borderRadius:99, opacity:dashed?0.5:1 }} />
+              <span style={{ fontSize:11, color:G.textMuted, fontFamily:FONT_UI }}>{l}</span>
             </div>
           ))}
         </div>
       </div>
 
       {/* ── Bottom 3 cols ── */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(280px, 1fr))', gap:16 }}>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(280px, 1fr))', gap:12 }}>
 
         {/* Top productos */}
-        <div style={{ ...card({ padding:'22px 24px' }) }}>
-          <Orb color={G.teal} size={140} top={-40} right={-40} opacity={0.07} />
-          <div style={{ fontSize:14, fontWeight:700, color:G.text, marginBottom:18, fontFamily:fontDisplay }}>Top productos del período</div>
+        <div style={{ ...kpiCard({ padding:'16px 20px' }) }}>
+          <div style={{ fontSize:10, fontWeight:700, color:G.textMuted, textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:14, fontFamily:FONT_UI }}>Top productos del período</div>
           {(!charts.topProducts || charts.topProducts.length === 0)
             ? <p style={{ fontSize:12, color:G.textFaint, margin:0 }}>Sin datos para el período seleccionado.</p>
-            : <div style={{ display:'flex', flexDirection:'column', gap:13 }}>
+            : <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
                 {charts.topProducts.slice(0,5).map((p, i) => {
                   const colors = [G.teal, G.violet, G.blue, G.amber, '#F97316'];
                   const c = colors[i] || G.teal;
                   return (
                     <div key={p.nombre}>
-                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:5 }}>
-                        <div style={{ display:'flex', alignItems:'center', gap:9 }}>
-                          <span style={{ fontSize:11, fontWeight:800, color:G.textFaint, minWidth:20 }}>#{i+1}</span>
+                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
+                        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                          <span style={{ fontSize:10, fontWeight:800, color:G.textFaint, minWidth:18 }}>#{i+1}</span>
                           <span style={{ fontSize:13, color:G.text, fontWeight:600 }}>{p.nombre}</span>
                         </div>
                         <div>
                           <span style={{ fontSize:11, color:G.textFaint }}>{p.unidades} uds</span>
-                          <span style={{ fontSize:11, color:c, fontWeight:600, marginLeft:8 }}>{money(p.monto)}</span>
+                          <span style={{ fontSize:11, color:c, fontWeight:700, marginLeft:8 }}>{money(p.monto)}</span>
                         </div>
                       </div>
-                      <div style={{ height:4, background:'rgba(0,0,0,0.06)', borderRadius:99, overflow:'hidden' }}>
+                      <div style={{ height:3, background:'#F1F5F9', borderRadius:99, overflow:'hidden' }}>
                         <div style={{ height:'100%', width:`${(p.unidades/maxProd)*100}%`, background:c, borderRadius:99 }} />
                       </div>
                     </div>
@@ -484,19 +470,18 @@ export default function Dashboard() {
         </div>
 
         {/* Ticket promedio detalle */}
-        <div style={{ ...card({ padding:'22px 24px' }) }}>
-          <Orb color={G.violet} size={140} top={-40} right={-40} opacity={0.07} />
-          <div style={{ fontSize:14, fontWeight:700, color:G.text, marginBottom:6, fontFamily:fontDisplay }}>Ticket promedio</div>
-          <div style={{ fontSize:34, fontWeight:800, color:G.violet, fontFamily:fontDisplay, letterSpacing:'-0.03em', marginBottom:4 }}>
+        <div style={{ ...kpiCard({ padding:'16px 20px' }) }}>
+          <div style={{ fontSize:10, fontWeight:700, color:G.textMuted, textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:10, fontFamily:FONT_UI }}>Ticket promedio</div>
+          <div style={{ fontSize:36, fontWeight:800, color:G.violet, fontFamily:FONT_UI, letterSpacing:'-0.03em', marginBottom:2 }}>
             {money(charts.ticketPromedio)}
           </div>
-          <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:18 }}>
+          <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:14 }}>
             <span style={{ fontSize:11, fontWeight:700, color: ticketChange >= 0 ? G.teal : G.red, background: ticketChange >= 0 ? 'rgba(29,158,117,0.10)' : 'rgba(226,75,74,0.10)', padding:'2px 8px', borderRadius:99 }}>
               {ticketChange >= 0 ? '↑' : '↓'} {Math.abs(ticketChange)}%
             </span>
             <span style={{ fontSize:11, color:G.textFaint }}>vs mismo período anterior</span>
           </div>
-          <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
             {[
               { label:'Este período',     val:charts.ticketPromedio,  color:G.violet },
               { label:'Período anterior', val:charts.ticketAnterior||0, color:'rgba(127,119,221,0.4)' },
@@ -506,7 +491,7 @@ export default function Dashboard() {
                   <span style={{ fontSize:11, color:G.textMuted }}>{row.label}</span>
                   <span style={{ fontSize:12, fontWeight:700, color:G.text }}>{money(row.val)}</span>
                 </div>
-                <div style={{ height:5, background:'rgba(0,0,0,0.06)', borderRadius:99, overflow:'hidden' }}>
+                <div style={{ height:4, background:'#F1F5F9', borderRadius:99, overflow:'hidden' }}>
                   <div style={{ height:'100%', width:`${charts.ticketPromedio > 0 ? Math.min((row.val/(Math.max(charts.ticketPromedio,charts.ticketAnterior||1)*1.1))*100,100) : 0}%`, background:row.color, borderRadius:99 }} />
                 </div>
               </div>
@@ -515,22 +500,21 @@ export default function Dashboard() {
         </div>
 
         {/* Hora pico */}
-        <div style={{ ...card({ padding:'22px 24px' }) }}>
-          <Orb color={G.amber} size={140} top={-40} right={-40} opacity={0.07} />
-          <div style={{ fontSize:14, fontWeight:700, color:G.text, marginBottom:6, fontFamily:fontDisplay }}>Hora pico</div>
+        <div style={{ ...kpiCard({ padding:'16px 20px' }) }}>
+          <div style={{ fontSize:10, fontWeight:700, color:G.textMuted, textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:10, fontFamily:FONT_UI }}>Hora pico</div>
           {horas.length === 0
             ? <p style={{ fontSize:12, color:G.textFaint, margin:0 }}>Sin datos para el período seleccionado.</p>
             : <>
-                <div style={{ fontSize:30, fontWeight:800, color:G.amber, fontFamily:fontDisplay, letterSpacing:'-0.02em', marginBottom:4 }}>
+                <div style={{ fontSize:32, fontWeight:800, color:G.amber, fontFamily:FONT_UI, letterSpacing:'-0.02em', marginBottom:2 }}>
                   {`${String(horaPico).padStart(2,'0')}:00`}
                 </div>
-                <div style={{ fontSize:11, color:G.textFaint, marginBottom:16 }}>
+                <div style={{ fontSize:11, color:G.textFaint, marginBottom:14 }}>
                   {money(porHora[horaPico] || 0)} en ese horario
                 </div>
                 <div style={{ display:'flex', alignItems:'flex-end', gap:3, height:48 }}>
                   {horas.map(h => (
                     <div key={h} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:2 }}>
-                      <div style={{ width:'100%', height:Math.max(3,(porHora[h]/maxHoraVal)*44), background:h===horaPico?G.amber:`rgba(239,159,39,0.2)`, borderRadius:3 }}/>
+                      <div style={{ width:'100%', height:Math.max(3,(porHora[h]/maxHoraVal)*44), background:h===horaPico?G.amber:'#F1F5F9', borderRadius:3 }}/>
                       <span style={{ fontSize:9, color:G.textFaint }}>{h}h</span>
                     </div>
                   ))}

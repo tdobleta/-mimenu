@@ -52,7 +52,7 @@ export default function Sidebar({ onClose }) {
       </div>
 
       {/* Nav */}
-      <nav style={{ flex:1, padding:'12px 10px', display:'flex', flexDirection:'column', gap:2, overflowY:'auto' }}>
+      <nav style={{ flex:1, padding:'10px 8px', display:'flex', flexDirection:'column', gap:1, overflowY:'auto' }}>
         {navItems.map(item => {
           const active = item.path === '/' ? loc.pathname === '/' : loc.pathname.startsWith(item.path.split('?')[0]);
           const baseStyle = {
