@@ -37,7 +37,7 @@ export default function StarProducts({ periodItems }) {
   const maxMonto = products[0]?.monto || 1;
 
   return (
-    <div style={{ backgroundColor:'white', border:'0.5px solid rgba(0,0,0,0.08)', borderRadius:10, padding:'18px 20px' }}>
+    <div style={{ background:'#FFFFFF', border:'1px solid #E2E8F0', boxShadow:'0 1px 3px rgba(0,0,0,0.06)', borderRadius:12, padding:'18px 20px' }}>
       <div style={{ fontSize:14, fontWeight:600, color:'#111827', marginBottom:6 }}>Ingeniería de menú — Qué vendés y cuánto ganás</div>
       <div style={{ fontSize:12, color:'#6B7280', marginBottom:16, lineHeight:'18px' }}>
         Los productos marcados con ★ son los más vendidos Y los que más ingresos generan. Son tus productos estrella.

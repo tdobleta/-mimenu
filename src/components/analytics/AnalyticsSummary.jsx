@@ -50,7 +50,7 @@ export default function AnalyticsSummary({ periodTurns, prevTurns }) {
   return (
     <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(180px, 1fr))', gap:12 }}>
       {cards.map(c => (
-        <div key={c.label} style={{ backgroundColor:'white', border:'0.5px solid rgba(0,0,0,0.08)', borderRadius:10, padding:'18px 20px' }}>
+        <div key={c.label} style={{ background:'#FFFFFF', border:'1px solid #E2E8F0', boxShadow:'0 1px 3px rgba(0,0,0,0.06)', borderRadius:12, padding:'16px 18px' }}>
           <div style={{ fontSize:11, textTransform:'uppercase', letterSpacing:'0.5px', color:'#9CA3AF', marginBottom:8 }}>{c.label}</div>
           <div style={{ fontSize:28, fontWeight:700, color:'#111827', lineHeight:1, letterSpacing:'-0.5px' }}>{c.value}</div>
           {c.change !== null && (

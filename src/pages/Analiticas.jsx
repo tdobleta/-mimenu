@@ -105,11 +105,11 @@ export default function Analiticas() {
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:24 }}>
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:12 }}>
-        <h1 style={{ fontSize:20, fontWeight:600, color:'#111827', margin:0 }}>Analíticas</h1>
+        <h1 style={{ fontSize:20, fontWeight:700, color:'#0F172A', margin:0, fontFamily:"'DM Sans',system-ui,sans-serif", letterSpacing:'-0.01em' }}>Analíticas</h1>
         <div style={{ display:'flex', gap:4 }}>
           {PERIODS.map(([k,l])=>(
             <button key={k} onClick={()=>setPeriod(k)}
-              style={{ padding:'6px 14px', borderRadius:99, fontSize:12, fontWeight:500, cursor:'pointer', backgroundColor:period===k?'#1D9E75':'white', color:period===k?'white':'#6B7280', border:period===k?'none':'0.5px solid rgba(0,0,0,0.10)' }}>
+              style={{ padding:'6px 14px', borderRadius:10, fontSize:12, fontWeight:600, cursor:'pointer', background:period===k?'#1D9E75':'#FFFFFF', color:period===k?'white':'#64748B', border:period===k?'none':'1px solid #E2E8F0', boxShadow:period===k?'0 4px 12px rgba(29,158,117,0.25)':'none' }}>
               {l}
             </button>
           ))}

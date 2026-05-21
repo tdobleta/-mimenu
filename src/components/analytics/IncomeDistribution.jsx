@@ -52,7 +52,7 @@ export default function IncomeDistribution({ periodTurns, periodItems, menuItems
 
   return (
     <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(320px, 1fr))', gap:16 }}>
-      <div style={{ backgroundColor:'white', border:'0.5px solid rgba(0,0,0,0.08)', borderRadius:10, padding:'18px 20px' }}>
+      <div style={{ background:'#FFFFFF', border:'1px solid #E2E8F0', boxShadow:'0 1px 3px rgba(0,0,0,0.06)', borderRadius:12, padding:'18px 20px' }}>
         <div style={{ fontSize:14, fontWeight:600, color:'#111827', marginBottom:14 }}>Cómo te pagan</div>
         {totalPay === 0 ? (
           <div style={{ fontSize:12, color:'#9CA3AF', textAlign:'center', padding:'30px 0' }}>Sin datos de pago</div>
@@ -63,7 +63,7 @@ export default function IncomeDistribution({ periodTurns, periodItems, menuItems
                 <Pie data={payData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={60} outerRadius={90} paddingAngle={2}>
                   {payData.map(p => <Cell key={p.name} fill={PAY_COLORS[p.name]||'#9CA3AF'} />)}
                 </Pie>
-                <Tooltip contentStyle={{ border:'0.5px solid rgba(0,0,0,0.08)', borderRadius:8, fontSize:12 }} formatter={v => [money(v)]} />
+                <Tooltip contentStyle={{ background:'#FFFFFF', border:'1px solid #E2E8F0', borderRadius:8, fontSize:12 }} formatter={v => [money(v)]} />
               </PieChart>
             </ResponsiveContainer>
             <div style={{ display:'flex', flexDirection:'column', gap:8, marginTop:10 }}>
@@ -80,14 +80,14 @@ export default function IncomeDistribution({ periodTurns, periodItems, menuItems
         )}
       </div>
 
-      <div style={{ backgroundColor:'white', border:'0.5px solid rgba(0,0,0,0.08)', borderRadius:10, padding:'18px 20px' }}>
+      <div style={{ background:'#FFFFFF', border:'1px solid #E2E8F0', boxShadow:'0 1px 3px rgba(0,0,0,0.06)', borderRadius:12, padding:'18px 20px' }}>
         <div style={{ fontSize:14, fontWeight:600, color:'#111827', marginBottom:14 }}>Facturación por categoría</div>
         <ResponsiveContainer width="100%" height={240}>
           <BarChart data={catData} layout="vertical" margin={{ left:20 }}>
             <XAxis type="number" tick={{ fontSize:11, fill:'#9CA3AF' }} axisLine={false} tickLine={false}
               tickFormatter={v => v >= 1000 ? `$${Math.round(v/1000)}k` : `$${v}`} />
             <YAxis type="category" dataKey="categoria" tick={{ fontSize:12, fill:'#374151' }} axisLine={false} tickLine={false} width={90} />
-            <Tooltip contentStyle={{ border:'0.5px solid rgba(0,0,0,0.08)', borderRadius:8, fontSize:12 }} formatter={v => [money(v), 'Facturación']} />
+            <Tooltip contentStyle={{ background:'#FFFFFF', border:'1px solid #E2E8F0', borderRadius:8, fontSize:12 }} formatter={v => [money(v), 'Facturación']} />
             <Bar dataKey="monto" fill="#1D9E75" radius={[0,6,6,0]} barSize={22} />
           </BarChart>
         </ResponsiveContainer>

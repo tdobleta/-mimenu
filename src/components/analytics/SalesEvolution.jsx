@@ -58,7 +58,7 @@ export default function SalesEvolution({ periodTurns, period, allTurns, periodSt
   }, [chartData, period, allTurns]);
 
   return (
-    <div style={{ backgroundColor:'white', border:'0.5px solid rgba(0,0,0,0.08)', borderRadius:10, padding:'18px 20px' }}>
+    <div style={{ background:'#FFFFFF', border:'1px solid #E2E8F0', boxShadow:'0 1px 3px rgba(0,0,0,0.06)', borderRadius:12, padding:'18px 20px' }}>
       <div style={{ marginBottom:14 }}>
         <div style={{ fontSize:14, fontWeight:600, color:'#111827' }}>Evolución de ventas</div>
         <div style={{ fontSize:12, color:'#6B7280', marginTop:2 }}>
@@ -78,7 +78,7 @@ export default function SalesEvolution({ periodTurns, period, allTurns, periodSt
           <XAxis dataKey="label" tick={{ fontSize:11, fill:'#9CA3AF' }} axisLine={false} tickLine={false} />
           <YAxis tick={{ fontSize:11, fill:'#9CA3AF' }} axisLine={false} tickLine={false}
             tickFormatter={v => v >= 1000000 ? `$${(v/1000000).toFixed(1)}M` : v >= 1000 ? `$${Math.round(v/1000)}k` : `$${v}`} />
-          <Tooltip contentStyle={{ border:'0.5px solid rgba(0,0,0,0.08)', borderRadius:8, fontSize:12 }} formatter={v => [money(v), 'Facturación']} />
+          <Tooltip contentStyle={{ background:'#FFFFFF', border:'1px solid #E2E8F0', borderRadius:8, fontSize:12 }} formatter={v => [money(v), 'Facturación']} />
           <Area type="monotone" dataKey="monto" stroke="#1D9E75" strokeWidth={2} fill="url(#areaFill)" dot={false} />
         </AreaChart>
       </ResponsiveContainer>

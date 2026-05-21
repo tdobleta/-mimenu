@@ -3,7 +3,9 @@ import { Link } from 'react-router-dom';
 import { useStore } from '@/lib/store';
 import { money } from '@/lib/fmt';
 import AnalyticsActions from '../components/analytics/AnalyticsActions';
-import { G, glass, glassDeep, glassLight, labelStyle, fontDisplay } from '@/lib/glass';
+import { G, glass, glassDeep, glassLight } from '@/lib/glass';
+
+const FONT_UI = "'DM Sans', system-ui, sans-serif";
 
 const TABS = [['ventas','Ventas'],['productos','Productos'],['mozos','Mozos'],['reservas','Reservas']];
 
@@ -127,14 +129,14 @@ export default function Reportes() {
   function exportReservas()  { downloadCSV('reservas.csv', ['Métrica','Valor'], [['Total',RESERVAS_DATA.total],['Confirmadas',RESERVAS_DATA.confirmadas],['Canceladas',RESERVAS_DATA.canceladas],['No-shows',RESERVAS_DATA.noShows],['Online',RESERVAS_DATA.online]]); }
 
   const BtnExport = ({ onClick }) => (
-    <button onClick={onClick} style={{ ...glassLight({ display:'flex', alignItems:'center', gap:6, padding:'6px 14px', borderRadius:10, fontSize:12, color:G.textMid, cursor:'pointer', border:'1px solid rgba(255,255,255,0.8)' }) }}>
+    <button onClick={onClick} style={{ display:'flex', alignItems:'center', gap:6, padding:'6px 14px', borderRadius:10, fontSize:12, color:G.textMid, cursor:'pointer', background:'#F8FAFC', border:'1px solid #E2E8F0', fontFamily:FONT_UI }}>
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
       Exportar CSV
     </button>
   );
 
-  const thStyle = { textAlign:'left', padding:'11px 16px', fontSize:11, fontWeight:700, color:G.textFaint, textTransform:'uppercase', letterSpacing:'0.05em', borderBottom:'1px solid rgba(255,255,255,0.5)', background:'rgba(255,255,255,0.3)' };
-  const tdStyle = { padding:'11px 16px', fontSize:13, color:G.textMid, borderBottom:'1px solid rgba(255,255,255,0.35)' };
+  const thStyle = { textAlign:'left', padding:'11px 16px', fontSize:11, fontWeight:700, color:G.textFaint, textTransform:'uppercase', letterSpacing:'0.05em', borderBottom:'1px solid #E2E8F0', background:'#F8FAFC' };
+  const tdStyle = { padding:'11px 16px', fontSize:13, color:G.textMid, borderBottom:'1px solid #F1F5F9' };
 
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:18 }}>
@@ -142,7 +144,7 @@ export default function Reportes() {
       {/* Header */}
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:10 }}>
         <div style={{ display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
-          <h1 style={{ fontSize:22, fontWeight:700, color:G.text, margin:0, fontFamily:fontDisplay, letterSpacing:'-0.02em' }}>Reportes</h1>
+          <h1 style={{ fontSize:20, fontWeight:700, color:G.text, margin:0, fontFamily:FONT_UI, letterSpacing:'-0.02em' }}>Reportes</h1>
           <button onClick={()=>store.refreshCharts&&store.refreshCharts()} style={{ ...glassLight({ display:'flex', alignItems:'center', gap:5, padding:'5px 12px', borderRadius:10, fontSize:12, color:G.textMid, cursor:'pointer', border:'1px solid rgba(255,255,255,0.8)' }) }}>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
             Actualizar
@@ -152,7 +154,7 @@ export default function Reportes() {
           <AnalyticsActions resetLabel="Reiniciar reportes" editLabel="Editar reportes" />
           <div style={{ display:'flex', gap:4 }}>
             {[['today','Hoy'],['week','Esta semana'],['month','Este mes'],['year','Este año']].map(([k,l])=>(
-              <button key={k} onClick={()=>setPeriod(k)} style={{ padding:'6px 14px', borderRadius:10, fontSize:12, fontWeight:600, cursor:'pointer', border:'none', transition:'all .15s', background:period===k?G.teal:'rgba(255,255,255,0.55)', color:period===k?'white':G.textMuted, boxShadow:period===k?`0 4px 12px rgba(29,158,117,0.25)`:'none' }}>{l}</button>
+              <button key={k} onClick={()=>setPeriod(k)} style={{ padding:'6px 14px', borderRadius:10, fontSize:12, fontWeight:600, cursor:'pointer', border: period===k?'none':'1px solid #E2E8F0', transition:'all .15s', background:period===k?G.teal:'#FFFFFF', color:period===k?'white':G.textMuted, boxShadow:period===k?`0 4px 12px rgba(29,158,117,0.25)`:'none' }}>{l}</button>
             ))}
           </div>
         </div>
@@ -161,7 +163,7 @@ export default function Reportes() {
       {/* Tabs */}
       <div style={{ display:'flex', gap:4 }}>
         {TABS.map(([k,l])=>(
-          <button key={k} onClick={()=>setTab(k)} style={{ padding:'8px 18px', fontSize:13, fontWeight:tab===k?700:500, cursor:'pointer', borderRadius:12, border:'none', transition:'all .15s', background:tab===k?'rgba(255,255,255,0.75)':'transparent', color:tab===k?G.teal:G.textFaint, boxShadow:tab===k?'0 2px 12px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.9)':'none' }}>{l}</button>
+          <button key={k} onClick={()=>setTab(k)} style={{ padding:'8px 18px', fontSize:13, fontWeight:tab===k?700:500, cursor:'pointer', borderRadius:12, border: tab===k?'1px solid #E2E8F0':'1px solid transparent', transition:'all .15s', background:tab===k?'#FFFFFF':'transparent', color:tab===k?G.teal:G.textFaint, boxShadow:tab===k?'0 1px 3px rgba(0,0,0,0.06)':'none' }}>{l}</button>
         ))}
       </div>
 
@@ -187,8 +189,8 @@ export default function Reportes() {
               { label:'Propinas',    val:totalVentas.propinas,      color:G.textMuted },
             ].map(m=>(
               <div key={m.label} style={{ padding:'4px 20px', borderRight:'1px solid rgba(0,0,0,0.06)' }}>
-                <div style={{ ...labelStyle, marginBottom:3 }}>{m.label}</div>
-                <div style={{ fontSize:17, fontWeight:700, color:m.color, fontFamily:fontDisplay }}>{money(m.val)}</div>
+                <div style={{ fontSize:10, fontWeight:700, color:G.textFaint, textTransform:'uppercase', letterSpacing:'0.07em', fontFamily:FONT_UI, marginBottom:3 }}>{m.label}</div>
+                <div style={{ fontSize:17, fontWeight:700, color:m.color, fontFamily:FONT_UI }}>{money(m.val)}</div>
               </div>
             ))}
             <div style={{ marginLeft:'auto', paddingLeft:20 }}><BtnExport onClick={exportVentas}/></div>
@@ -199,7 +201,7 @@ export default function Reportes() {
               <thead><tr>{['Fecha','Mesas','Total','Efectivo','Tarjeta','MercadoPago','Transf.','Propinas'].map(h=><th key={h} style={thStyle}>{h}</th>)}</tr></thead>
               <tbody>
                 {VENTAS_DATA.map(r=>(
-                  <tr key={r.fecha} onMouseEnter={e=>e.currentTarget.style.background='rgba(255,255,255,0.3)'} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+                  <tr key={r.fecha} onMouseEnter={e=>e.currentTarget.style.background='rgba(29,158,117,0.04)'} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
                     <td style={{ ...tdStyle, fontWeight:600, color:G.text }}>{r.fecha}</td>
                     <td style={tdStyle}>{r.mesas}</td>
                     <td style={{ ...tdStyle, fontWeight:700, color:G.teal }}>{money(r.total)}</td>
@@ -262,7 +264,7 @@ export default function Reportes() {
                 <thead><tr>{['Mozo','Mesas','Total facturado','Ticket promedio','% del total'].map(h=><th key={h} style={thStyle}>{h}</th>)}</tr></thead>
                 <tbody>
                   {MOZOS_DATA.map(m=>(
-                    <tr key={m.mozo} onMouseEnter={e=>e.currentTarget.style.background='rgba(255,255,255,0.3)'} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+                    <tr key={m.mozo} onMouseEnter={e=>e.currentTarget.style.background='rgba(29,158,117,0.04)'} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
                       <td style={{ ...tdStyle, fontWeight:600, color:G.text }}>{m.mozo}</td>
                       <td style={tdStyle}>{m.mesas}</td>
                       <td style={{ ...tdStyle, fontWeight:700, color:G.teal }}>{money(m.total)}</td>
@@ -296,8 +298,8 @@ export default function Reportes() {
               { label:'Reservas online', value:RESERVAS_DATA.online,        color:G.blue  },
             ].map(k=>(
               <div key={k.label} style={{ ...glass({ padding:'18px 20px' }) }}>
-                <div style={labelStyle}>{k.label}</div>
-                <div style={{ fontSize:32, fontWeight:700, color:k.color, lineHeight:1, fontFamily:fontDisplay }}>{k.value}</div>
+                <div style={{ fontSize:10, fontWeight:700, color:G.textFaint, textTransform:'uppercase', letterSpacing:'0.07em', fontFamily:FONT_UI, marginBottom:6 }}>{k.label}</div>
+                <div style={{ fontSize:32, fontWeight:700, color:k.color, lineHeight:1, fontFamily:FONT_UI }}>{k.value}</div>
                 {k.sub && <div style={{ fontSize:12, color:k.color, marginTop:6, fontWeight:600, opacity:0.8 }}>{k.sub}</div>}
               </div>
             ))}

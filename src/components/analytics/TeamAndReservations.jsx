@@ -53,7 +53,7 @@ export default function TeamAndReservations({ periodTurns, reservas, periodStart
 
   return (
     <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(320px, 1fr))', gap:16 }}>
-      <div style={{ backgroundColor:'white', border:'0.5px solid rgba(0,0,0,0.08)', borderRadius:10, padding:'18px 20px' }}>
+      <div style={{ background:'#FFFFFF', border:'1px solid #E2E8F0', boxShadow:'0 1px 3px rgba(0,0,0,0.06)', borderRadius:12, padding:'18px 20px' }}>
         <div style={{ fontSize:14, fontWeight:600, color:'#111827', marginBottom:14 }}>Rendimiento del equipo</div>
         {team.length === 0 ? (
           <div style={{ fontSize:12, color:'#9CA3AF', textAlign:'center', padding:'20px 0' }}>Sin datos del equipo</div>
@@ -86,7 +86,7 @@ export default function TeamAndReservations({ periodTurns, reservas, periodStart
         )}
       </div>
 
-      <div style={{ backgroundColor:'white', border:'0.5px solid rgba(0,0,0,0.08)', borderRadius:10, padding:'18px 20px' }}>
+      <div style={{ background:'#FFFFFF', border:'1px solid #E2E8F0', boxShadow:'0 1px 3px rgba(0,0,0,0.06)', borderRadius:12, padding:'18px 20px' }}>
         <div style={{ fontSize:14, fontWeight:600, color:'#111827', marginBottom:14 }}>Reservas del período</div>
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:18 }}>
           <KPI label="Total" value={resStats.total} color="#111827" />

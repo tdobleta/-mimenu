@@ -57,7 +57,7 @@ export default function TablePerformance({ periodTurns, period, periodStart }) {
   }, [periodTurns]);
 
   return (
-    <div style={{ backgroundColor:'white', border:'0.5px solid rgba(0,0,0,0.08)', borderRadius:10, padding:'18px 20px' }}>
+    <div style={{ background:'#FFFFFF', border:'1px solid #E2E8F0', boxShadow:'0 1px 3px rgba(0,0,0,0.06)', borderRadius:12, padding:'18px 20px' }}>
       <div style={{ fontSize:14, fontWeight:600, color:'#111827', marginBottom:14 }}>Rendimiento del salón</div>
 
       <div style={{ display:'flex', flexWrap:'wrap', borderTop:'0.5px solid rgba(0,0,0,0.06)', borderBottom:'0.5px solid rgba(0,0,0,0.06)', marginBottom:18 }}>

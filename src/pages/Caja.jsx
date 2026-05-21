@@ -7,6 +7,9 @@ import OpenShiftModal from '../components/caja/OpenShiftModal';
 import AddRetiroModal from '../components/caja/AddRetiroModal';
 import CloseShiftModal from '../components/caja/CloseShiftModal';
 import ShiftHistory from '../components/caja/ShiftHistory';
+import { G } from '@/lib/glass';
+
+const FONT_UI = "'DM Sans', system-ui, sans-serif";
 
 const TIPO_LABEL = { manana:'Mañana', tarde:'Tarde', noche:'Noche', general:'General' };
 
@@ -208,8 +211,8 @@ export default function Caja() {
           </div>
 
           {/* Ventas por método */}
-          <div style={{ backgroundColor:'white', border:'0.5px solid rgba(0,0,0,0.08)', borderRadius:10, overflow:'hidden' }}>
-            <div style={{ padding:'14px 18px', fontSize:14, fontWeight:600, color:'#111827', borderBottom:'0.5px solid rgba(0,0,0,0.06)' }}>Ventas por método de pago</div>
+          <div style={{ background:'#FFFFFF', border:'1px solid #E2E8F0', boxShadow:'0 1px 3px rgba(0,0,0,0.06)', borderRadius:12, overflow:'hidden' }}>
+            <div style={{ padding:'14px 18px', fontSize:13, fontWeight:700, color:G.text, borderBottom:'1px solid #E2E8F0', fontFamily:FONT_UI }}>Ventas por método de pago</div>
             {turnos.length === 0 ? (
               <div style={{ padding:'30px 20px', textAlign:'center', fontSize:13, color:'#9CA3AF' }}>Sin ventas registradas en este turno</div>
             ) : (
@@ -240,7 +243,7 @@ export default function Caja() {
           </div>
 
           {/* Retiros */}
-          <div style={{ backgroundColor:'white', border:'0.5px solid rgba(0,0,0,0.08)', borderRadius:10, overflow:'hidden' }}>
+          <div style={{ background:'#FFFFFF', border:'1px solid #E2E8F0', boxShadow:'0 1px 3px rgba(0,0,0,0.06)', borderRadius:12, overflow:'hidden' }}>
             <div style={{ padding:'14px 18px', display:'flex', alignItems:'center', justifyContent:'space-between', borderBottom:'0.5px solid rgba(0,0,0,0.06)' }}>
               <span style={{ fontSize:14, fontWeight:600, color:'#111827' }}>Retiros registrados</span>
               <button onClick={() => navigate('/pos')} style={{
@@ -337,8 +340,8 @@ function ReservasHoy({ reservas }) {
     return { backgroundColor:s.bg, color:s.c, padding:'2px 8px', borderRadius:99, fontSize:11, fontWeight:600 };
   };
   return (
-    <div style={{ backgroundColor:'white', border:'0.5px solid rgba(0,0,0,0.08)', borderRadius:10, overflow:'hidden' }}>
-      <div style={{ padding:'14px 18px', fontSize:14, fontWeight:600, color:'#111827', borderBottom:'0.5px solid rgba(0,0,0,0.06)' }}>Reservas de hoy</div>
+    <div style={{ background:'#FFFFFF', border:'1px solid #E2E8F0', boxShadow:'0 1px 3px rgba(0,0,0,0.06)', borderRadius:12, overflow:'hidden' }}>
+      <div style={{ padding:'14px 18px', fontSize:13, fontWeight:700, color:G.text, borderBottom:'1px solid #E2E8F0', fontFamily:FONT_UI }}>Reservas de hoy</div>
       {hoy.length === 0
         ? <div style={{ padding:'24px 20px', textAlign:'center', fontSize:13, color:'#9CA3AF' }}>No hay reservas para hoy</div>
         : <div style={{ padding:'10px 18px', display:'flex', flexDirection:'column', gap:10 }}>
@@ -362,8 +365,8 @@ function ActividadReciente({ activity }) {
     return m < 60 ? `hace ${m}m` : `hace ${Math.floor(m/60)}h`;
   }
   return (
-    <div style={{ backgroundColor:'white', border:'0.5px solid rgba(0,0,0,0.08)', borderRadius:10, overflow:'hidden' }}>
-      <div style={{ padding:'14px 18px', fontSize:14, fontWeight:600, color:'#111827', borderBottom:'0.5px solid rgba(0,0,0,0.06)' }}>Actividad reciente</div>
+    <div style={{ background:'#FFFFFF', border:'1px solid #E2E8F0', boxShadow:'0 1px 3px rgba(0,0,0,0.06)', borderRadius:12, overflow:'hidden' }}>
+      <div style={{ padding:'14px 18px', fontSize:13, fontWeight:700, color:G.text, borderBottom:'1px solid #E2E8F0', fontFamily:FONT_UI }}>Actividad reciente</div>
       {activity.length === 0
         ? <div style={{ padding:'24px 20px', textAlign:'center', fontSize:13, color:'#9CA3AF' }}>Sin actividad reciente</div>
         : <div style={{ padding:'10px 18px', display:'flex', flexDirection:'column', gap:10 }}>
@@ -385,11 +388,11 @@ function ActividadReciente({ activity }) {
 function Header({ tab, setTab }) {
   return (
     <div>
-      <h1 style={{ fontSize:20, fontWeight:600, color:'#111827', margin:0, marginBottom:14 }}>Caja</h1>
-      <div style={{ display:'flex', borderBottom:'0.5px solid rgba(0,0,0,0.08)' }}>
+      <h1 style={{ fontSize:20, fontWeight:700, color:G.text, margin:0, marginBottom:14, fontFamily:FONT_UI, letterSpacing:'-0.01em' }}>Caja</h1>
+      <div style={{ display:'flex', borderBottom:'1px solid #E2E8F0' }}>
         {[['actual','Turno actual'],['historial','Historial']].map(([k,l]) => (
           <button key={k} onClick={()=>setTab(k)}
-            style={{ padding:'8px 16px', fontSize:13, border:'none', background:'none', cursor:'pointer', marginBottom:-1, fontWeight: tab===k?500:400, color: tab===k?'#1D9E75':'#9CA3AF', borderBottom: tab===k?'2px solid #1D9E75':'2px solid transparent' }}>
+            style={{ padding:'8px 16px', fontSize:13, border:'none', background:'none', cursor:'pointer', marginBottom:-1, fontWeight: tab===k?600:400, color: tab===k?G.teal:G.textFaint, borderBottom: tab===k?`2px solid ${G.teal}`:'2px solid transparent', fontFamily:FONT_UI }}>
             {l}
           </button>
         ))}
@@ -400,9 +403,9 @@ function Header({ tab, setTab }) {
 
 function Kpi({ label, value, valueColor }) {
   return (
-    <div style={{ backgroundColor:'white', border:'0.5px solid rgba(0,0,0,0.08)', borderRadius:10, padding:'18px 20px' }}>
-      <div style={{ fontSize:11, textTransform:'uppercase', letterSpacing:'0.5px', color:'#9CA3AF', marginBottom:8 }}>{label}</div>
-      <div style={{ fontSize:24, fontWeight:700, color: valueColor || '#111827', lineHeight:1, letterSpacing:'-0.4px' }}>{value}</div>
+    <div style={{ background:'#FFFFFF', border:'1px solid #E2E8F0', boxShadow:'0 1px 3px rgba(0,0,0,0.06)', borderRadius:14, padding:'16px 18px', position:'relative' }}>
+      <div style={{ fontSize:10, textTransform:'uppercase', letterSpacing:'0.07em', color:G.textFaint, fontWeight:700, marginBottom:8, fontFamily:FONT_UI }}>{label}</div>
+      <div style={{ fontSize:28, fontWeight:800, color: valueColor || G.text, lineHeight:1, letterSpacing:'-0.03em', fontFamily:FONT_UI }}>{value}</div>
     </div>
   );
 }
