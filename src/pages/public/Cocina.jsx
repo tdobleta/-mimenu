@@ -6,14 +6,24 @@ import { supabase } from '@/api/supabaseClient';
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
 async function updateCocinaEstado(turnId, branchId, updates) {
-  const res = await fetch(`${SUPABASE_URL}/functions/v1/cocina-update`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + import.meta.env.VITE_SUPABASE_ANON_KEY },
-    body: JSON.stringify({ turn_id: turnId, branch_id: branchId, ...updates }),
-  });
-  const data = await res.json();
-  if (!data.ok) throw new Error(data.error || 'Error actualizando cocina');
-  return data;
+  // Primer intento: Edge Function (usa service_role para bypassear RLS sin sesión de usuario)
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/cocina-update`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + import.meta.env.VITE_SUPABASE_ANON_KEY },
+      body: JSON.stringify({ turn_id: turnId, branch_id: branchId, ...updates }),
+    });
+    if (res.ok) return; // HTTP 2xx → éxito, sin importar el body
+    // HTTP 4xx/5xx — Edge Function falló, intentar fallback directo
+  } catch(e) {
+    // fetch falló (CORS, red, Edge Function no disponible) — intentar fallback
+  }
+  // Fallback: update directo via supabase-js (requiere que RLS permita el anon key)
+  const updateData = {};
+  if (updates.cocina_estado !== undefined) updateData.cocina_estado = updates.cocina_estado;
+  if (typeof updates.comanda_lista === 'boolean') updateData.comanda_lista = updates.comanda_lista;
+  const { error } = await supabase.from('turns').update(updateData).eq('id', turnId);
+  if (error) throw error;
 }
 
 const COLORS = {
