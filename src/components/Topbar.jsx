@@ -6,7 +6,7 @@ import AlertsDropdown from './AlertsDropdown';
 import { base44 } from '@/api/base44Client';
 import { supabase } from '@/api/supabaseClient';
 import useUserRole from '@/lib/useUserRole';
-import { G, glassLight } from '@/lib/glass';
+import { G } from '@/lib/glass';
 import { useKitchenNotifications } from '@/lib/useKitchenNotifications';
 import KitchenNotifDropdown from './KitchenNotifDropdown';
 
@@ -81,7 +81,7 @@ export default function Topbar({ onMobile }) {
       {/* Restaurante + rol */}
       {restaurante.nombre && (
         <div className="hidden md:flex" style={{ display:'flex', alignItems:'center', gap:8 }}>
-          <div style={{ ...glassLight({ padding:'4px 12px', borderRadius:99, display:'flex', alignItems:'center', gap:6 }) }}>
+          <div style={{ background:'#F8FAFC', border:'1px solid #E2E8F0', padding:'4px 12px', borderRadius:99, display:'flex', alignItems:'center', gap:6 }}>
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={G.teal} strokeWidth="2.5"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
             <span style={{ fontSize:13, color:G.text, fontWeight:500 }}>{restaurante.nombre}</span>
           </div>
@@ -95,7 +95,7 @@ export default function Topbar({ onMobile }) {
       <div style={{ flex:1, display:'flex', justifyContent:'center' }} ref={ref}>
         <div style={{ position:'relative' }}>
           <button onClick={() => setOpen(v=>!v)} style={{
-            ...glassLight({ padding:'7px 16px', borderRadius:99, display:'flex', alignItems:'center', gap:8, border:'1px solid rgba(255,255,255,0.8)', cursor:'pointer' }),
+            background:'#F8FAFC', border:'1px solid #E2E8F0', padding:'7px 16px', borderRadius:99, display:'flex', alignItems:'center', gap:8, cursor:'pointer',
             fontSize: 13, fontWeight: 500, color: G.text,
           }}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={G.teal} strokeWidth="2.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
@@ -139,7 +139,7 @@ export default function Topbar({ onMobile }) {
         {/* Notificaciones cocina */}
         <div ref={kitchenRef} style={{ position:'relative' }}>
           <div onClick={() => { setKitchenOpen(v=>!v); if(!kitchenOpen) markAllRead(); }}
-            style={{ ...glassLight({ width:34, height:34, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', padding:0 }) }}>
+            style={{ background:'#F8FAFC', border:'1px solid #E2E8F0', width:34, height:34, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', padding:0 }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={kitchenUnread > 0 ? '#1D9E75' : G.textMuted} strokeWidth="2"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.1 1 3"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>
           </div>
           {kitchenUnread > 0 && (
