@@ -26,7 +26,7 @@ function foodCostColor(pct) {
   return G.red;
 }
 
-const TABS = ['Menú', 'Stock', 'Recetas', 'Food Cost', 'Compras', 'Movimientos'];
+const TABS = ['Menú', 'Stock', 'Recetas', 'Food Cost', 'Compras', 'Recuento', 'Movimientos'];
 
 const ST_BADGE = {
   ok:          { bg:'rgba(29,158,117,0.10)', c:G.teal,  label:'OK'        },
@@ -72,6 +72,10 @@ export default function Stock() {
   const [ingresoUnidad, setIngresoUnidad] = useState('');
   const [ingresoSaving, setIngresoSaving] = useState(false);
   const [ingresos, setIngresos] = useState([]);
+
+  // Recuento físico
+  const [recuentoContado, setRecuentoContado] = useState({});  // { [itemId]: cantidadContada }
+  const [recuentoSaving, setRecuentoSaving] = useState(false);
 
   // Recetas
   const [recetas, setRecetas]         = useState({});
@@ -273,6 +277,39 @@ export default function Stock() {
       addToast(e?.message?.includes('stock_ingresos') ? 'Creá la tabla stock_ingresos en Supabase primero' : 'Error al registrar compra', 'error');
     }
     setIngresoSaving(false);
+  }
+
+  async function confirmarRecuento() {
+    if (recuentoSaving) return;
+    const diffs = stock.filter(it => {
+      const contado = recuentoContado[it.id];
+      return contado !== undefined && contado !== '' && Number(contado) !== Number(it.actual);
+    });
+    if (diffs.length === 0) { addToast('Sin diferencias para ajustar', 'info'); return; }
+    setRecuentoSaving(true);
+    let ok = 0;
+    for (const it of diffs) {
+      const contado = Number(recuentoContado[it.id]);
+      const diff = contado - Number(it.actual);
+      const bid = it.sucursalId || activeBranch;
+      try {
+        await base44.entities.StockItem.update(it.id, { actual: contado });
+        store.updateStockItem(bid, it.id, { actual: contado });
+        // Registrar ajuste como movimiento
+        if (diff > 0) {
+          await dbAddIngreso(bid, { stockItemId:it.id, cantidad:diff, notas:'Ajuste inventario', usuario:user?.email }).catch(()=>{});
+        } else {
+          await dbAddEgreso(bid, { ingredienteId:it.id, ingredienteNombre:it.nombre, cantidad:Math.abs(diff), unidad:it.unidad, motivo:'Ajuste inventario', origen:'recuento' });
+        }
+        ok++;
+      } catch(e) {}
+    }
+    addToast(`Recuento aplicado: ${ok} ingrediente${ok!==1?'s':''} ajustado${ok!==1?'s':''}`, 'success');
+    setRecuentoContado({});
+    setRecuentoSaving(false);
+    // Recargar ingresos para mostrar los ajustes
+    fetchIngresos(activeBranch, 100).then(setIngresos).catch(()=>{});
+    fetchEgresos(activeBranch, 100).then(setEgresos).catch(()=>{});
   }
 
   const thStyle = { textAlign:'left', padding:'10px 14px', fontSize:11, fontWeight:700, color:G.textFaint, textTransform:'uppercase', letterSpacing:'0.05em', borderBottom:'1px solid #E2E8F0', background:'#F8FAFC' };
@@ -597,6 +634,93 @@ export default function Stock() {
               </table>
             )}
           </div>
+        </div>
+      )}
+
+      {/* ── RECUENTO FÍSICO ── */}
+      {tab === 'Recuento' && (
+        <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+          {/* Instrucción */}
+          <div style={{ ...glassLight({ padding:'12px 18px', borderRadius:14, fontSize:13, color:'#92600A', background:'rgba(239,159,39,0.08)', border:'1px solid rgba(239,159,39,0.2)' }) }}>
+            <strong>Recuento físico:</strong> Ingresá la cantidad <em>real</em> que tenés de cada ingrediente. Al confirmar, el stock se ajustará y se registrarán movimientos de ajuste automáticamente.
+          </div>
+
+          {stock.length === 0 ? (
+            <div style={{ textAlign:'center', padding:'40px 20px', color:G.textFaint, fontSize:13 }}>Sin ingredientes cargados</div>
+          ) : (
+            <>
+              <div style={{ ...glassDeep({ overflow:'hidden', padding:0 }) }}>
+                <table style={{ width:'100%', borderCollapse:'collapse', minWidth:500 }}>
+                  <thead>
+                    <tr>{['Ingrediente','Unidad','Stock sistema','Contado físico','Diferencia'].map(h=><th key={h} style={thStyle}>{h}</th>)}</tr>
+                  </thead>
+                  <tbody>
+                    {stock.map(it => {
+                      const contado = recuentoContado[it.id];
+                      const contadoNum = contado !== undefined && contado !== '' ? Number(contado) : null;
+                      const diff = contadoNum !== null ? contadoNum - Number(it.actual) : null;
+                      const diffColor = diff === null ? G.textFaint : diff > 0 ? G.teal : diff < 0 ? G.red : G.textFaint;
+                      return (
+                        <tr key={it.id} onMouseEnter={e=>e.currentTarget.style.background='rgba(29,158,117,0.04)'} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+                          <td style={{ ...tdStyle, fontWeight:600, color:G.text }}>{it.nombre}</td>
+                          <td style={tdStyle}>{it.unidad}</td>
+                          <td style={{ ...tdStyle, color:G.textMid }}>{it.actual}</td>
+                          <td style={tdStyle}>
+                            <input
+                              type="number"
+                              min="0"
+                              placeholder={String(it.actual)}
+                              value={recuentoContado[it.id] ?? ''}
+                              onChange={e => setRecuentoContado(prev => ({ ...prev, [it.id]: e.target.value }))}
+                              style={{ width:90, padding:'5px 9px', border:'1px solid #E2E8F0', background:'#FFFFFF', borderRadius:8, fontSize:13, color:G.text, outline:'none' }}
+                            />
+                          </td>
+                          <td style={{ ...tdStyle, fontWeight:700, color:diffColor }}>
+                            {diff === null ? '—' : diff === 0 ? <span style={{ color:G.textFaint }}>Sin cambio</span> : `${diff > 0 ? '+' : ''}${diff}`}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Resumen de diferencias */}
+              {Object.keys(recuentoContado).some(id => recuentoContado[id] !== '' && Number(recuentoContado[id]) !== Number(stock.find(s=>s.id===id)?.actual)) && (
+                <div style={{ ...CARD, padding:'14px 18px', background:'rgba(29,158,117,0.04)', border:'1px solid rgba(29,158,117,0.15)' }}>
+                  <div style={{ fontSize:12, fontWeight:700, color:G.teal, marginBottom:8 }}>Ajustes a aplicar:</div>
+                  {stock.filter(it => {
+                    const c = recuentoContado[it.id];
+                    return c !== undefined && c !== '' && Number(c) !== Number(it.actual);
+                  }).map(it => {
+                    const diff = Number(recuentoContado[it.id]) - Number(it.actual);
+                    return (
+                      <div key={it.id} style={{ display:'flex', justifyContent:'space-between', fontSize:12, color:G.textMid, padding:'2px 0' }}>
+                        <span>{it.nombre}</span>
+                        <span style={{ fontWeight:700, color: diff > 0 ? G.teal : G.red }}>
+                          {diff > 0 ? '+' : ''}{diff} {it.unidad} ({it.actual} → {recuentoContado[it.id]})
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              <div style={{ display:'flex', gap:10 }}>
+                <button
+                  onClick={() => setRecuentoContado({})}
+                  style={{ flex:1, padding:'10px', border:'1px solid rgba(0,0,0,0.10)', borderRadius:12, fontSize:13, color:G.textMid, background:'transparent', cursor:'pointer' }}>
+                  Limpiar
+                </button>
+                <button
+                  onClick={confirmarRecuento}
+                  disabled={recuentoSaving}
+                  style={{ flex:2, padding:'10px', background:G.teal, border:'none', borderRadius:12, fontSize:13, fontWeight:700, color:'white', cursor:'pointer', boxShadow:'0 4px 12px rgba(29,158,117,0.25)', opacity:recuentoSaving?0.6:1 }}>
+                  {recuentoSaving ? 'Aplicando ajustes...' : 'Confirmar recuento y ajustar stock'}
+                </button>
+              </div>
+            </>
+          )}
         </div>
       )}
 
