@@ -3,7 +3,10 @@ import { Link } from 'react-router-dom';
 import { useStore } from '@/lib/store';
 import { money } from '@/lib/fmt';
 import AnalyticsActions from '../components/analytics/AnalyticsActions';
-import { G, glass, glassDeep, glassLight } from '@/lib/glass';
+import { G } from '@/lib/glass';
+
+const CARD  = { background:'#FFFFFF', border:'1px solid #E2E8F0', boxShadow:'0 1px 3px rgba(0,0,0,0.06)', borderRadius:12 };
+const CARD_INNER = { background:'#F8FAFC', border:'1px solid #E2E8F0', borderRadius:8 };
 
 const FONT_UI = "'DM Sans', system-ui, sans-serif";
 
@@ -145,7 +148,7 @@ export default function Reportes() {
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:10 }}>
         <div style={{ display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
           <h1 style={{ fontSize:20, fontWeight:700, color:G.text, margin:0, fontFamily:FONT_UI, letterSpacing:'-0.02em' }}>Reportes</h1>
-          <button onClick={()=>store.refreshCharts&&store.refreshCharts()} style={{ ...glassLight({ display:'flex', alignItems:'center', gap:5, padding:'5px 12px', borderRadius:10, fontSize:12, color:G.textMid, cursor:'pointer', border:'1px solid rgba(255,255,255,0.8)' }) }}>
+          <button onClick={()=>store.refreshCharts&&store.refreshCharts()} style={{ ...CARD_INNER, display:'flex', alignItems:'center', gap:5, padding:'5px 12px', borderRadius:10, fontSize:12, color:G.textMid, cursor:'pointer' }}>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
             Actualizar
           </button>
@@ -169,7 +172,7 @@ export default function Reportes() {
 
       {/* VENTAS vacío */}
       {tab==='ventas' && VENTAS_DATA.length===0 && (
-        <div style={{ ...glass({ padding:'40px 20px', textAlign:'center' }) }}>
+        <div style={{ ...CARD, padding:'40px 20px', textAlign:'center' }}>
           <div style={{ fontSize:14, color:G.textMid, marginBottom:6, fontWeight:600 }}>No hay ventas cerradas en este período</div>
           <div style={{ fontSize:12, color:G.textFaint, marginBottom:18 }}>Cerrá tu primera mesa para empezar a ver datos.</div>
           <Link to="/salon" style={{ display:'inline-block', padding:'9px 20px', background:G.teal, color:'white', textDecoration:'none', borderRadius:10, fontSize:13, fontWeight:600, boxShadow:`0 4px 14px rgba(29,158,117,0.3)` }}>Ir al Salón</Link>
@@ -178,9 +181,9 @@ export default function Reportes() {
 
       {/* VENTAS con datos */}
       {tab==='ventas' && VENTAS_DATA.length>0 && (
-        <div style={{ ...glassDeep({ overflow:'hidden', padding:0 }) }}>
+        <div style={{ ...CARD, overflow:'hidden', padding:0 }}>
           {/* Resumen métodos de pago */}
-          <div style={{ display:'flex', flexWrap:'wrap', gap:0, padding:'18px 20px', borderBottom:'1px solid rgba(255,255,255,0.4)', alignItems:'center' }}>
+          <div style={{ display:'flex', flexWrap:'wrap', gap:0, padding:'18px 20px', borderBottom:'1px solid #F1F5F9', alignItems:'center' }}>
             {[
               { label:'Efectivo',    val:totalVentas.efectivo,      color:G.teal },
               { label:'Tarjeta',     val:totalVentas.tarjeta,       color:G.violet },
@@ -230,7 +233,7 @@ export default function Reportes() {
 
       {/* PRODUCTOS */}
       {tab==='productos' && (
-        <div style={{ ...glassDeep({ padding:'20px 24px' }) }}>
+        <div style={{ ...CARD, padding:'20px 24px' }}>
           <div style={{ display:'flex', justifyContent:'flex-end', marginBottom:18 }}><BtnExport onClick={exportProductos}/></div>
           {products.length===0
             ? <div style={{ textAlign:'center', fontSize:13, color:G.textFaint, padding:'30px 0' }}>No hay productos vendidos en este período.</div>
@@ -256,8 +259,8 @@ export default function Reportes() {
 
       {/* MOZOS */}
       {tab==='mozos' && (
-        <div style={{ ...glassDeep({ overflow:'hidden', padding:0 }) }}>
-          <div style={{ display:'flex', justifyContent:'flex-end', padding:'14px 20px', borderBottom:'1px solid rgba(255,255,255,0.4)' }}><BtnExport onClick={exportMozos}/></div>
+        <div style={{ ...CARD, overflow:'hidden', padding:0 }}>
+          <div style={{ display:'flex', justifyContent:'flex-end', padding:'14px 20px', borderBottom:'1px solid #F1F5F9' }}><BtnExport onClick={exportMozos}/></div>
           {MOZOS_DATA.length===0
             ? <div style={{ textAlign:'center', fontSize:13, color:G.textFaint, padding:'30px 0' }}>No hay datos de mozos en este período.</div>
             : <table style={{ width:'100%', borderCollapse:'collapse' }}>
@@ -297,7 +300,7 @@ export default function Reportes() {
               { label:'No-shows',        value:RESERVAS_DATA.noShows,       color:G.amber },
               { label:'Reservas online', value:RESERVAS_DATA.online,        color:G.blue  },
             ].map(k=>(
-              <div key={k.label} style={{ ...glass({ padding:'18px 20px' }) }}>
+              <div key={k.label} style={{ ...CARD, padding:'18px 20px' }}>
                 <div style={{ fontSize:10, fontWeight:700, color:G.textFaint, textTransform:'uppercase', letterSpacing:'0.07em', fontFamily:FONT_UI, marginBottom:6 }}>{k.label}</div>
                 <div style={{ fontSize:32, fontWeight:700, color:k.color, lineHeight:1, fontFamily:FONT_UI }}>{k.value}</div>
                 {k.sub && <div style={{ fontSize:12, color:k.color, marginTop:6, fontWeight:600, opacity:0.8 }}>{k.sub}</div>}
