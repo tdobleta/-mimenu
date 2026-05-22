@@ -151,6 +151,51 @@ export async function fetchEgresos(branchId, limit = 100) {
   return data || [];
 }
 
+// ── DESCUENTO AUTOMÁTICO AL CERRAR MESA ──────────────────────
+
+/**
+ * Descuenta stock automáticamente según las recetas configuradas,
+ * al cerrar una mesa desde Salón o POSView.
+ *
+ * @param {Array}  order    - items del pedido [{itemId, qty}]
+ * @param {string} branchId
+ * @param {Object} store    - store de la app (para leer y actualizar stock local)
+ */
+export async function descontarStockPorMesa(order, branchId, store) {
+  try {
+    const recetas = await fetchRecetas(branchId);
+    if (!recetas || Object.keys(recetas).length === 0) return;
+    const stockItems = store.getStock ? store.getStock() : (store.stock?.[branchId] || []);
+    for (const item of order) {
+      const rec = recetas[item.itemId || item.id];
+      if (!rec || rec.length === 0) continue;
+      for (const r of rec) {
+        const ing = stockItems.find(s => s.id === r.ingredienteId);
+        if (!ing) continue;
+        const cantidad = Number(r.cantidad) * (item.qty || 1);
+        const nuevoActual = Math.max(0, Number(ing.actual) - cantidad);
+        try {
+          const { error } = await supabase
+            .from('stock_items')
+            .update({ actual: nuevoActual })
+            .eq('id', ing.id);
+          if (error) throw error;
+          store.updateStockItem(branchId, ing.id, { actual: nuevoActual });
+          await addEgreso(branchId, {
+            ingredienteId:      ing.id,
+            ingredienteNombre:  ing.nombre,
+            cantidad,
+            unidad:             ing.unidad,
+            motivo:             `Mesa (automático)`,
+            origen:             'automatico',
+          });
+        } catch(e) { /* un error en un ítem no debe abortar el resto */ }
+      }
+    }
+  } catch(e) { /* silencioso — no debe bloquear el cierre de mesa */ }
+}
+
+
 // ── INGRESOS / COMPRAS ────────────────────────────────────────
 
 /**

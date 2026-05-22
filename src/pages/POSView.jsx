@@ -11,6 +11,7 @@ import { getCategoryColor } from '@/lib/menuCategories';
 import { enqueue } from '@/lib/offlineQueue';
 import { useBidirectionalSync } from '@/lib/useBidirectionalSync';
 import { subscribeToTurns, subscribeToTurnItems } from '@/lib/realtimeManager';
+import { descontarStockPorMesa } from '@/lib/stockApi';
 
 function cc(cat) { return getCategoryColor(cat); }
 function fmt(n) { return '$'+Number(n||0).toLocaleString('es-AR',{maximumFractionDigits:0}); }
@@ -538,6 +539,8 @@ export default function POSView() {
         } catch(e) {}
       }
       if(selectedTurn?.id){const tables=store.getTables(branchId);const table=tables.find(t=>t.turnId===selectedTurn.id);if(table)store.closeTable(branchId,table.id);}
+      // Descontar stock automáticamente según recetas (no bloquea el cobro)
+      descontarStockPorMesa(order, branchId, store).catch(() => {});
       store.refreshCharts&&store.refreshCharts();
       addToast('Cobrado '+fmt(tot),'success');
       setShowCobro(false);

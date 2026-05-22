@@ -11,40 +11,8 @@ import useUserRole from '@/lib/useUserRole';
 import { G, glass, glassLight, fontDisplay } from '@/lib/glass';
 import FacturaModal from '../facturacion/FacturaModal';
 import { getAfipConfig } from '@/lib/afip';
-import { base44 as _base44 } from '@/api/base44Client'; // para stock descuento
 import { MENU_CATEGORIES, DEFAULT_CATEGORY, getCategoryColor } from '@/lib/menuCategories';
-import { fetchRecetas, addEgreso as dbAddEgreso } from '@/lib/stockApi';
-
-// ── Descuento automático de stock al cerrar mesa ──────────────────────────────
-async function descontarStockPorMesa(order, branchId, store) {
-  try {
-    const recetas = await fetchRecetas(branchId);
-    if (!recetas || Object.keys(recetas).length === 0) return;
-    const stock = store.getStock ? store.getStock() : (store.stock[branchId] || []);
-    for (const item of order) {
-      const rec = recetas[item.itemId || item.id];
-      if (!rec || rec.length === 0) continue;
-      for (const r of rec) {
-        const ing = stock.find(s => s.id === r.ingredienteId);
-        if (!ing) continue;
-        const cantidad = Number(r.cantidad) * (item.qty || 1);
-        const nuevoStock = Math.max(0, Number(ing.actual) - cantidad);
-        try {
-          await _base44.entities.StockItem.update(ing.id, { actual: nuevoStock });
-          store.updateStockItem(branchId, ing.id, { actual: nuevoStock });
-          await dbAddEgreso(branchId, {
-            ingredienteId: ing.id,
-            ingredienteNombre: ing.nombre,
-            cantidad,
-            unidad: ing.unidad,
-            motivo: `Mesa ${item.mesa || ''} (automático)`,
-            origen: 'automatico',
-          });
-        } catch(e) {}
-      }
-    }
-  } catch(e) {}
-}
+import { descontarStockPorMesa } from '@/lib/stockApi';
 
 // Colores para categorías extra no definidas en MENU_CATEGORIES
 const EXTRA_COLORS = [G.teal, G.violet, G.blue, G.amber, '#F97316', '#EC4899', '#6366F1', '#14B8A6'];
