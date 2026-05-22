@@ -109,10 +109,13 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Doble filtro: id + branch_id (defense in depth — el SELECT ya verificó branch_id,
+    // pero un atacante que conoce el turn_id no debe poder afectar otro restaurante).
     const { error: updateError } = await supabaseAdmin
       .from('turns')
       .update(updateData)
-      .eq('id', turn_id);
+      .eq('id', turn_id)
+      .eq('branch_id', branch_id);
 
     if (updateError) {
       console.error('[cocina-update] Update error:', updateError);
