@@ -2,6 +2,7 @@ import { supabase } from "@/api/supabaseClient";
 import { base44 } from '@/api/base44Client';
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { fetchClosedTurnsPaginated, fetchTurnItemsBatch } from '@/lib/pagination';
+import { saveSnapshot, loadSnapshot } from '@/lib/snapshotDB';
 
 const now = () => Date.now();
 
@@ -29,6 +30,7 @@ function emptyState() {
     ownerEmail: null,
     needsOnboarding: false,
     isInvitedUser: false,
+    isOfflineMode: false,   // true cuando arranca sin internet desde snapshot
   };
 }
 
@@ -311,20 +313,23 @@ export function AppProvider({ children }) {
           } catch(e) {}
         }
 
+        const sucursalesMap = branches.map(b => ({
+          id: b.id,
+          nombre: b.nombre || 'Sucursal',
+          direccion: b.direccion || '',
+          conexion: b.metodo_conexion || 'mimenú POS',
+          mesas: b.mesas || 4,
+          franjas: b.franjas || ['12:00','13:00','20:00','21:00'],
+        }));
+
         setS(prev => ({
           ...prev,
           loading: false,
           isDemo: false,
+          isOfflineMode: false,
           restaurante: { nombre: restaurant.nombre || '', direccion: restaurant.direccion || '', telefono: restaurant.telefono || '' },
           branchId: branches[0].id,
-          sucursales: branches.map(b => ({
-            id: b.id,
-            nombre: b.nombre || 'Sucursal',
-            direccion: b.direccion || '',
-            conexion: b.metodo_conexion || 'mimenú POS',
-            mesas: b.mesas || 4,
-            franjas: b.franjas || ['12:00','13:00','20:00','21:00'],
-          })),
+          sucursales: sucursalesMap,
           menuItems: menuItemsByBranch,
           tables,
           gridConfig,
@@ -339,8 +344,40 @@ export function AppProvider({ children }) {
           needsOnboarding: !restaurant.onboarding_completado,
         }));
 
+        // Guardar snapshot para poder arrancar offline la próxima vez
+        saveSnapshot({
+          restaurantId: restaurant.id,
+          restaurante: { nombre: restaurant.nombre || '', direccion: restaurant.direccion || '', telefono: restaurant.telefono || '' },
+          sucursales: sucursalesMap,
+          menuItems: menuItemsByBranch,
+          stock,
+        }).catch(() => {});
+
       } catch (err) {
         console.error('Error init:', err);
+
+        // Cold start offline: intentar cargar el snapshot guardado de la sesión anterior
+        try {
+          const snapshot = await loadSnapshot();
+          if (snapshot) {
+            console.log('[store] Arrancando en modo offline desde snapshot de', new Date(snapshot.ts).toLocaleString());
+            setS(prev => ({
+              ...prev,
+              loading: false,
+              isOfflineMode: true,
+              restaurantId: snapshot.restaurantId,
+              restaurante: snapshot.restaurante || { nombre: '', direccion: '', telefono: '' },
+              branchId: snapshot.sucursales?.[0]?.id || null,
+              sucursales: snapshot.sucursales || [],
+              menuItems: snapshot.menuItems || {},
+              stock: snapshot.stock || {},
+            }));
+            return;
+          }
+        } catch(snapErr) {
+          console.error('[store] No se pudo cargar snapshot:', snapErr);
+        }
+
         setS(prev => ({ ...prev, loading: false, isDemo: false }));
       } finally {
         initInProgressRef.current = false;

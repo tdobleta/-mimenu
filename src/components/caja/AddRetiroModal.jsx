@@ -5,6 +5,7 @@ import { useToast } from '@/lib/toast';
 import { money } from '@/lib/fmt';
 import { useAuth } from '@/lib/AuthContext';
 import useUserRole from '@/lib/useUserRole';
+import { enqueue } from '@/lib/offlineQueue';
 
 const CONCEPTOS = ['Retiro recaudación','Pago proveedor','Gastos operativos','Otro'];
 
@@ -43,10 +44,10 @@ export default function AddRetiroModal({ onClose }) {
       onClose();
     } catch(err) {
       console.error(err);
-      // Guardar localmente igual — el retiro quedará en memoria hasta que se cierre el turno
-      // En Fase 1 (offline queue) esto se encola para sincronizar al reconectar
+      // Guardar en store local + encolar para sincronizar al reconectar
       store.addRetiro(retiro);
-      addToast('Retiro guardado localmente sin conexión. Se sincronizará al cerrar el turno.', 'warning');
+      enqueue({ type: 'CAJA_RETIRO', cajaShiftId: store.turnoActivo.id, retiro }).catch(() => {});
+      addToast('Retiro guardado sin conexión. Se sincronizará al reconectar.', 'warning');
       onClose();
     }
   }

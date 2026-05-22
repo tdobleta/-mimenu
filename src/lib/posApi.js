@@ -1,4 +1,5 @@
 import { supabase } from '@/api/supabaseClient';
+import { enqueue } from '@/lib/offlineQueue';
 
 // ── Turn (mesa) ───────────────────────────────────────────────────────────────
 // Apertura y cierre se hacen vía base44.entities.Turn y cerrar_mesa_atomico RPC.
@@ -48,6 +49,11 @@ export async function dbAddTurnItem({ turnId, branchId, menuItemId, nombre, prec
 }
 
 export async function dbSaveNota(turnItemId, notas) {
+  // Si no hay conexión, encolar directamente sin intentar DB
+  if (!navigator.onLine) {
+    await enqueue({ type: 'NOTA_SAVE', turnItemId, notas: notas || '' }).catch(() => {});
+    return;
+  }
   const { error } = await supabase
     .from('turn_items')
     .update({ notas: notas || '' })
@@ -56,6 +62,16 @@ export async function dbSaveNota(turnItemId, notas) {
 }
 
 export async function dbUpdateTurnItem(turnItemId, cantidad) {
+  // Si no hay conexión, encolar directamente
+  if (!navigator.onLine) {
+    if (cantidad <= 0) {
+      await enqueue({ type: 'DELETE_TURN_ITEM', turnItemId }).catch(() => {});
+      return true;
+    }
+    await enqueue({ type: 'UPDATE_TURN_ITEM', turnItemId, updates: { cantidad } }).catch(() => {});
+    return { cantidad };
+  }
+
   if (cantidad <= 0) {
     const { error } = await supabase.from('turn_items').delete().eq('id', turnItemId);
     if (error) throw error;

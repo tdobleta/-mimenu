@@ -82,3 +82,33 @@ export async function clearQueue() {
     tx.onerror = () => reject(tx.error);
   });
 }
+
+// ── Actualizar metadatos de una operación (retries, status, lastError) ─
+// Usado por drainQueue para marcar dead letters sin borrarlas del store.
+export async function updateOp(id, updates) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, 'readwrite');
+    const store = tx.objectStore(STORE);
+    const req = store.get(id);
+    req.onsuccess = () => {
+      if (!req.result) { resolve(); return; }
+      store.put({ ...req.result, ...updates });
+    };
+    tx.oncomplete = resolve;
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+// ── Obtener solo operaciones activas (excluye las marcadas como failed) ─
+// countPending() cuenta TODAS incluyendo failed — usar getActive() para el drain.
+export async function getActive() {
+  const all = await getPending();
+  return all.filter(op => op.status !== 'failed');
+}
+
+// ── Contar solo operaciones activas (no failed) ───────────────
+export async function countActive() {
+  const active = await getActive();
+  return active.length;
+}
