@@ -30,14 +30,18 @@ function downloadCSV(filename, headers, rows) {
 }
 
 function parsePagos(t) {
-  if (t.pagos) {
+  // 1. pagos_detalle (nuevo campo JSONB guardado por cerrar_mesa_atomico)
+  const raw = t.pagos_detalle || t.pagos;
+  if (raw) {
     try {
-      const arr = Array.isArray(t.pagos) ? t.pagos : JSON.parse(t.pagos);
+      const arr = Array.isArray(raw) ? raw : JSON.parse(raw);
       if (Array.isArray(arr) && arr.length > 0) return arr;
     } catch {}
   }
   const m = t.metodo_pago || '';
+  // 2. Pago simple (no mixto)
   if (!m.toLowerCase().startsWith('mixto')) return [{ metodo: m, monto: t.total_facturado || 0 }];
+  // 3. Parsear string legado "Mixto (Efectivo $X + Tarjeta $Y)"
   const inner = m.match(/\((.+)\)/)?.[1];
   if (!inner) return [{ metodo: m, monto: t.total_facturado || 0 }];
   const parts = inner.split('+').map(part => {
