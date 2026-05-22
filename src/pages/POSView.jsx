@@ -497,6 +497,11 @@ export default function POSView() {
   }
 
   async function handleCobro({pagos,metodo,total:tot,propina}){
+    // Guard offline: cerrar_mesa_atomico requiere internet
+    if (!navigator.onLine) {
+      addToast('Sin conexión — no se puede cobrar hasta reconectar.', 'error');
+      return;
+    }
     try{
       const cajaId=store.turnoActivo?.id||null;
       let tid=selectedTurn?.id;

@@ -37,6 +37,9 @@ function fmtHora(ts) {
   return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
 }
 
+const COCINA_CACHE_KEY = 'mimenu_cocina_cache';
+const COCINA_CACHE_MAX_AGE = 2 * 3600 * 1000; // 2 horas
+
 export default function CocinaDisplay() {
   const { user } = useAuth();
   const { restaurante, branchId, sucursales } = useStore();
@@ -47,11 +50,24 @@ export default function CocinaDisplay() {
   const [loading, setLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState(null);
   const [, setTick] = useState(0);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
   const removalTimers = useRef({});
   // Ref siempre actualizado para evitar stale closure en cambiarEstado (async)
   // Mismo patrón que storeRef en Salon.jsx
   const comandasRef = useRef([]);
   useEffect(() => { comandasRef.current = comandas; }, [comandas]);
+
+  // Detectar cambios de conectividad para el banner offline
+  useEffect(() => {
+    const handleOnline  = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online',  handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online',  handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   const loadCocina = useCallback(async () => {
     if (!activeBranchId) return;
@@ -66,12 +82,9 @@ export default function CocinaDisplay() {
         return;
       }
       // Batch: 1 sola query para TODOS los items (elimina N+1)
-      // Antes: N requests, uno por mesa. Con 15 mesas = 16 requests por evento.
-      // Ahora: 2 requests siempre (turns + batch de items).
       const turnIds = turns.map(t => t.id);
       const allItems = await fetchTurnItemsBatch(turnIds);
 
-      // Agrupar items por turn_id
       const itemsByTurn = allItems.reduce((acc, item) => {
         if (!acc[item.turn_id]) acc[item.turn_id] = [];
         acc[item.turn_id].push(item);
@@ -86,21 +99,39 @@ export default function CocinaDisplay() {
       setComandas(withItems);
       registerActiveTurns(activeBranchId, turns.map(t => t.id));
       setLastUpdate(Date.now());
+
+      // Guardar en localStorage para mostrar si internet cae
+      try {
+        localStorage.setItem(COCINA_CACHE_KEY, JSON.stringify({
+          ts: Date.now(),
+          branchId: activeBranchId,
+          comandas: withItems.slice(0, 30),
+        }));
+      } catch(e) { /* localStorage lleno o bloqueado — ignorar */ }
     } catch(err) { console.error('Error cargando cocina:', err); }
     setLoading(false);
   }, [activeBranchId]);
 
   useEffect(() => {
     if (!activeBranchId) return;
+
+    // Cargar cache inmediatamente mientras Supabase responde
+    // (muestra algo útil incluso si la carga inicial tarda o falla)
+    try {
+      const cached = JSON.parse(localStorage.getItem(COCINA_CACHE_KEY) || 'null');
+      if (cached?.branchId === activeBranchId && Date.now() - cached.ts < COCINA_CACHE_MAX_AGE) {
+        setComandas(cached.comandas || []);
+      }
+    } catch(e) {}
+
     loadCocina();
 
     // Realtime: recargar cuando cambian turns o turn_items de esta branch
-    // Usa singleton realtimeManager → comparte canal con otros componentes del mismo branch
     const unsubTurns = subscribeToTurns(activeBranchId, () => loadCocina());
     const unsubItems = subscribeToTurnItems(activeBranchId, () => loadCocina());
 
-    // Fallback: polling cada 60s por si Realtime se desconecta
-    const fallback = setInterval(loadCocina, 60000);
+    // Fallback: polling cada 30s por si Realtime se desconecta
+    const fallback = setInterval(() => { if (navigator.onLine) loadCocina(); }, 30000);
 
     return () => {
       unsubTurns();
@@ -205,6 +236,14 @@ export default function CocinaDisplay() {
           </button>
         </div>
       </div>
+
+      {/* Banner offline — prominente para que el cocinero lo vea desde lejos */}
+      {!isOnline && (
+        <div style={{ position:'sticky', top:63, zIndex:9, background:'#EF4444', color:'white', padding:'14px 20px', fontSize:16, fontWeight:700, textAlign:'center', display:'flex', alignItems:'center', justifyContent:'center', gap:12, letterSpacing:'0.01em' }}>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          ⚠ SIN INTERNET — Mostrando últimas comandas guardadas. Nuevos pedidos no llegarán hasta reconectar.
+        </div>
+      )}
 
       {loading && (
         <div style={{ display:'flex', alignItems:'center', justifyContent:'center', padding:60 }}>

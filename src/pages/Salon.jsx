@@ -124,7 +124,37 @@ export default function Salon() {
         s.closeTable(displayBranch, tableMatch.id);
       }
     });
-    return () => unsub();
+
+    // Polling fallback cada 30s: re-sincroniza estados si el WebSocket cae
+    // (Realtime puede desconectarse sin aviso en redes inestables del local)
+    const pollInterval = setInterval(async () => {
+      if (!navigator.onLine) return;
+      try {
+        const turns = await dbLoadActiveTurns(displayBranch);
+        const s = storeRef.current;
+        const currentTables = s.getTables(displayBranch);
+        const openTurnIds = new Set(turns.map(t => t.id));
+
+        // Abrir mesas que llegaron de otro dispositivo y aún aparecen libres
+        turns.forEach(t => {
+          const tb = currentTables.find(x => x.num === t.mesa_num);
+          if (!tb) return;
+          if (tb.status === 'libre') s.openTableWithTurn(displayBranch, tb.id, t.id, t.mozo, t.opened_at);
+          // Actualizar badge "📦 Pronta" si cocina marcó lista y Realtime no lo entregó
+          if (t.comanda_lista !== undefined) s.setTableComandaLista(displayBranch, tb.id, !!t.comanda_lista);
+        });
+
+        // Cerrar mesas que ya no están activas en DB (cobradas por otro dispositivo)
+        currentTables
+          .filter(tb => tb.status !== 'libre' && tb.turnId && !openTurnIds.has(tb.turnId))
+          .forEach(tb => s.closeTable(displayBranch, tb.id));
+      } catch(e) { /* silencioso — el polling es de respaldo, no crítico */ }
+    }, 30000);
+
+    return () => {
+      unsub();
+      clearInterval(pollInterval);
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [displayBranch]);
 

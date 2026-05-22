@@ -461,6 +461,12 @@ export default function ComandaPanel({ table, branchId, onClose, addToast }) {
             if (cerrando) return;
             setCerrando(true);
             if (!store.turnoActivo) { addToast('No hay turno de caja abierto. Abrí la caja antes de cerrar mesas.', 'error'); setCerrando(false); return; }
+            // Guard offline: el RPC cerrar_mesa_atomico requiere internet
+            if (!navigator.onLine) {
+              addToast('Sin conexión — no se puede cobrar hasta reconectar. Anotá el total manualmente.', 'error');
+              setCerrando(false);
+              return;
+            }
             // La verificación de doble cierre se hace dentro de cerrar_mesa_atomico con FOR UPDATE lock
             const cajaShiftId = store.turnoActivo.id;
             try {
