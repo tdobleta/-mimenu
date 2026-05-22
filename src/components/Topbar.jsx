@@ -6,7 +6,7 @@ import AlertsDropdown from './AlertsDropdown';
 import { base44 } from '@/api/base44Client';
 import { supabase } from '@/api/supabaseClient';
 import useUserRole from '@/lib/useUserRole';
-import { G } from '@/lib/glass';
+import { G, glassLight } from '@/lib/glass';
 import { useKitchenNotifications } from '@/lib/useKitchenNotifications';
 import KitchenNotifDropdown from './KitchenNotifDropdown';
 
