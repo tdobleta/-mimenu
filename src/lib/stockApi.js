@@ -2,8 +2,7 @@ import { supabase } from '@/api/supabaseClient';
 
 // ============================================================
 // stockApi.js
-// API de Supabase para recetas, precios y egresos de stock.
-// Reemplaza el uso de localStorage en Stock.jsx y ComandaPanel.jsx
+// API de Supabase para recetas, precios, egresos e ingresos de stock.
 // ============================================================
 
 
@@ -151,6 +150,78 @@ export async function fetchEgresos(branchId, limit = 100) {
   if (error) throw error;
   return data || [];
 }
+
+// ── INGRESOS / COMPRAS ────────────────────────────────────────
+
+/**
+ * Trae los últimos N ingresos de una sucursal.
+ * Requiere tabla stock_ingresos en DB.
+ */
+export async function fetchIngresos(branchId, limit = 100) {
+  const { data, error } = await supabase
+    .from('stock_ingresos')
+    .select('*')
+    .eq('branch_id', branchId)
+    .order('fecha', { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return data || [];
+}
+
+/**
+ * Registra un ingreso/compra de stock y actualiza stock_items.actual.
+ * @param {string} branchId
+ * @param {Object} params
+ * @param {string} params.stockItemId  - UUID del ingrediente
+ * @param {number} params.cantidad
+ * @param {number} [params.costoUnit]  - Costo unitario para precio promedio
+ * @param {string} [params.proveedor]
+ * @param {string} [params.notas]
+ * @param {string} [params.usuario]
+ * @returns {{ ingreso, nuevoActual }}
+ */
+export async function addIngreso(branchId, { stockItemId, cantidad, costoUnit, proveedor, notas, usuario }) {
+  const cantNum = Number(cantidad) || 0;
+  if (cantNum <= 0) throw new Error('La cantidad debe ser mayor a 0');
+
+  // 1. Insertar en stock_ingresos
+  const { data: ingreso, error: ingError } = await supabase
+    .from('stock_ingresos')
+    .insert({
+      branch_id:    branchId,
+      stock_item_id: stockItemId,
+      cantidad:     cantNum,
+      costo_unit:   costoUnit ? Number(costoUnit) : null,
+      proveedor:    proveedor || null,
+      notas:        notas || null,
+      usuario:      usuario || null,
+      fecha:        new Date().toISOString(),
+    })
+    .select()
+    .single();
+  if (ingError) throw ingError;
+
+  // 2. Leer stock actual y sumar la cantidad
+  const { data: item, error: readErr } = await supabase
+    .from('stock_items')
+    .select('actual')
+    .eq('id', stockItemId)
+    .single();
+  if (readErr) throw readErr;
+
+  const nuevoActual = (Number(item?.actual) || 0) + cantNum;
+
+  const { error: updError } = await supabase
+    .from('stock_items')
+    .update({ actual: nuevoActual })
+    .eq('id', stockItemId);
+  if (updError) throw updError;
+
+  return { ingreso, nuevoActual };
+}
+
+
+// ── EGRESOS / MOVIMIENTOS ─────────────────────────────────────
 
 /**
  * Registra un egreso de stock.

@@ -5,13 +5,18 @@ import { useToast } from '@/lib/toast';
 import { money, stockStatus } from '@/lib/fmt';
 import { useAuth } from '@/lib/AuthContext';
 import useUserRole from '@/lib/useUserRole';
-import { G, glass, glassDeep, glassLight, labelStyle, fontDisplay } from '@/lib/glass';
+import { G, glassDeep, glassLight, fontDisplay, labelStyle } from '@/lib/glass';
 import MenuTab from '../components/configuracion/MenuTab';
 import {
   fetchRecetas, saveReceta,
   fetchPrecios, savePrecio,
   fetchEgresos, addEgreso as dbAddEgreso,
+  fetchIngresos, addIngreso as dbAddIngreso,
 } from '@/lib/stockApi';
+
+const CARD    = { background:'#FFFFFF', border:'1px solid #E2E8F0', boxShadow:'0 1px 3px rgba(0,0,0,0.06)', borderRadius:12 };
+const FONT_UI = "'DM Sans', system-ui, sans-serif";
+const labelStyleS = { fontSize:11, fontWeight:700, color:'#94A3B8', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:5, fontFamily:FONT_UI };
 
 // ── Colores food cost ─────────────────────────────────────────────────────────
 function foodCostColor(pct) {
@@ -21,7 +26,7 @@ function foodCostColor(pct) {
   return G.red;
 }
 
-const TABS = ['Menú', 'Stock', 'Recetas', 'Food Cost', 'Movimientos'];
+const TABS = ['Menú', 'Stock', 'Recetas', 'Food Cost', 'Compras', 'Movimientos'];
 
 const ST_BADGE = {
   ok:          { bg:'rgba(29,158,117,0.10)', c:G.teal,  label:'OK'        },
@@ -34,7 +39,7 @@ const UNIDADES = ['kg','g','litro','ml','unidad','docena','caja','porción'];
 function Input({ value, onChange, placeholder, type='text', style={} }) {
   return (
     <input type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
-      style={{ padding:'8px 11px', border:'1px solid rgba(255,255,255,0.65)', background:'rgba(255,255,255,0.65)', borderRadius:9, fontSize:13, color:G.text, outline:'none', width:'100%', boxSizing:'border-box', ...style }} />
+      style={{ padding:'8px 11px', border:'1px solid #E2E8F0', background:'#FFFFFF', borderRadius:9, fontSize:13, color:G.text, outline:'none', width:'100%', boxSizing:'border-box', ...style }} />
   );
 }
 
@@ -61,6 +66,13 @@ export default function Stock() {
   const [egresoSaving, setEgresoSaving] = useState(false);
   const [egresos, setEgresos] = useState([]);
 
+  // Ingresos / Compras
+  const [showIngresoModal, setShowIngresoModal] = useState(false);
+  const [ingresoForm, setIngresoForm] = useState({ stockItemId:'', cantidad:'', costoUnit:'', proveedor:'', notas:'' });
+  const [ingresoUnidad, setIngresoUnidad] = useState('');
+  const [ingresoSaving, setIngresoSaving] = useState(false);
+  const [ingresos, setIngresos] = useState([]);
+
   // Recetas
   const [recetas, setRecetas]         = useState({});
   const [editRecetaId, setEditRecetaId] = useState(null);
@@ -80,10 +92,12 @@ export default function Stock() {
       fetchRecetas(activeBranch),
       fetchPrecios(activeBranch),
       fetchEgresos(activeBranch, 100),
-    ]).then(([rec, prec, egr]) => {
+      fetchIngresos(activeBranch, 100).catch(() => []),  // graceful: tabla puede no existir aún
+    ]).then(([rec, prec, egr, ing]) => {
       setRecetas(rec);
       setPrecios(prec);
       setEgresos(egr);
+      setIngresos(ing);
     }).catch(e => {
       console.error('Error cargando datos de stock:', e);
     }).finally(() => {
@@ -235,19 +249,50 @@ export default function Stock() {
     setEgresoSaving(false);
   }
 
-  const thStyle = { textAlign:'left', padding:'10px 14px', fontSize:11, fontWeight:700, color:G.textFaint, textTransform:'uppercase', letterSpacing:'0.05em', borderBottom:'1px solid rgba(255,255,255,0.5)', background:'rgba(255,255,255,0.3)' };
-  const tdStyle = { padding:'10px 14px', fontSize:13, color:G.textMid, borderBottom:'1px solid rgba(255,255,255,0.3)' };
+  async function confirmarIngreso() {
+    if (ingresoSaving) return;
+    setIngresoSaving(true);
+    const it = stock.find(s => s.id === ingresoForm.stockItemId);
+    if (!it || !ingresoForm.cantidad || Number(ingresoForm.cantidad) <= 0) { setIngresoSaving(false); return; }
+    const bid = it.sucursalId || activeBranch;
+    try {
+      const { ingreso, nuevoActual } = await dbAddIngreso(bid, {
+        stockItemId: it.id,
+        cantidad:    Number(ingresoForm.cantidad),
+        costoUnit:   Number(ingresoForm.costoUnit) || null,
+        proveedor:   ingresoForm.proveedor || null,
+        notas:       ingresoForm.notas || null,
+        usuario:     user?.email || null,
+      });
+      store.updateStockItem(bid, it.id, { actual: nuevoActual });
+      setIngresos(prev => [ingreso, ...prev]);
+      addToast(`Ingreso: +${ingresoForm.cantidad} ${it.unidad} de ${it.nombre}`, 'success');
+      setShowIngresoModal(false);
+      setIngresoForm({ stockItemId:'', cantidad:'', costoUnit:'', proveedor:'', notas:'' });
+    } catch(e) {
+      addToast(e?.message?.includes('stock_ingresos') ? 'Creá la tabla stock_ingresos en Supabase primero' : 'Error al registrar compra', 'error');
+    }
+    setIngresoSaving(false);
+  }
+
+  const thStyle = { textAlign:'left', padding:'10px 14px', fontSize:11, fontWeight:700, color:G.textFaint, textTransform:'uppercase', letterSpacing:'0.05em', borderBottom:'1px solid #E2E8F0', background:'#F8FAFC' };
+  const tdStyle = { padding:'10px 14px', fontSize:13, color:G.textMid, borderBottom:'1px solid #F1F5F9' };
 
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:18 }}>
 
       {/* Header */}
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:10 }}>
-        <h1 style={{ fontSize:22, fontWeight:700, color:G.text, margin:0, fontFamily:fontDisplay, letterSpacing:'-0.02em' }}>Stock y Costos</h1>
+        <h1 style={{ fontSize:22, fontWeight:700, color:G.text, margin:0, fontFamily:FONT_UI, letterSpacing:'-0.02em' }}>Stock y Costos</h1>
         <div style={{ display:'flex', gap:8 }}>
           {tab === 'Stock' && (
             <button onClick={() => setShowAdd(true)} style={{ padding:'8px 18px', background:G.teal, border:'none', borderRadius:11, fontSize:13, fontWeight:700, color:'white', cursor:'pointer', boxShadow:`0 4px 12px rgba(29,158,117,0.25)` }}>
               + Ingrediente
+            </button>
+          )}
+          {tab === 'Compras' && (
+            <button onClick={() => setShowIngresoModal(true)} style={{ padding:'8px 18px', background:'rgba(29,158,117,0.10)', border:`1px solid rgba(29,158,117,0.3)`, borderRadius:11, fontSize:13, fontWeight:700, color:G.teal, cursor:'pointer' }}>
+              + Registrar compra
             </button>
           )}
           {tab === 'Movimientos' && (
@@ -266,9 +311,9 @@ export default function Stock() {
           { label:'Bajo stock',   value: stock.filter(s => stockStatus(s) === 'bajo').length,      color:G.amber },
           { label:'Con receta',   value: menuItems.filter(m => recetas[m.id]?.length > 0).length,  color:G.violet },
         ].map(k => (
-          <div key={k.label} style={{ ...glass({ padding:'16px 18px' }) }}>
-            <div style={{ ...labelStyle }}>{k.label}</div>
-            <div style={{ fontSize:28, fontWeight:700, color:k.color, fontFamily:fontDisplay }}>{k.value}</div>
+          <div key={k.label} style={{ ...CARD, padding:'16px 18px' }}>
+            <div style={{ ...labelStyleS }}>{k.label}</div>
+            <div style={{ fontSize:28, fontWeight:700, color:k.color, fontFamily:FONT_UI }}>{k.value}</div>
           </div>
         ))}
       </div>
@@ -277,10 +322,11 @@ export default function Stock() {
       <div style={{ display:'flex', gap:4 }}>
         {TABS.map(t => (
           <button key={t} onClick={() => setTab(t)} style={{
-            padding:'7px 16px', fontSize:13, fontWeight: tab===t ? 700 : 500, cursor:'pointer', borderRadius:12, border:'none', transition:'all .15s',
-            background: tab===t ? 'rgba(255,255,255,0.75)' : 'transparent',
+            padding:'7px 16px', fontSize:13, fontWeight: tab===t ? 700 : 500, cursor:'pointer', borderRadius:12, transition:'all .15s',
+            border: tab===t ? '1px solid #E2E8F0' : '1px solid transparent',
+            background: tab===t ? '#FFFFFF' : 'transparent',
             color: tab===t ? G.teal : G.textFaint,
-            boxShadow: tab===t ? '0 2px 12px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.9)' : 'none',
+            boxShadow: tab===t ? '0 1px 3px rgba(0,0,0,0.06)' : 'none',
           }}>{t}</button>
         ))}
       </div>
@@ -503,29 +549,107 @@ export default function Stock() {
         </div>
       )}
 
-      {/* ── MOVIMIENTOS ── */}
-      {tab === 'Movimientos' && (
-        <div style={{ ...glassDeep({ overflow:'hidden', padding:0 }) }}>
-          {egresosOrdenados.length === 0 ? (
-            <div style={{ textAlign:'center', padding:'40px 20px', color:G.textFaint, fontSize:13 }}>Sin movimientos registrados</div>
-          ) : (
-            <table style={{ width:'100%', borderCollapse:'collapse' }}>
-              <thead><tr>{['Fecha/Hora','Ingrediente','Cantidad','Unidad','Motivo'].map(h=><th key={h} style={thStyle}>{h}</th>)}</tr></thead>
-              <tbody>
-                {egresosOrdenados.map(eg => (
-                  <tr key={eg.id} onMouseEnter={e=>e.currentTarget.style.background='rgba(255,255,255,0.3)'} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
-                    <td style={{ ...tdStyle, color:G.textFaint, whiteSpace:'nowrap' }}>{fmtTs(eg.ts)}</td>
-                    <td style={{ ...tdStyle, fontWeight:600, color:G.text }}>{eg.ingredienteNombre}</td>
-                    <td style={{ ...tdStyle, fontWeight:700, color:G.red }}>−{eg.cantidad}</td>
-                    <td style={tdStyle}>{eg.unidad}</td>
-                    <td style={tdStyle}>{eg.motivo}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+      {/* ── COMPRAS ── */}
+      {tab === 'Compras' && (
+        <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+          {/* KPIs rápidos */}
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(160px,1fr))', gap:12 }}>
+            {[
+              { label:'Total compras', value: ingresos.length, color:G.teal },
+              { label:'Últimas 30 días', value: ingresos.filter(i => new Date(i.fecha).getTime() > Date.now()-30*86400000).length, color:G.violet },
+              { label:'Inversión total', value: money(ingresos.reduce((a,i)=>a+(Number(i.costo_unit)||0)*(Number(i.cantidad)||0),0)), color:G.amber },
+            ].map(k=>(
+              <div key={k.label} style={{ ...CARD, padding:'14px 18px' }}>
+                <div style={labelStyleS}>{k.label}</div>
+                <div style={{ fontSize:22, fontWeight:700, color:k.color, fontFamily:FONT_UI }}>{k.value}</div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ ...glassDeep({ overflow:'hidden', padding:0 }) }}>
+            {ingresos.length === 0 ? (
+              <div style={{ textAlign:'center', padding:'40px 20px', color:G.textFaint, fontSize:13 }}>
+                Sin compras registradas. Usá el botón "+ Registrar compra" para agregar el primero.
+              </div>
+            ) : (
+              <table style={{ width:'100%', borderCollapse:'collapse' }}>
+                <thead>
+                  <tr>{['Fecha/Hora','Ingrediente','Cantidad','Costo unit.','Total','Proveedor','Notas'].map(h=><th key={h} style={thStyle}>{h}</th>)}</tr>
+                </thead>
+                <tbody>
+                  {ingresos.map(ing => {
+                    const nombre = stock.find(s=>s.id===ing.stock_item_id)?.nombre || ing.stock_item_id;
+                    const unidad = stock.find(s=>s.id===ing.stock_item_id)?.unidad || '';
+                    const total  = (Number(ing.costo_unit)||0) * (Number(ing.cantidad)||0);
+                    return (
+                      <tr key={ing.id} onMouseEnter={e=>e.currentTarget.style.background='rgba(29,158,117,0.04)'} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+                        <td style={{ ...tdStyle, color:G.textFaint, whiteSpace:'nowrap' }}>{fmtTs(ing.fecha)}</td>
+                        <td style={{ ...tdStyle, fontWeight:600, color:G.text }}>{nombre}</td>
+                        <td style={{ ...tdStyle, fontWeight:700, color:G.teal }}>+{ing.cantidad} {unidad}</td>
+                        <td style={tdStyle}>{ing.costo_unit ? money(ing.costo_unit) : '—'}</td>
+                        <td style={{ ...tdStyle, fontWeight:600, color:G.text }}>{total > 0 ? money(total) : '—'}</td>
+                        <td style={tdStyle}>{ing.proveedor || '—'}</td>
+                        <td style={{ ...tdStyle, color:G.textFaint }}>{ing.notas || '—'}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
         </div>
       )}
+
+      {/* ── MOVIMIENTOS (unificados: egresos + ingresos) ── */}
+      {tab === 'Movimientos' && (() => {
+        const movimientos = [
+          ...egresos.map(e => ({ ...e, tipo:'egreso', ts: new Date(e.ts).getTime(), nombre: e.ingredienteNombre, unidad: e.unidad, detalle: e.motivo })),
+          ...ingresos.map(i => ({
+            ...i,
+            tipo:'ingreso',
+            ts: new Date(i.fecha).getTime(),
+            nombre: stock.find(s=>s.id===i.stock_item_id)?.nombre || i.stock_item_id,
+            unidad: stock.find(s=>s.id===i.stock_item_id)?.unidad || '',
+            detalle: i.proveedor || i.notas || '',
+          })),
+        ].sort((a,b) => b.ts - a.ts).slice(0, 100);
+
+        return (
+          <div style={{ ...glassDeep({ overflow:'hidden', padding:0 }) }}>
+            {movimientos.length === 0 ? (
+              <div style={{ textAlign:'center', padding:'40px 20px', color:G.textFaint, fontSize:13 }}>Sin movimientos registrados</div>
+            ) : (
+              <table style={{ width:'100%', borderCollapse:'collapse' }}>
+                <thead>
+                  <tr>{['Fecha/Hora','Tipo','Ingrediente','Cantidad','Unidad','Detalle'].map(h=><th key={h} style={thStyle}>{h}</th>)}</tr>
+                </thead>
+                <tbody>
+                  {movimientos.map(mv => (
+                    <tr key={`${mv.tipo}-${mv.id}`} onMouseEnter={e=>e.currentTarget.style.background='rgba(255,255,255,0.3)'} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+                      <td style={{ ...tdStyle, color:G.textFaint, whiteSpace:'nowrap' }}>{fmtTs(mv.ts)}</td>
+                      <td style={tdStyle}>
+                        <span style={{
+                          background: mv.tipo==='ingreso' ? 'rgba(29,158,117,0.10)' : 'rgba(226,75,74,0.10)',
+                          color:      mv.tipo==='ingreso' ? G.teal                  : G.red,
+                          padding:'2px 9px', borderRadius:99, fontSize:11, fontWeight:700,
+                        }}>
+                          {mv.tipo==='ingreso' ? '↑ Ingreso' : '↓ Egreso'}
+                        </span>
+                      </td>
+                      <td style={{ ...tdStyle, fontWeight:600, color:G.text }}>{mv.nombre}</td>
+                      <td style={{ ...tdStyle, fontWeight:700, color: mv.tipo==='ingreso' ? G.teal : G.red }}>
+                        {mv.tipo==='ingreso' ? '+' : '−'}{mv.cantidad}
+                      </td>
+                      <td style={tdStyle}>{mv.unidad}</td>
+                      <td style={tdStyle}>{mv.detalle || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        );
+      })()}
 
       {/* ── MODAL AGREGAR INGREDIENTE ── */}
       {showAdd && (
@@ -608,6 +732,56 @@ export default function Stock() {
               <button onClick={confirmarEgreso} disabled={egresoSaving || !egresoForm.ingredienteId || !egresoForm.cantidad}
                 style={{ flex:1, padding:'10px', background:G.red, border:'none', borderRadius:12, fontSize:13, fontWeight:700, color:'white', cursor:'pointer', opacity: (!egresoForm.ingredienteId||!egresoForm.cantidad||egresoSaving)?0.5:1 }}>
                 {egresoSaving ? 'Registrando...' : 'Registrar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL INGRESO/COMPRA ── */}
+      {showIngresoModal && (
+        <div style={{ position:'fixed', inset:0, zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(15,15,35,0.5)' }} onClick={()=>setShowIngresoModal(false)}>
+          <div style={{ background:'#FFFFFF', border:'1px solid #E2E8F0', boxShadow:'0 24px 64px rgba(60,60,160,0.16)', borderRadius:20, width:440, maxWidth:'95vw', padding:24, fontFamily:FONT_UI }} onClick={e=>e.stopPropagation()}>
+            <div style={{ fontSize:16, fontWeight:700, color:G.text, marginBottom:18 }}>Registrar compra / ingreso</div>
+            <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+              <div>
+                <div style={labelStyleS}>Ingrediente</div>
+                <select value={ingresoForm.stockItemId} onChange={e=>{const it=stock.find(s=>s.id===e.target.value);setIngresoForm(f=>({...f,stockItemId:e.target.value}));setIngresoUnidad(it?.unidad||'');}}
+                  style={{ width:'100%', padding:'8px 11px', border:'1px solid #E2E8F0', background:'#FFFFFF', borderRadius:9, fontSize:13, color:G.text, outline:'none' }}>
+                  <option value="">Seleccioná ingrediente...</option>
+                  {stock.map(it=><option key={it.id} value={it.id}>{it.nombre} (stock: {it.actual} {it.unidad})</option>)}
+                </select>
+              </div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+                <div>
+                  <div style={labelStyleS}>Cantidad {ingresoUnidad && `(${ingresoUnidad})`}</div>
+                  <Input type="number" value={ingresoForm.cantidad} onChange={v=>setIngresoForm(f=>({...f,cantidad:v}))} placeholder="0" />
+                </div>
+                <div>
+                  <div style={labelStyleS}>Costo unitario ($)</div>
+                  <Input type="number" value={ingresoForm.costoUnit} onChange={v=>setIngresoForm(f=>({...f,costoUnit:v}))} placeholder="0" />
+                </div>
+              </div>
+              <div>
+                <div style={labelStyleS}>Proveedor (opcional)</div>
+                <Input value={ingresoForm.proveedor} onChange={v=>setIngresoForm(f=>({...f,proveedor:v}))} placeholder="Ej: Distribuidora López" />
+              </div>
+              <div>
+                <div style={labelStyleS}>Notas (opcional)</div>
+                <Input value={ingresoForm.notas} onChange={v=>setIngresoForm(f=>({...f,notas:v}))} placeholder="Ej: Factura B N°1234" />
+              </div>
+              {ingresoForm.cantidad && ingresoForm.costoUnit && Number(ingresoForm.cantidad)>0 && Number(ingresoForm.costoUnit)>0 && (
+                <div style={{ background:'rgba(29,158,117,0.06)', border:'1px solid rgba(29,158,117,0.15)', borderRadius:10, padding:'10px 14px', display:'flex', justifyContent:'space-between' }}>
+                  <span style={{ fontSize:13, color:G.textMid }}>Total compra:</span>
+                  <span style={{ fontSize:14, fontWeight:700, color:G.teal }}>{money(Number(ingresoForm.cantidad)*Number(ingresoForm.costoUnit))}</span>
+                </div>
+              )}
+            </div>
+            <div style={{ display:'flex', gap:10, marginTop:20 }}>
+              <button onClick={()=>setShowIngresoModal(false)} style={{ flex:1, padding:'10px', border:'1px solid rgba(0,0,0,0.10)', borderRadius:12, fontSize:13, color:G.textMid, background:'transparent', cursor:'pointer' }}>Cancelar</button>
+              <button onClick={confirmarIngreso} disabled={ingresoSaving || !ingresoForm.stockItemId || !ingresoForm.cantidad || Number(ingresoForm.cantidad)<=0}
+                style={{ flex:2, padding:'10px', background:G.teal, border:'none', borderRadius:12, fontSize:13, fontWeight:700, color:'white', cursor:'pointer', boxShadow:'0 4px 12px rgba(29,158,117,0.25)', opacity:(!ingresoForm.stockItemId||!ingresoForm.cantidad||ingresoSaving)?0.5:1 }}>
+                {ingresoSaving ? 'Registrando...' : 'Registrar compra'}
               </button>
             </div>
           </div>
