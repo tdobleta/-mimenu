@@ -1,9 +1,42 @@
 import { useState } from 'react';
 import { Outlet } from 'react-router-dom';
+import { useRegisterSW } from 'virtual:pwa-register/react';
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
 import { APP_BG } from '@/lib/glass';
 import MimenuChatbot from './MimenuChatbot';
+
+// Banner de actualización del Service Worker.
+// Aparece cuando hay una nueva versión disponible (registerType: 'prompt').
+// El restaurante elige cuándo actualizar — no se reinicia automáticamente.
+function SWUpdateBanner() {
+  const { needRefresh: [needRefresh], updateServiceWorker } = useRegisterSW();
+  if (!needRefresh) return null;
+  return (
+    <div style={{
+      position: 'fixed', bottom: 20, right: 20, zIndex: 9999,
+      background: '#FFFFFF', border: '1px solid #E2E8F0',
+      boxShadow: '0 4px 16px rgba(0,0,0,0.12)', borderRadius: 12,
+      padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 12,
+      maxWidth: 360, fontSize: 13,
+    }}>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontWeight: 600, color: '#0F172A', marginBottom: 2 }}>Nueva versión disponible</div>
+        <div style={{ color: '#64748B', fontSize: 12 }}>Actualizá cuando termines la jornada.</div>
+      </div>
+      <button
+        onClick={() => updateServiceWorker(true)}
+        style={{
+          padding: '7px 14px', border: 'none', borderRadius: 8,
+          background: '#1D9E75', color: 'white', fontSize: 12,
+          fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap',
+        }}
+      >
+        Actualizar
+      </button>
+    </div>
+  );
+}
 
 export default function Layout() {
   const [mob, setMob] = useState(false);
@@ -39,6 +72,7 @@ export default function Layout() {
         </main>
       </div>
       <MimenuChatbot />
+      <SWUpdateBanner />
     </div>
   );
 }

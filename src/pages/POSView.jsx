@@ -545,7 +545,10 @@ export default function POSView() {
       }
       if(selectedTurn?.id){const tables=store.getTables(branchId);const table=tables.find(t=>t.turnId===selectedTurn.id);if(table)store.closeTable(branchId,table.id);}
       // Descontar stock automáticamente según recetas (no bloquea el cobro)
-      descontarStockPorMesa(order, branchId, store).catch(() => {});
+      descontarStockPorMesa(order, branchId, store).catch((err) => {
+        console.error('[Stock] Fallo al descontar stock en POSView:', err);
+        addToast('Cobrado. Nota: el descuento de stock falló — revisalo manualmente.', 'warning');
+      });
       store.refreshCharts&&store.refreshCharts();
       addToast('Cobrado '+fmt(tot),'success');
       setShowCobro(false);

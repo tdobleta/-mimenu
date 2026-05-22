@@ -4,18 +4,26 @@ import { useAuth } from '@/lib/AuthContext';
 import { useStore } from '@/lib/store';
 import { fetchTurnItemsBatch } from '@/lib/pagination';
 import { subscribeToTurns, subscribeToTurnItems, registerActiveTurns } from '@/lib/realtimeManager';
-import { supabase } from '@/api/supabaseClient';
 import { useToast } from '@/lib/toast';
 
-// ── Helper: actualizar estado en Supabase directamente (mismo patrón que ControlCocina.marcarEntregada)
-// Reemplaza la llamada al Edge Function cocina-update que fallaba por falta de Authorization header
-async function updateCocinaEstado(turnId, _branchId, updates) {
-  const { cocina_estado, comanda_lista } = updates;
-  const updateData = {};
-  if (cocina_estado !== undefined) updateData.cocina_estado = cocina_estado;
-  if (typeof comanda_lista === 'boolean') updateData.comanda_lista = comanda_lista;
-  const { error } = await supabase.from('turns').update(updateData).eq('id', turnId);
-  if (error) throw error;
+// ── Helper: actualizar estado via Edge Function cocina-update (usa service_role, bypasea RLS)
+// Funciona tanto para sesiones autenticadas como para el display público sin auth.
+// La anon key es suficiente para invocar la Edge Function; ella valida turn_id+branch_id internamente.
+const _SUPA_URL      = import.meta.env.VITE_SUPABASE_URL;
+const _SUPA_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+async function updateCocinaEstado(turnId, branchId, updates) {
+  const res = await fetch(`${_SUPA_URL}/functions/v1/cocina-update`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${_SUPA_ANON_KEY}`,
+      'apikey': _SUPA_ANON_KEY,
+    },
+    body: JSON.stringify({ turn_id: turnId, branch_id: branchId, ...updates }),
+  });
+  const data = await res.json();
+  if (!data.ok) throw new Error(data.error || 'Error actualizando cocina');
 }
 
 const COLORS = {
