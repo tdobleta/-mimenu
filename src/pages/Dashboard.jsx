@@ -322,6 +322,13 @@ export default function Dashboard() {
 
   const periodoLabel = `${fmtDateShort(rangeStart)} → ${fmtDateShort(rangeEnd - 1)}`;
 
+  // ── Alertas de stock bajo ──────────────────────────────────────────────────
+  const stockAlertas = (() => {
+    const bid = store.branchId && store.branchId !== 'todas' ? store.branchId : store.sucursales?.[0]?.id;
+    const items = (store.stock?.[bid] || []);
+    return items.filter(s => Number(s.actual) < Number(s.minimo || 0));
+  })();
+
   // ── Datos nuevos para Row 3 ──────────────────────────────────────────────────
   const mesasCerradasCount = (store.closedTurns||[]).filter(t => (t._ts||0) >= rangeStart && (t._ts||0) < rangeEnd).length;
   const itemsVendidos = (charts.topProducts||[]).reduce((a,p) => a + (p.unidades||0), 0);
@@ -353,9 +360,21 @@ export default function Dashboard() {
 
       {/* ── Header ── */}
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:10 }}>
-        <div>
-          <h1 style={{ fontSize:20, fontWeight:700, color:G.text, margin:0, fontFamily:FONT_UI, letterSpacing:'-0.02em', lineHeight:1.2 }}>Dashboard</h1>
-          <div style={{ fontSize:12, color:G.textFaint, marginTop:3 }}>{dateLong(new Date())}</div>
+        <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+          <div>
+            <h1 style={{ fontSize:20, fontWeight:700, color:G.text, margin:0, fontFamily:FONT_UI, letterSpacing:'-0.02em', lineHeight:1.2 }}>Dashboard</h1>
+            <div style={{ fontSize:12, color:G.textFaint, marginTop:3 }}>{dateLong(new Date())}</div>
+          </div>
+          {stockAlertas.length > 0 && (
+            <a href="/stock" style={{ textDecoration:'none' }}>
+              <div style={{ display:'flex', alignItems:'center', gap:6, background:'rgba(226,75,74,0.10)', border:'1px solid rgba(226,75,74,0.25)', borderRadius:99, padding:'5px 12px', cursor:'pointer' }}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#E24B4A" strokeWidth="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                <span style={{ fontSize:12, fontWeight:700, color:'#E24B4A' }}>
+                  {stockAlertas.length} ingrediente{stockAlertas.length !== 1 ? 's' : ''} bajo stock
+                </span>
+              </div>
+            </a>
+          )}
         </div>
         <div style={{ display:'flex', alignItems:'center', gap:10 }}>
           <DateRangePicker
