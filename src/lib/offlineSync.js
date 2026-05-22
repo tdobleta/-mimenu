@@ -178,7 +178,11 @@ export async function drainQueue(onProgress) {
       try {
         // Backoff exponencial en reintentos (no en el primero)
         if (attempt > 0) {
-          await sleep(BACKOFF_BASE_MS * Math.pow(2, attempt - 1));
+          const base   = BACKOFF_BASE_MS * Math.pow(2, attempt - 1);
+          const jitter = Math.random() * base * 0.3;   // 0-30% del delay base
+          await sleep(base + jitter);
+          // Resultado: retry 1 → 1500-1950ms, retry 2 → 3000-3900ms
+          // Distribuye reintentos en el tiempo → evita thundering herd con 50+ restaurantes
         }
 
         // Si el error previo fue JWT, refrescar sesión una sola vez
