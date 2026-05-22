@@ -33,6 +33,26 @@ export default function Salon() {
     if (!activeBranchTab && store.sucursales.length > 0) setActiveBranchTab(store.sucursales[0].id);
   }, [store.sucursales]);
 
+  // Session timeout de 2h para tablets de mozos (dispositivos compartidos).
+  // Previene que un mozo deje su sesión abierta para el próximo turno.
+  useEffect(() => {
+    if (userRole !== 'Mozo') return;
+    let timer;
+    const reset = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        supabase.auth.signOut().then(() => navigate('/login'));
+      }, 2 * 60 * 60 * 1000); // 2 horas
+    };
+    reset();
+    const events = ['click', 'keydown', 'touchstart', 'scroll'];
+    events.forEach(e => window.addEventListener(e, reset, { passive: true }));
+    return () => {
+      clearTimeout(timer);
+      events.forEach(e => window.removeEventListener(e, reset));
+    };
+  }, [userRole, navigate]);
+
   const displayBranch = store.branchId === 'todas'
     ? (activeBranchTab || store.sucursales[0]?.id)
     : store.branchId;

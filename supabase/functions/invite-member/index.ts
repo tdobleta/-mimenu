@@ -1,0 +1,198 @@
+// supabase/functions/invite-member/index.ts
+// Edge Function para invitar trabajadores al restaurante.
+//
+// PROBLEMA QUE RESUELVE:
+//   EquipoTab.jsx solo crea un registro en team_members pero NO crea
+//   una cuenta Supabase Auth → el trabajador no puede hacer login.
+//   Esta función usa service_role para crear la cuenta Auth y envía
+//   las credenciales por email vía Resend.
+//
+// SECRETS necesarios (Dashboard → Project Settings → Edge Functions → Secrets):
+//   RESEND_API_KEY = re_xxxxxxxx
+//   (SUPABASE_SERVICE_ROLE_KEY y SUPABASE_URL ya están disponibles automáticamente)
+//
+// DEPLOY:
+//   supabase functions deploy invite-member
+//
+// FLUJO:
+//   1. Dueño ingresa email + nombre + rol en Configuración → Equipo
+//   2. Front llama a esta función con Authorization: Bearer <session.access_token>
+//   3. Función verifica que el caller es dueño/encargado del restaurante
+//   4. Crea cuenta Auth con password aleatorio (email_confirm: true → login inmediato)
+//   5. Crea/actualiza team_members
+//   6. Envía email con credenciales vía Resend
+//   7. Devuelve { ok: true }
+
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+const CORS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+function generarPassword(len = 10): string {
+  // Sin O,0,I,l,1 para evitar confusión visual al leer en pantalla chica
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+  return Array.from({ length: len }, () =>
+    chars[Math.floor(Math.random() * chars.length)]
+  ).join('');
+}
+
+function json(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...CORS, 'Content-Type': 'application/json' },
+  });
+}
+
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
+
+  try {
+    // ── 1. Inicializar cliente admin ──────────────────────────────────────────
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+      { auth: { autoRefreshToken: false, persistSession: false } }
+    );
+
+    // ── 2. Autenticar el caller ───────────────────────────────────────────────
+    const authHeader = req.headers.get('Authorization') || '';
+    const token = authHeader.replace('Bearer ', '');
+    if (!token) return json({ error: 'No autorizado' }, 401);
+
+    const { data: { user: caller }, error: authErr } = await supabaseAdmin.auth.getUser(token);
+    if (authErr || !caller) return json({ error: 'No autorizado' }, 401);
+
+    // ── 3. Leer payload ───────────────────────────────────────────────────────
+    const { email, nombre, rol, restaurantId } = await req.json();
+    if (!email || !nombre || !rol || !restaurantId) {
+      return json({ error: 'Faltan campos: email, nombre, rol, restaurantId' }, 400);
+    }
+    const emailClean = email.trim().toLowerCase();
+    const rolesValidos = ['Encargado', 'Mozo', 'Cocinero'];
+    if (!rolesValidos.includes(rol)) {
+      return json({ error: `Rol inválido. Debe ser uno de: ${rolesValidos.join(', ')}` }, 400);
+    }
+
+    // ── 4. Verificar que el caller pertenece al restaurante ───────────────────
+    const { data: restaurant } = await supabaseAdmin
+      .from('restaurants')
+      .select('id, nombre, owner_id, owner_email')
+      .eq('id', restaurantId)
+      .single();
+
+    if (!restaurant) return json({ error: 'Restaurante no encontrado' }, 404);
+
+    // Verificar que es dueño (por owner_id o owner_email)
+    const esOwner = restaurant.owner_id === caller.id || restaurant.owner_email === caller.email;
+    // O encargado (tiene registro en team_members con rol Encargado)
+    let esEncargado = false;
+    if (!esOwner) {
+      const { data: callerMember } = await supabaseAdmin
+        .from('team_members')
+        .select('rol')
+        .eq('restaurant_id', restaurantId)
+        .eq('email', caller.email)
+        .single();
+      esEncargado = callerMember?.rol === 'Encargado';
+    }
+    if (!esOwner && !esEncargado) return json({ error: 'Sin permiso' }, 403);
+
+    // ── 5. Verificar que el email no está ya en el equipo ─────────────────────
+    const { data: existingMember } = await supabaseAdmin
+      .from('team_members')
+      .select('id')
+      .eq('restaurant_id', restaurantId)
+      .eq('email', emailClean)
+      .maybeSingle();
+
+    if (existingMember) {
+      return json({ error: 'Este email ya está en el equipo de este restaurante' }, 409);
+    }
+
+    // ── 6. Crear o resetear cuenta Auth ───────────────────────────────────────
+    const password = generarPassword();
+    let authUserId: string;
+
+    // Buscar si ya tiene cuenta en Supabase Auth
+    const { data: usersList } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
+    const existingAuthUser = usersList?.users?.find(u => u.email === emailClean);
+
+    if (existingAuthUser) {
+      // Ya tiene cuenta → resetear contraseña
+      await supabaseAdmin.auth.admin.updateUserById(existingAuthUser.id, { password });
+      authUserId = existingAuthUser.id;
+    } else {
+      // Crear nueva cuenta — email_confirm: true → puede loguear sin verificar email
+      const { data: newUser, error: createErr } = await supabaseAdmin.auth.admin.createUser({
+        email: emailClean,
+        password,
+        email_confirm: true,
+      });
+      if (createErr) throw createErr;
+      authUserId = newUser.user!.id;
+    }
+
+    // ── 7. Crear registro en team_members ─────────────────────────────────────
+    await supabaseAdmin.from('team_members').upsert(
+      { restaurant_id: restaurantId, email: emailClean, nombre: nombre.trim(), rol, user_id: authUserId },
+      { onConflict: 'restaurant_id,email' }
+    );
+
+    // ── 8. Enviar email con credenciales (Resend) ─────────────────────────────
+    const resendKey = Deno.env.get('RESEND_API_KEY');
+    if (resendKey) {
+      await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${resendKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          from: 'mimenú <noreply@mimenu.app>',
+          to: emailClean,
+          subject: `Tu acceso a mimenú — ${restaurant.nombre}`,
+          html: `
+            <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px;color:#111827">
+              <h2 style="color:#1D9E75;margin-bottom:8px">¡Hola, ${nombre.trim()}!</h2>
+              <p style="color:#374151;margin-bottom:16px">
+                <strong>${restaurant.nombre}</strong> te agregó como <strong>${rol}</strong> en mimenú POS.
+              </p>
+              <p style="color:#374151;margin-bottom:8px">Podés ingresar con estas credenciales:</p>
+              <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px;padding:18px 20px;margin:0 0 16px">
+                <p style="margin:6px 0;font-size:14px"><strong>Email:</strong> ${emailClean}</p>
+                <p style="margin:6px 0;font-size:14px"><strong>Contraseña:</strong>
+                  <code style="font-size:20px;letter-spacing:3px;font-weight:700;color:#1D9E75">${password}</code>
+                </p>
+              </div>
+              <p style="margin-bottom:20px">
+                <a href="https://app.mimenu.ar" style="display:inline-block;background:#1D9E75;color:white;padding:11px 24px;border-radius:8px;font-weight:600;text-decoration:none;font-size:14px">
+                  Ingresar a mimenú →
+                </a>
+              </p>
+              <p style="color:#9CA3AF;font-size:12px;margin:0">
+                Por seguridad, podés cambiar tu contraseña desde tu perfil después de ingresar.
+              </p>
+            </div>
+          `,
+        }),
+      });
+    } else {
+      // Si no hay RESEND_API_KEY configurada, igual funciona — solo no envía email
+      console.warn('[invite-member] RESEND_API_KEY no configurada — no se envió email');
+    }
+
+    return json({
+      ok: true,
+      mensaje: `Invitación enviada a ${emailClean}${resendKey ? '. Revisá el email.' : ' (sin email, Resend no configurado)'}`,
+      // En desarrollo, devolver la contraseña para poder testear sin email
+      ...(Deno.env.get('SUPABASE_ENV') === 'local' ? { password } : {}),
+    });
+
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('[invite-member] Error:', msg);
+    return json({ error: msg || 'Error interno' }, 500);
+  }
+});

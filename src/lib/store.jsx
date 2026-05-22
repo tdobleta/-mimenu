@@ -344,13 +344,29 @@ export function AppProvider({ children }) {
           needsOnboarding: !restaurant.onboarding_completado,
         }));
 
-        // Guardar snapshot para poder arrancar offline la próxima vez
+        // Guardar snapshot para poder arrancar offline la próxima vez.
+        // Incluye tables (estado de mesas) y turnoActivo para que el mozo
+        // pueda ver las mesas ocupadas aunque la PC reinicie sin internet.
+        const tablesForSnapshot = {};
+        Object.entries(tables).forEach(([bid, tbs]) => {
+          tablesForSnapshot[bid] = tbs.map(t => ({
+            id: t.id, num: t.num, gridCol: t.gridCol, gridRow: t.gridRow,
+            status: t.status, openedAt: t.openedAt || null,
+            turnId: t.turnId || null, mozo: t.mozo || '',
+            // NO guardamos order[] — los items se recargan de DB al reconectar
+          }));
+        });
         saveSnapshot({
           restaurantId: restaurant.id,
           restaurante: { nombre: restaurant.nombre || '', direccion: restaurant.direccion || '', telefono: restaurant.telefono || '' },
           sucursales: sucursalesMap,
           menuItems: menuItemsByBranch,
           stock,
+          tables: tablesForSnapshot,
+          gridConfig,
+          turnoActivo: turnoActivo
+            ? { id: turnoActivo.id, branchId: turnoActivo.branchId, fondoInicial: turnoActivo.fondoInicial, abiertaAt: turnoActivo.abiertaAt, tipoTurno: turnoActivo.tipoTurno, retiros: turnoActivo.retiros || [] }
+            : null,
         }).catch(() => {});
 
       } catch (err) {
@@ -371,6 +387,11 @@ export function AppProvider({ children }) {
               sucursales: snapshot.sucursales || [],
               menuItems: snapshot.menuItems || {},
               stock: snapshot.stock || {},
+              // Restaurar estado de mesas para que el mozo vea cuáles están ocupadas
+              tables: snapshot.tables || {},
+              gridConfig: snapshot.gridConfig || {},
+              // Restaurar turno de caja activo (necesario para lógica de caja)
+              turnoActivo: snapshot.turnoActivo || null,
             }));
             return;
           }

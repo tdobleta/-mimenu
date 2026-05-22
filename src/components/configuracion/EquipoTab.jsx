@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { base44 } from '@/api/base44Client';
 import { useStore } from '@/lib/store';
 import { useToast } from '@/lib/toast';
+import { supabase } from '@/api/supabaseClient';
 
 const ROLES = [
   { key:'Encargado', label:'Encargado', desc:'Acceso a todas las vistas excepto Configuración.' },
@@ -26,33 +26,43 @@ export default function EquipoTab() {
 
   async function save() {
     const emailClean = form.email.trim().toLowerCase();
-    if (!emailClean) { addToast('Ingresá un email', 'error'); return; }
+    if (!emailClean || !form.nombre?.trim()) { addToast('Ingresá nombre y email', 'error'); return; }
     setSaving(true);
     try {
       const restaurantId = store.restaurantId;
       if (!restaurantId) { addToast('No se encontró el restaurante', 'error'); setSaving(false); return; }
 
-      // Verificar que el email no existe ya en el equipo de este restaurante
+      // Verificar que el email no existe ya en el equipo de este restaurante (check local)
       const yaExiste = (store.teamMembers || []).some(m => m.email.toLowerCase() === emailClean);
       if (yaExiste) { addToast('Este email ya está en el equipo', 'error'); setSaving(false); return; }
 
-      // Un solo insert — base44.entities.TeamMember.create() llama a supabase directamente
-      const created = await base44.entities.TeamMember.create({
-        restaurant_id: restaurantId,
-        email: emailClean,
-        nombre: form.nombre?.trim() || '',
-        rol: form.rol,
+      // Llamar Edge Function invite-member:
+      //   - Crea cuenta Supabase Auth con contraseña aleatoria
+      //   - Crea team_members record
+      //   - Envía email con credenciales vía Resend
+      const { data: { session } } = await supabase.auth.getSession();
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const res = await fetch(`${supabaseUrl}/functions/v1/invite-member`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`,
+        },
+        body: JSON.stringify({ email: emailClean, nombre: form.nombre.trim(), rol: form.rol, restaurantId }),
       });
-      addTeamMember(created);
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || 'Error al invitar');
 
-      const appUrl = window.location.origin;
-      setShareInfo({ nombre: form.nombre || emailClean, email: emailClean, url: appUrl });
+      // Refrescar lista local con el nuevo miembro
+      addTeamMember({ id: Date.now(), email: emailClean, nombre: form.nombre.trim(), rol: form.rol, restaurant_id: restaurantId });
+
+      setShareInfo({ nombre: form.nombre || emailClean, email: emailClean });
       setShowModal(false);
       setForm({ nombre:'', email:'', rol:'Mozo' });
     } catch(err) {
       console.error(err);
-      const isDuplicate = err?.code === '23505' || err?.message?.toLowerCase().includes('duplicate') || err?.message?.toLowerCase().includes('unique');
-      addToast(isDuplicate ? 'Este email ya existe en el sistema' : 'Error al agregar miembro — verificá que el email sea correcto', 'error');
+      const isConflict = err?.message?.includes('ya está en el equipo');
+      addToast(isConflict ? 'Este email ya está en el equipo' : (err?.message || 'Error al invitar — verificá la conexión'), 'error');
     }
     setSaving(false);
   }
@@ -140,29 +150,18 @@ export default function EquipoTab() {
         <div style={{ position:'fixed', inset:0, zIndex:1001, display:'flex', alignItems:'center', justifyContent:'center', backgroundColor:'rgba(0,0,0,0.4)' }}>
           <div style={{ background:'#FFFFFF', border:'1px solid #E2E8F0', boxShadow:'0 8px 32px rgba(0,0,0,0.12)', borderRadius:14, width:440, maxWidth:'95vw', padding:28 }} onClick={e=>e.stopPropagation()}>
             <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:16 }}>
-              <div style={{ width:36, height:36, borderRadius:'50%', backgroundColor:'#FEF9C3', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#CA8A04" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              <div style={{ width:36, height:36, borderRadius:'50%', backgroundColor:'#E8F7F2', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1D9E75" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
               </div>
               <div>
-                <div style={{ fontSize:14, fontWeight:600, color:'#111827' }}>{shareInfo.nombre} ya tiene cuenta en mimenú</div>
-                <div style={{ fontSize:12, color:'#6B7280', marginTop:2 }}>Fue agregado al equipo correctamente. Compartile el link para que ingrese.</div>
+                <div style={{ fontSize:14, fontWeight:600, color:'#111827' }}>Invitación enviada a {shareInfo.nombre}</div>
+                <div style={{ fontSize:12, color:'#6B7280', marginTop:2 }}>Cuenta creada y email enviado con las credenciales.</div>
               </div>
             </div>
 
-            <div style={{ backgroundColor:'#F9FAFB', borderRadius:8, padding:14, marginBottom:16 }}>
-              <div style={{ fontSize:11, color:'#9CA3AF', marginBottom:6, fontWeight:500, textTransform:'uppercase', letterSpacing:'0.4px' }}>Link de acceso</div>
-              <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                <span style={{ fontSize:13, color:'#111827', flex:1, wordBreak:'break-all' }}>{shareInfo.url}</span>
-                <button
-                  onClick={() => { navigator.clipboard.writeText(shareInfo.url); addToast('Link copiado', 'success'); }}
-                  style={{ padding:'5px 10px', border:'1px solid #E2E8F0', borderRadius:6, fontSize:12, cursor:'pointer', background:'#FFFFFF', whiteSpace:'nowrap', color:'#374151' }}>
-                  Copiar
-                </button>
-              </div>
-            </div>
-
-            <div style={{ backgroundColor:'#F0FBF7', borderRadius:8, padding:12, marginBottom:20, fontSize:12, color:'#1D9E75', lineHeight:'18px' }}>
-              Decile a <strong>{shareInfo.nombre}</strong> que entre con <strong>{shareInfo.email}</strong> y su contraseña habitual. El sistema lo va a reconocer automáticamente con su rol asignado.
+            <div style={{ backgroundColor:'#F0FBF7', borderRadius:8, padding:14, marginBottom:20, fontSize:13, color:'#374151', lineHeight:'20px' }}>
+              <strong>{shareInfo.nombre}</strong> recibirá un email en <strong>{shareInfo.email}</strong> con su contraseña para ingresar.<br/>
+              <span style={{ fontSize:12, color:'#6B7280', marginTop:4, display:'block' }}>Si no llega el email, revisá la carpeta de spam. La cuenta ya está activa.</span>
             </div>
 
             <button
