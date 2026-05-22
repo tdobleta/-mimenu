@@ -111,20 +111,24 @@ async function processOperation(op) {
     }
 
     case 'CAJA_RETIRO': {
+      // Verificar idempotencia: leer retiros actuales para no duplicar por ts
+      // El RPC append_caja_retiro usa || atómico de PostgreSQL — sin race conditions.
+      // Aún así necesitamos la lectura para idempotencia (evitar duplicar en retry).
       const { data: shift, error: fetchErr } = await supabase
         .from('caja_shifts').select('retiros').eq('id', op.cajaShiftId).single();
       if (fetchErr) throw fetchErr;
 
       let current = [];
-      try { current = JSON.parse(shift?.retiros || '[]'); } catch(e) {}
+      try { current = Array.isArray(shift?.retiros) ? shift.retiros : JSON.parse(shift?.retiros || '[]'); } catch(e) {}
 
-      // Idempotencia: no insertar si ya existe un retiro con el mismo timestamp
+      // Idempotencia por timestamp: no insertar si ya existe
       const alreadyExists = current.some(r => r.ts === op.retiro.ts);
       if (!alreadyExists) {
-        const { error } = await supabase
-          .from('caja_shifts')
-          .update({ retiros: JSON.stringify([...current, op.retiro]) })
-          .eq('id', op.cajaShiftId);
+        // RPC atómico — PostgreSQL garantiza que no se pierden retiros concurrentes
+        const { error } = await supabase.rpc('append_caja_retiro', {
+          p_shift_id:    op.cajaShiftId,
+          p_retiro_json: op.retiro,
+        });
         if (error) throw error;
       }
       break;
@@ -132,16 +136,14 @@ async function processOperation(op) {
 
     case 'STOCK_DECREMENT': {
       // op.items = [{stockItemId, cantidad}] — decrementos, NO valores absolutos
-      // Leer actual y restar para evitar inconsistencias de concurrencia
+      // decrement_stock RPC usa GREATEST(0, actual - qty) — atómico, sin race conditions,
+      // y nunca produce stock negativo aunque haya dos tablets simultáneas.
       for (const item of (op.items || [])) {
-        const { data: curr } = await supabase
-          .from('stock_items').select('actual').eq('id', item.stockItemId).single();
-        if (curr != null) {
-          const newActual = Math.max(0, (curr.actual || 0) - item.cantidad);
-          const { error } = await supabase
-            .from('stock_items').update({ actual: newActual }).eq('id', item.stockItemId);
-          if (error) throw error;
-        }
+        const { error } = await supabase.rpc('decrement_stock', {
+          p_id:  item.stockItemId,
+          p_qty: item.cantidad,
+        });
+        if (error) throw error;
       }
       break;
     }

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { base44 } from '@/api/base44Client';
+import { supabase } from '@/api/supabaseClient';
 import { useStore } from '@/lib/store';
 import { useToast } from '@/lib/toast';
 import { money } from '@/lib/fmt';
@@ -27,10 +27,14 @@ export default function AddRetiroModal({ onClose }) {
     setSaving(true);
     const retiro = { ts: Date.now(), concepto: conceptoFinal, monto: montoNum };
     try {
-      const newRetiros = [...(store.turnoActivo.retiros || []), retiro];
-      await base44.entities.CajaShift.update(store.turnoActivo.id, {
-        retiros: JSON.stringify(newRetiros),
+      // Usar RPC atómico en lugar de JS read-modify-write.
+      // append_caja_retiro usa operador || de PostgreSQL → sin race conditions
+      // aunque dos tablets ejecuten simultáneamente.
+      const { error } = await supabase.rpc('append_caja_retiro', {
+        p_shift_id:    store.turnoActivo.id,
+        p_retiro_json: retiro,
       });
+      if (error) throw error;
       store.addRetiro(retiro);
       store.logAccion({
         usuario: user?.email || 'Sistema',

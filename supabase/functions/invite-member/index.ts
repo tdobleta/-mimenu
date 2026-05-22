@@ -5,7 +5,7 @@
 //   EquipoTab.jsx solo crea un registro en team_members pero NO crea
 //   una cuenta Supabase Auth → el trabajador no puede hacer login.
 //   Esta función usa service_role para crear la cuenta Auth y envía
-//   las credenciales por email vía Resend.
+//   un magic link seguro vía Resend.
 //
 // SECRETS necesarios (Dashboard → Project Settings → Edge Functions → Secrets):
 //   RESEND_API_KEY = re_xxxxxxxx
@@ -18,10 +18,16 @@
 //   1. Dueño ingresa email + nombre + rol en Configuración → Equipo
 //   2. Front llama a esta función con Authorization: Bearer <session.access_token>
 //   3. Función verifica que el caller es dueño/encargado del restaurante
-//   4. Crea cuenta Auth con password aleatorio (email_confirm: true → login inmediato)
+//   4. Genera un magic link de invitación (admin.generateLink type:'invite', 24h)
 //   5. Crea/actualiza team_members
-//   6. Envía email con credenciales vía Resend
-//   7. Devuelve { ok: true }
+//   6. Envía el link por email vía Resend (NO se envía contraseña en texto plano)
+//   7. El trabajador hace clic → elige su propia contraseña → acceso activo
+//   8. Devuelve { ok: true }
+//
+// SEGURIDAD:
+//   - Nunca se genera ni almacena una contraseña en texto plano
+//   - El magic link expira en 24h (configurable en Supabase Auth settings)
+//   - El usuario elige su propia contraseña al activar la cuenta
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -29,14 +35,6 @@ const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
-
-function generarPassword(len = 10): string {
-  // Sin O,0,I,l,1 para evitar confusión visual al leer en pantalla chica
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
-  return Array.from({ length: len }, () =>
-    chars[Math.floor(Math.random() * chars.length)]
-  ).join('');
-}
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -111,36 +109,35 @@ Deno.serve(async (req) => {
       return json({ error: 'Este email ya está en el equipo de este restaurante' }, 409);
     }
 
-    // ── 6. Crear o resetear cuenta Auth ───────────────────────────────────────
-    const password = generarPassword();
-    let authUserId: string;
+    // ── 6. Generar magic link de invitación (sin contraseña en texto plano) ──
+    // admin.generateLink type:'invite' crea el usuario si no existe,
+    // o envía un nuevo link de activación si ya existe.
+    // El link expira en 24h (configurable en Supabase Auth settings).
+    // El trabajador hace clic → elige su propia contraseña → acceso activo.
+    const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
+      type: 'invite',
+      email: emailClean,
+      options: {
+        redirectTo: 'https://app.mimenu.ar',
+      },
+    });
+    if (linkError) throw linkError;
 
-    // Buscar si ya tiene cuenta en Supabase Auth
-    const { data: usersList } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
-    const existingAuthUser = usersList?.users?.find(u => u.email === emailClean);
+    const inviteLink = linkData.properties?.action_link;
+    if (!inviteLink) throw new Error('No se pudo generar el link de invitación');
 
-    if (existingAuthUser) {
-      // Ya tiene cuenta → resetear contraseña
-      await supabaseAdmin.auth.admin.updateUserById(existingAuthUser.id, { password });
-      authUserId = existingAuthUser.id;
-    } else {
-      // Crear nueva cuenta — email_confirm: true → puede loguear sin verificar email
-      const { data: newUser, error: createErr } = await supabaseAdmin.auth.admin.createUser({
-        email: emailClean,
-        password,
-        email_confirm: true,
-      });
-      if (createErr) throw createErr;
-      authUserId = newUser.user!.id;
-    }
+    // Obtener el user_id del usuario creado/encontrado
+    const authUserId: string = linkData.user?.id || '';
 
     // ── 7. Crear registro en team_members ─────────────────────────────────────
     await supabaseAdmin.from('team_members').upsert(
-      { restaurant_id: restaurantId, email: emailClean, nombre: nombre.trim(), rol, user_id: authUserId },
+      { restaurant_id: restaurantId, email: emailClean, nombre: nombre.trim(), rol, user_id: authUserId || null },
       { onConflict: 'restaurant_id,email' }
     );
 
-    // ── 8. Enviar email con credenciales (Resend) ─────────────────────────────
+    // ── 8. Enviar email con magic link (Resend) ───────────────────────────────
+    // IMPORTANTE: Solo se envía el link — nunca credenciales en texto plano.
+    // El link expira en 24h. Si el link venció, el dueño puede re-invitar.
     const resendKey = Deno.env.get('RESEND_API_KEY');
     if (resendKey) {
       await fetch('https://api.resend.com/emails', {
@@ -157,22 +154,25 @@ Deno.serve(async (req) => {
             <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px;color:#111827">
               <h2 style="color:#1D9E75;margin-bottom:8px">¡Hola, ${nombre.trim()}!</h2>
               <p style="color:#374151;margin-bottom:16px">
-                <strong>${restaurant.nombre}</strong> te agregó como <strong>${rol}</strong> en mimenú POS.
+                <strong>${restaurant.nombre}</strong> te invitó como <strong>${rol}</strong> en mimenú POS.
               </p>
-              <p style="color:#374151;margin-bottom:8px">Podés ingresar con estas credenciales:</p>
-              <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px;padding:18px 20px;margin:0 0 16px">
-                <p style="margin:6px 0;font-size:14px"><strong>Email:</strong> ${emailClean}</p>
-                <p style="margin:6px 0;font-size:14px"><strong>Contraseña:</strong>
-                  <code style="font-size:20px;letter-spacing:3px;font-weight:700;color:#1D9E75">${password}</code>
-                </p>
-              </div>
-              <p style="margin-bottom:20px">
-                <a href="https://app.mimenu.ar" style="display:inline-block;background:#1D9E75;color:white;padding:11px 24px;border-radius:8px;font-weight:600;text-decoration:none;font-size:14px">
-                  Ingresar a mimenú →
+              <p style="color:#374151;margin-bottom:16px">
+                Hacé clic en el botón para activar tu cuenta y elegir tu contraseña.
+                El link es válido por <strong>24 horas</strong>.
+              </p>
+              <p style="margin-bottom:20px;text-align:center">
+                <a href="${inviteLink}" style="display:inline-block;background:#1D9E75;color:white;padding:13px 28px;border-radius:8px;font-weight:600;text-decoration:none;font-size:15px">
+                  Activar mi cuenta →
                 </a>
               </p>
+              <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:12px 16px;margin-bottom:16px">
+                <p style="margin:0;font-size:12px;color:#6B7280">
+                  Si el botón no funciona, copiá este link en tu navegador:<br/>
+                  <span style="color:#1D9E75;word-break:break-all;font-size:11px">${inviteLink}</span>
+                </p>
+              </div>
               <p style="color:#9CA3AF;font-size:12px;margin:0">
-                Por seguridad, podés cambiar tu contraseña desde tu perfil después de ingresar.
+                Si no esperabas esta invitación, podés ignorar este email.
               </p>
             </div>
           `,
@@ -185,9 +185,9 @@ Deno.serve(async (req) => {
 
     return json({
       ok: true,
-      mensaje: `Invitación enviada a ${emailClean}${resendKey ? '. Revisá el email.' : ' (sin email, Resend no configurado)'}`,
-      // En desarrollo, devolver la contraseña para poder testear sin email
-      ...(Deno.env.get('SUPABASE_ENV') === 'local' ? { password } : {}),
+      mensaje: `Invitación enviada a ${emailClean}${resendKey ? '. Revisá el email para activar la cuenta.' : ' (sin email, Resend no configurado)'}`,
+      // En desarrollo, devolver el link para testear sin email
+      ...(Deno.env.get('SUPABASE_ENV') === 'local' ? { inviteLink } : {}),
     });
 
   } catch (err: unknown) {
