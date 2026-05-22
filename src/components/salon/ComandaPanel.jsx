@@ -146,7 +146,9 @@ export default function ComandaPanel({ table, branchId, onClose, addToast }) {
             // Si el usuario escribió una nota antes de que DB respondiera, guardarla ahora
             const pendingNota = pendingNotesRef.current[uid];
             if (pendingNota) {
-              dbSaveNota(ti.id, pendingNota).catch(() => {});
+              dbSaveNota(ti.id, pendingNota).catch(() => {
+                addToast('Nota no guardada — sin conexión. Se perdió si cerrás la app.', 'warning');
+              });
               delete pendingNotesRef.current[uid];
             }
           })
@@ -436,7 +438,9 @@ export default function ComandaPanel({ table, branchId, onClose, addToast }) {
                 store.updateTableOrder(branchId, table.id, order.map(i => (i.uid || i.turnItemId || i.itemId) === key ? { ...i, nota } : i));
                 // Persistir en DB si el ítem ya fue guardado en server (tiene turnItemId)
                 if (notasModal.item.turnItemId) {
-                  dbSaveNota(notasModal.item.turnItemId, nota).catch(() => {});
+                  dbSaveNota(notasModal.item.turnItemId, nota).catch(() => {
+                    addToast('Nota no guardada — sin conexión. Se perdió si cerrás la app.', 'warning');
+                  });
                 } else if (notasModal.item.uid) {
                   // DB aún no respondió — guardar en ref; se persistirá cuando llegue el turnItemId
                   pendingNotesRef.current[notasModal.item.uid] = nota;
@@ -492,7 +496,10 @@ export default function ComandaPanel({ table, branchId, onClose, addToast }) {
               }
               store.closeTable(branchId, table.id);
               // Descontar stock automáticamente según recetas configuradas
-              descontarStockPorMesa(table.order || [], branchId, store).catch(() => {});
+              descontarStockPorMesa(table.order || [], branchId, store).catch((err) => {
+                console.error('[Stock] Fallo al descontar stock:', err);
+                addToast('Mesa cerrada. Nota: el descuento de stock falló — revisalo manualmente.', 'warning');
+              });
               // El total de caja ya se actualizó dentro de cerrar_mesa_atomico
               if (store.turnoActivo) {
                 try {

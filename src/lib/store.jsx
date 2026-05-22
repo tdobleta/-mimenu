@@ -385,6 +385,8 @@ export function AppProvider({ children }) {
               precio: item.precio || 0,
               categoria: item.categoria || 'Principales',
               disponible: item.activo !== false,
+              imagen_url: item.imagen_url || null,
+              modificadores: [],
             })),
           },
         }));

@@ -24,8 +24,8 @@ export default function AddRetiroModal({ onClose }) {
   async function confirm() {
     if (montoNum <= 0 || !conceptoFinal || !store.turnoActivo) return;
     setSaving(true);
+    const retiro = { ts: Date.now(), concepto: conceptoFinal, monto: montoNum };
     try {
-      const retiro = { ts: Date.now(), concepto: conceptoFinal, monto: montoNum };
       const newRetiros = [...(store.turnoActivo.retiros || []), retiro];
       await base44.entities.CajaShift.update(store.turnoActivo.id, {
         retiros: JSON.stringify(newRetiros),
@@ -43,8 +43,11 @@ export default function AddRetiroModal({ onClose }) {
       onClose();
     } catch(err) {
       console.error(err);
-      addToast('No se pudo registrar el retiro. Intentá de nuevo.', 'error');
-      setSaving(false);
+      // Guardar localmente igual — el retiro quedará en memoria hasta que se cierre el turno
+      // En Fase 1 (offline queue) esto se encola para sincronizar al reconectar
+      store.addRetiro(retiro);
+      addToast('Retiro guardado localmente sin conexión. Se sincronizará al cerrar el turno.', 'warning');
+      onClose();
     }
   }
 

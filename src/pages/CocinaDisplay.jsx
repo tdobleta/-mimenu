@@ -5,6 +5,7 @@ import { useStore } from '@/lib/store';
 import { fetchTurnItemsBatch } from '@/lib/pagination';
 import { subscribeToTurns, subscribeToTurnItems, registerActiveTurns } from '@/lib/realtimeManager';
 import { supabase } from '@/api/supabaseClient';
+import { useToast } from '@/lib/toast';
 
 // ── Helper: actualizar estado en Supabase directamente (mismo patrón que ControlCocina.marcarEntregada)
 // Reemplaza la llamada al Edge Function cocina-update que fallaba por falta de Authorization header
@@ -39,6 +40,7 @@ function fmtHora(ts) {
 export default function CocinaDisplay() {
   const { user } = useAuth();
   const { restaurante, branchId, sucursales } = useStore();
+  const { addToast } = useToast();
   const activeBranchId = branchId !== 'todas' ? branchId : sucursales[0]?.id;
   const [comandas, setComandas] = useState([]);
   const [itemsListos, setItemsListos] = useState({});
@@ -160,6 +162,7 @@ export default function CocinaDisplay() {
       }
     } catch(err) {
       console.error('Error cambiando estado cocina:', err);
+      addToast('No se pudo guardar el cambio. Revisá tu conexión.', 'error');
       // Revert optimistic update si falla
       loadCocina();
     }

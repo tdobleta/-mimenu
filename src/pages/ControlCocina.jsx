@@ -4,6 +4,7 @@ import { supabase } from '@/api/supabaseClient';
 import { subscribeToTurns, subscribeToTurnItems, registerActiveTurns } from '@/lib/realtimeManager';
 import { G, glass, glassDeep, fontDisplay, fontUI } from '@/lib/glass';
 import { money } from '@/lib/fmt';
+import { useToast } from '@/lib/toast';
 
 // ── Helpers ────────────────────────────────────────────────────────────
 
@@ -33,6 +34,7 @@ function mesaColor(mins) {
 
 export default function ControlCocina() {
   const store = useStore();
+  const { addToast } = useToast();
   const branchId = store.branchId !== 'todas' ? store.branchId : store.sucursales[0]?.id;
   const allTables = store.getTables(branchId);
 
@@ -117,6 +119,7 @@ export default function ControlCocina() {
       loadComandas();
     } catch (e) {
       console.error('Error marcando entregada:', e);
+      addToast('No se pudo registrar la entrega. Revisá tu conexión.', 'error');
     }
   }
 

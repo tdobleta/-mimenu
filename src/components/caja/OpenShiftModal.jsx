@@ -31,6 +31,13 @@ export default function OpenShiftModal({ onClose }) {
     if (!branchId) return;
     setSaving(true);
     try {
+      // Verificar si ya hay un turno abierto para esta sucursal
+      const existing = await base44.entities.CajaShift.filter({ branch_id: branchId, status: 'abierto' });
+      if (existing?.length > 0) {
+        addToast('Ya hay un turno abierto en esta sucursal. Cerralo antes de abrir uno nuevo.', 'warning');
+        setSaving(false);
+        return;
+      }
       const now = new Date().toISOString();
       const created = await base44.entities.CajaShift.create({
         branch_id: branchId,
@@ -61,7 +68,12 @@ export default function OpenShiftModal({ onClose }) {
       onClose();
     } catch(err) {
       console.error(err);
-      addToast('No se pudo abrir el turno. Revisá tu conexión e intentá de nuevo.', 'error');
+      const isDuplicate = err?.code === '23505' || err?.message?.includes('duplicate') || err?.message?.includes('unique');
+      if (isDuplicate) {
+        addToast('Ya existe un turno abierto. Recargá la página para verlo.', 'warning');
+      } else {
+        addToast('No se pudo abrir el turno. Revisá tu conexión e intentá de nuevo.', 'error');
+      }
       setSaving(false);
     }
   }
