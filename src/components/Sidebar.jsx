@@ -2,6 +2,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useStore } from '@/lib/store';
 import useUserRole from '@/lib/useUserRole';
 import { G } from '@/lib/glass';
+import { supabase } from '@/api/supabaseClient';
 
 const ROLE_PATHS = {
   Dueno:    ['/','/salon','/caja','/reservas','/stock','/clientes','/reportes','/analiticas','/conexion','/configuracion','/control-cocina','/public/cocina'],
@@ -128,10 +129,44 @@ export default function Sidebar({ onClose }) {
         <div style={{ fontSize:10, color:'#484F58', marginBottom:6, letterSpacing:'0.04em' }}>versión 1.0.0</div>
         <div style={{ display:'flex', alignItems:'center', gap:7 }}>
           <span style={{ width:6, height:6, borderRadius:'50%', background:'#1D9E75', flexShrink:0 }} />
-          <span style={{ fontSize:12, color:'#8B949E', fontWeight:600, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
+          <span style={{ fontSize:12, color:'#8B949E', fontWeight:600, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', flex:1 }}>
             {restaurante.nombre}
           </span>
         </div>
+
+        {/* Botón "Cambio de turno" — visible para Mozo y Cocinero
+            Permite al mozo saliente cerrar sesión limpiamente para que el mozo
+            entrante pueda ingresar con su propia cuenta, sin dejar sesiones abiertas. */}
+        {(role === 'Mozo' || role === 'Cocinero') && (
+          <button
+            onClick={() => supabase.auth.signOut().then(() => window.location.href = '/login')}
+            style={{
+              marginTop: 10,
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 7,
+              padding: '7px 10px',
+              background: 'rgba(255,255,255,0.05)',
+              border: '1px solid #21262D',
+              borderRadius: 8,
+              cursor: 'pointer',
+              color: '#6B7280',
+              fontSize: 12,
+              fontWeight: 500,
+              transition: 'all .15s',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background='rgba(255,255,255,0.09)'; e.currentTarget.style.color='#E6EDF3'; }}
+            onMouseLeave={e => { e.currentTarget.style.background='rgba(255,255,255,0.05)'; e.currentTarget.style.color='#6B7280'; }}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+              <polyline points="16 17 21 12 16 7"/>
+              <line x1="21" y1="12" x2="9" y2="12"/>
+            </svg>
+            Cambio de turno
+          </button>
+        )}
       </div>
     </div>
   );
