@@ -3,6 +3,7 @@ import { useStore } from '@/lib/store';
 import { base44 } from '@/api/base44Client';
 import { Link } from 'react-router-dom';
 import { exportTurnsCSV } from '@/lib/export';
+import { fetchRecetas, fetchPrecios } from '@/lib/stockApi';
 import AnalyticsSummary from '../components/analytics/AnalyticsSummary';
 import SalesEvolution from '../components/analytics/SalesEvolution';
 import IncomeDistribution from '../components/analytics/IncomeDistribution';
@@ -34,6 +35,8 @@ export default function Analiticas() {
   const [allTurns, setAllTurns] = useState([]);
   const [allItems, setAllItems] = useState([]);
   const [menuItemsDb, setMenuItemsDb] = useState([]);
+  const [stockRecipes, setStockRecipes] = useState({});
+  const [stockPrecios, setStockPrecios] = useState({});
 
   useEffect(() => {
     let cancelled = false;
@@ -64,10 +67,19 @@ export default function Analiticas() {
         const items = itemsArrays.flat();
 
         let menus = [];
+        let recipes = {};
+        let precios = {};
         try {
           if (branchIds.length > 0) {
-            const menuArrays = await Promise.all(branchIds.map(bid => base44.entities.MenuItem.filter({ branch_id: bid }).catch(() => [])));
+            const [menuArrays, recipeArrays, precioArrays] = await Promise.all([
+              Promise.all(branchIds.map(bid => base44.entities.MenuItem.filter({ branch_id: bid }).catch(() => []))),
+              Promise.all(branchIds.map(bid => fetchRecetas(bid).catch(() => ({})))),
+              Promise.all(branchIds.map(bid => fetchPrecios(bid).catch(() => ({})))),
+            ]);
             menus = menuArrays.flat();
+            // Merge recipes and precios from all branches
+            recipeArrays.forEach(r => Object.assign(recipes, r));
+            precioArrays.forEach(p => Object.assign(precios, p));
           }
         } catch(e) {}
 
@@ -75,6 +87,8 @@ export default function Analiticas() {
           setAllTurns(turns);
           setAllItems(items);
           setMenuItemsDb(menus);
+          setStockRecipes(recipes);
+          setStockPrecios(precios);
           setLoading(false);
         }
       } catch(err) {
@@ -154,7 +168,7 @@ export default function Analiticas() {
           <SalesEvolution periodTurns={periodTurns} period={period} allTurns={allTurns} periodStart={periodStart} />
           <IncomeDistribution periodTurns={periodTurns} periodItems={periodItems} menuItemsDb={menuItemsDb} />
           <TablePerformance periodTurns={periodTurns} period={period} periodStart={periodStart} />
-          <StarProducts periodItems={periodItems} />
+          <StarProducts periodItems={periodItems} menuItemsDb={menuItemsDb} stockRecipes={stockRecipes} stockPrecios={stockPrecios} />
           <MozoPerformance periodTurns={periodTurns} />
           <TeamAndReservations periodTurns={periodTurns} reservas={reservas} period={period} periodStart={periodStart} />
         </>
