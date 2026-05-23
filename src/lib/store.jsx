@@ -156,8 +156,8 @@ export function AppProvider({ children }) {
             precio: item.precio || 0,
             categoria: item.categoria || 'Principales',
             disponible: item.activo !== false,
+            imagen_url: item.imagen_url || null,
             modificadores: mods.filter(m => m.menu_item_id === item.id),
-          imagen_url: item.imagen_url || null,
           }));
         });
         const teamMembersDb = await base44.entities.TeamMember.filter({ restaurant_id: restaurant.id }).catch(() => []);
@@ -432,7 +432,11 @@ export function AppProvider({ children }) {
     if (s.menuItems[targetBid]) return;
     (async () => {
       try {
-        const items = await base44.entities.MenuItem.filter({ branch_id: targetBid });
+        const [items, modsRes] = await Promise.all([
+          base44.entities.MenuItem.filter({ branch_id: targetBid }),
+          supabase.from('modifier_groups').select('*').eq('branch_id', targetBid).then(r => r.data || []).catch(() => []),
+        ]);
+        const mods = modsRes || [];
         setS(p => ({
           ...p,
           menuItems: {
@@ -444,7 +448,7 @@ export function AppProvider({ children }) {
               categoria: item.categoria || 'Principales',
               disponible: item.activo !== false,
               imagen_url: item.imagen_url || null,
-              modificadores: [],
+              modificadores: mods.filter(m => m.menu_item_id === item.id),
             })),
           },
         }));
