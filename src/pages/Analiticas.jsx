@@ -9,6 +9,7 @@ import IncomeDistribution from '../components/analytics/IncomeDistribution';
 import TablePerformance from '../components/analytics/TablePerformance';
 import StarProducts from '../components/analytics/StarProducts';
 import TeamAndReservations from '../components/analytics/TeamAndReservations';
+import MozoPerformance from '../components/analytics/MozoPerformance';
 
 const PERIODS = [
   ['today','Hoy'],
@@ -154,6 +155,7 @@ export default function Analiticas() {
           <IncomeDistribution periodTurns={periodTurns} periodItems={periodItems} menuItemsDb={menuItemsDb} />
           <TablePerformance periodTurns={periodTurns} period={period} periodStart={periodStart} />
           <StarProducts periodItems={periodItems} />
+          <MozoPerformance periodTurns={periodTurns} />
           <TeamAndReservations periodTurns={periodTurns} reservas={reservas} period={period} periodStart={periodStart} />
         </>
       )}
