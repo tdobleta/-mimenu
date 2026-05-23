@@ -5,6 +5,7 @@ import EquipoTab from '../components/configuracion/EquipoTab';
 import AuditoriaTab from '../components/configuracion/AuditoriaTab';
 import PrinterSetup from '../components/printer/PrinterSetup';
 import FacturacionSetup from '../components/facturacion/FacturacionSetup';
+import TerminalTab from '../components/configuracion/TerminalTab';
 import { G, fontDisplay } from '@/lib/glass';
 
 const TABS = [
@@ -13,6 +14,7 @@ const TABS = [
   ['equipo',      'Equipo'],
   ['impresora',   'Impresora'],
   ['facturacion', 'Facturación AFIP'],
+  ['terminal',    'Terminal de pago'],
   ['auditoria',   'Auditoría'],
 ];
 
@@ -43,6 +45,7 @@ export default function Configuracion() {
         {tab === 'equipo'      && <EquipoTab />}
         {tab === 'impresora'   && <PrinterSetup />}
         {tab === 'facturacion' && <FacturacionSetup />}
+        {tab === 'terminal'    && <TerminalTab />}
         {tab === 'auditoria'   && <AuditoriaTab />}
       </div>
     </div>

@@ -1,9 +1,12 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { money } from '@/lib/fmt';
 import { useStore } from '@/lib/store';
 import { getPrinterConfig, printReceipt } from '@/lib/printer';
 import { supabase } from '@/api/supabaseClient';
 import { searchCustomers, addCustomerVisit } from '@/lib/crmApi';
+
+const MP_POLL_INTERVAL_MS = 2000;   // cada 2s
+const MP_TIMEOUT_MS       = 60000;  // 60s máximo (C2 del plan)
 
 const LAST_EMAIL_KEY = 'mimenu_last_client_email';
 
@@ -42,6 +45,127 @@ export default function CloseTableModal({ table, total, branchId, onClose, onCon
   const [puntosARedimir, setPuntosARedimir] = useState(0);
   const [crmSearching, setCrmSearching] = useState(false);
   const crmTimerRef = useRef(null);
+
+  // MP Point terminal
+  const [hasMpConfig, setHasMpConfig]   = useState(false);
+  // mpState: 'idle' | 'pending' | 'timeout' | 'success' | 'error'
+  const [mpState,    setMpState]         = useState('idle');
+  const [mpIntentId, setMpIntentId]      = useState(null);
+  const [mpError,    setMpError]         = useState('');
+  const mpPollRef   = useRef(null);   // setInterval handle
+  const mpStartRef  = useRef(null);   // Date.now() al inicio del pago
+
+  // Verificar si el restaurante tiene MP Point configurado
+  useEffect(() => {
+    const rid = store.restaurantId;
+    if (!rid) return;
+    supabase
+      .from('restaurant_settings')
+      .select('mp_access_token, mp_device_id')
+      .eq('restaurant_id', rid)
+      .maybeSingle()
+      .then(({ data }) => {
+        setHasMpConfig(!!(data?.mp_access_token && data?.mp_device_id));
+      })
+      .catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [store.restaurantId]);
+
+  // Limpiar polling al desmontar
+  useEffect(() => {
+    return () => {
+      if (mpPollRef.current) clearInterval(mpPollRef.current);
+    };
+  }, []);
+
+  // Handler de pago con terminal MP Point
+  const handleMpPoint = useCallback(async () => {
+    setMpState('pending');
+    setMpError('');
+    setMpIntentId(null);
+    mpStartRef.current = Date.now();
+
+    try {
+      // 1. Crear payment intent en el servidor
+      const { data: { session } } = await supabase.auth.getSession();
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const res = await fetch(`${supabaseUrl}/functions/v1/mp-payment-intent`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`,
+        },
+        body: JSON.stringify({
+          amount:       Math.round(totalConPropina),
+          description:  `Mesa ${table.num} — ${store.restaurante?.nombre || 'mimenú'}`,
+          turnId:       table.turnId || null,
+          restaurantId: store.restaurantId,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok || json.error) throw new Error(json.error || 'Error al iniciar el pago en la terminal');
+
+      const intentId = json.intentId;
+      setMpIntentId(intentId);
+
+      // 2. Polling del estado cada 2s, con timeout de 60s
+      mpPollRef.current = setInterval(async () => {
+        // Timeout: C2 del plan — 60s sin respuesta → UI de verificación manual
+        if (Date.now() - mpStartRef.current > MP_TIMEOUT_MS) {
+          clearInterval(mpPollRef.current);
+          setMpState('timeout');
+          return;
+        }
+
+        try {
+          const statusRes = await fetch(`${supabaseUrl}/functions/v1/mp-payment-status`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session?.access_token}`,
+            },
+            body: JSON.stringify({ intentId, restaurantId: store.restaurantId }),
+          });
+          const statusJson = await statusRes.json();
+          if (!statusRes.ok) return; // error transitorio, reintentar en próximo tick
+
+          const stateType = statusJson?.state?.type;
+
+          if (stateType === 'FINISHED') {
+            clearInterval(mpPollRef.current);
+            setMpState('success');
+            // Cerrar mesa con método "Tarjeta MP Point"
+            await onConfirmWithDiscount(
+              'Tarjeta MP Point',
+              finalTotal,
+              disc ? discAmount : 0,
+              discMotivo,
+              propinaAmount,
+              [{ metodo: 'Tarjeta MP Point', monto: totalConPropina }],
+            );
+          } else if (stateType === 'ABANDONED' || stateType === 'ERROR' || stateType === 'CANCELED') {
+            clearInterval(mpPollRef.current);
+            setMpState('error');
+            setMpError('El pago fue cancelado o rechazado. Intentá de nuevo.');
+          }
+          // OPEN / PROCESSING → seguir esperando
+        } catch { /* error de red → reintentar */ }
+      }, MP_POLL_INTERVAL_MS);
+
+    } catch (err) {
+      setMpState('error');
+      setMpError(err.message || 'No se pudo conectar con la terminal');
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [totalConPropina, finalTotal, disc, discAmount, discMotivo, propinaAmount, table, store.restaurantId, store.restaurante, onConfirmWithDiscount]);
+
+  // Cancelar flujo MP y volver a idle
+  const handleMpCancel = () => {
+    if (mpPollRef.current) clearInterval(mpPollRef.current);
+    setMpState('idle');
+    setMpIntentId(null);
+    setMpError('');
+  };
 
   const discAmount = (() => {
     if (!disc || !discVal) return 0;
@@ -230,7 +354,7 @@ export default function CloseTableModal({ table, total, branchId, onClose, onCon
 
         {/* Métodos de pago */}
         <div style={{ fontSize:10, fontWeight:700, color:'#9BA3B8', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6 }}>Método de pago</div>
-        <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginBottom:8 }}>
+        <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginBottom: hasMpConfig ? 4 : 8 }}>
           {METHODS.map(m => {
             const color = METHOD_COLOR[m];
             const isM1 = method1 === m;
@@ -261,6 +385,113 @@ export default function CloseTableModal({ table, total, branchId, onClose, onCon
             );
           })}
         </div>
+
+        {/* Botón Terminal MP Point — solo si está configurado */}
+        {hasMpConfig && mpState === 'idle' && (
+          <div style={{ marginBottom:8 }}>
+            <button
+              onClick={handleMpPoint}
+              style={{
+                width: '100%',
+                padding: '9px 14px',
+                border: '1.5px solid #009EE3',
+                borderRadius: 10,
+                background: 'rgba(0,158,227,0.07)',
+                color: '#007EB7',
+                fontSize: 13,
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+                transition: 'all .15s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background='rgba(0,158,227,0.13)'; }}
+              onMouseLeave={e => { e.currentTarget.style.background='rgba(0,158,227,0.07)'; }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="2" y="5" width="20" height="14" rx="2"/>
+                <line x1="2" y1="10" x2="22" y2="10"/>
+              </svg>
+              Cobrar con Terminal MP Point
+            </button>
+          </div>
+        )}
+
+        {/* ── Panel de pago MP Point en curso ─────────────────────────── */}
+        {mpState === 'pending' && (
+          <div style={{ background:'#EFF9FF', border:'1.5px solid #009EE3', borderRadius:12, padding:'18px 16px', marginBottom:10, textAlign:'center' }}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:10, marginBottom:10 }}>
+              {/* Spinner */}
+              <div style={{ width:20, height:20, border:'3px solid #BAE6FD', borderTopColor:'#009EE3', borderRadius:'50%', animation:'spin 0.7s linear infinite' }} />
+              <span style={{ fontSize:14, fontWeight:700, color:'#007EB7' }}>Esperando pago en la terminal…</span>
+            </div>
+            <p style={{ fontSize:12, color:'#0369A1', margin:'0 0 12px', lineHeight:'18px' }}>
+              El monto <strong>{money(totalConPropina)}</strong> fue enviado a la terminal.
+              Pedile al cliente que acerque o inserte su tarjeta.
+            </p>
+            <button
+              onClick={handleMpCancel}
+              style={{ padding:'6px 16px', border:'1px solid #BAE6FD', borderRadius:8, background:'white', color:'#0369A1', fontSize:12, fontWeight:600, cursor:'pointer' }}
+            >
+              Cancelar — usar otro método
+            </button>
+          </div>
+        )}
+
+        {/* ── Timeout: verificación manual (C2 del plan) ──────────────── */}
+        {mpState === 'timeout' && (
+          <div style={{ background:'#FEF3C7', border:'1.5px solid #F59E0B', borderRadius:12, padding:'16px', marginBottom:10 }}>
+            <div style={{ fontWeight:700, color:'#92400E', fontSize:14, marginBottom:8 }}>
+              ⚠ Sin confirmación (60s)
+            </div>
+            <p style={{ fontSize:12, color:'#78350F', margin:'0 0 12px', lineHeight:'18px' }}>
+              Verificá el recibo impreso de la terminal.<br/>
+              Si el pago fue aprobado, cerrá la mesa manualmente.
+            </p>
+            <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+              <button
+                onClick={async () => {
+                  setMpState('idle');
+                  await onConfirmWithDiscount(
+                    'Tarjeta MP Point',
+                    finalTotal,
+                    disc ? discAmount : 0,
+                    discMotivo,
+                    propinaAmount,
+                    [{ metodo: 'Tarjeta MP Point', monto: totalConPropina }],
+                  );
+                }}
+                style={{ flex:1, padding:'8px 0', borderRadius:8, border:'none', background:'#D97706', color:'white', fontWeight:700, fontSize:12, cursor:'pointer' }}
+              >
+                ✓ Pago aprobado — Cerrar mesa
+              </button>
+              <button
+                onClick={handleMpCancel}
+                style={{ flex:1, padding:'8px 0', borderRadius:8, border:'1px solid #F59E0B', background:'white', color:'#92400E', fontWeight:600, fontSize:12, cursor:'pointer' }}
+              >
+                ✗ No se procesó — Cancelar
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Error de terminal ─────────────────────────────────────── */}
+        {mpState === 'error' && (
+          <div style={{ background:'rgba(239,68,68,0.07)', border:'1px solid rgba(239,68,68,0.3)', borderRadius:10, padding:'12px 14px', marginBottom:10 }}>
+            <div style={{ fontSize:13, fontWeight:700, color:'#EF4444', marginBottom:6 }}>
+              Error en la terminal MP
+            </div>
+            <p style={{ fontSize:12, color:'#7F1D1D', margin:'0 0 10px', lineHeight:'18px' }}>{mpError}</p>
+            <button
+              onClick={handleMpCancel}
+              style={{ padding:'6px 14px', borderRadius:8, border:'1px solid rgba(239,68,68,0.3)', background:'white', color:'#EF4444', fontSize:12, fontWeight:600, cursor:'pointer' }}
+            >
+              Volver a intentar
+            </button>
+          </div>
+        )}
 
         {/* Pago mixto */}
         {mixMode && (
@@ -445,8 +676,16 @@ export default function CloseTableModal({ table, total, branchId, onClose, onCon
           <button onClick={onClose} style={{ flex:1, padding:'9px 0', border:'1px solid #E2E8F0', borderRadius:12, fontSize:13, color:'#374151', background:'#FFFFFF', cursor:'pointer' }}>
             Cancelar
           </button>
-          <button disabled={!montosCuadran || printing} onClick={handleConfirm}
-            style={{ flex:2, padding:'9px 0', border:'none', borderRadius:12, fontSize:13, fontWeight:700, color:'white', background:'#1D9E75', cursor: (!montosCuadran || printing) ? 'not-allowed' : 'pointer', opacity: (!montosCuadran || printing) ? 0.5 : 1, boxShadow:'0 4px 14px rgba(29,158,117,0.28)' }}>
+          <button
+            disabled={!montosCuadran || printing || mpState === 'pending'}
+            onClick={handleConfirm}
+            style={{
+              flex:2, padding:'9px 0', border:'none', borderRadius:12, fontSize:13, fontWeight:700, color:'white',
+              background: mpState === 'pending' ? '#9CA3AF' : '#1D9E75',
+              cursor: (!montosCuadran || printing || mpState === 'pending') ? 'not-allowed' : 'pointer',
+              opacity: (!montosCuadran || printing || mpState === 'pending') ? 0.5 : 1,
+              boxShadow: mpState !== 'pending' ? '0 4px 14px rgba(29,158,117,0.28)' : 'none',
+            }}>
             {printing ? 'Imprimiendo...' : 'Confirmar y cerrar mesa'}
           </button>
         </div>
