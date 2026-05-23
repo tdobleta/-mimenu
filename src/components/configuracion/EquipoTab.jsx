@@ -69,7 +69,8 @@ export default function EquipoTab() {
 
   async function handleDelete(member) {
     try {
-      await base44.entities.TeamMember.delete(member.id);
+      const { error } = await supabase.from('team_members').delete().eq('id', member.id);
+      if (error) throw error;
       removeTeamMember(member.id);
       addToast('Miembro eliminado', 'info');
     } catch(err) {
