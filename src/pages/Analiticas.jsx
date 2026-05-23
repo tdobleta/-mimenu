@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useStore } from '@/lib/store';
 import { base44 } from '@/api/base44Client';
 import { Link } from 'react-router-dom';
+import { exportTurnsCSV } from '@/lib/export';
 import AnalyticsSummary from '../components/analytics/AnalyticsSummary';
 import SalesEvolution from '../components/analytics/SalesEvolution';
 import IncomeDistribution from '../components/analytics/IncomeDistribution';
@@ -113,13 +114,22 @@ export default function Analiticas() {
     <div style={{ display:'flex', flexDirection:'column', gap:24 }}>
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:12 }}>
         <h1 style={{ fontSize:20, fontWeight:700, color:'#0F172A', margin:0, fontFamily:"'DM Sans',system-ui,sans-serif", letterSpacing:'-0.01em' }}>Analíticas</h1>
-        <div style={{ display:'flex', gap:4 }}>
+        <div style={{ display:'flex', gap:4, alignItems:'center' }}>
           {PERIODS.map(([k,l])=>(
             <button key={k} onClick={()=>setPeriod(k)}
               style={{ padding:'6px 14px', borderRadius:10, fontSize:12, fontWeight:600, cursor:'pointer', background:period===k?'#1D9E75':'#FFFFFF', color:period===k?'white':'#64748B', border:period===k?'none':'1px solid #E2E8F0', boxShadow:period===k?'0 4px 12px rgba(29,158,117,0.25)':'none' }}>
               {l}
             </button>
           ))}
+          {periodTurns.length > 0 && (
+            <button
+              onClick={() => exportTurnsCSV(periodTurns, `ventas-${period}-${new Date().toISOString().slice(0,10)}.csv`)}
+              title="Exportar a Excel/CSV"
+              style={{ marginLeft:8, padding:'6px 12px', borderRadius:10, fontSize:12, fontWeight:600, cursor:'pointer', background:'#FFFFFF', color:'#64748B', border:'1px solid #E2E8F0', display:'flex', alignItems:'center', gap:5 }}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              CSV
+            </button>
+          )}
         </div>
       </div>
 

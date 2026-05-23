@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useStore } from '@/lib/store';
 import { money } from '@/lib/fmt';
+import { exportTurnsCSV } from '@/lib/export';
 
 const TIPO_LABEL = { manana:'Mañana', tarde:'Tarde', noche:'Noche', general:'General' };
 const FILTROS = [
@@ -36,6 +37,16 @@ export default function ShiftHistory() {
   const [shifts, setShifts] = useState(null);
   const [expanded, setExpanded] = useState(null);
   const [filtroTipo, setFiltroTipo] = useState('todos');
+
+  function handleExport() {
+    // Usar los turnos cerrados del store, filtrados por los shifts visibles
+    const shiftIds = new Set((filtered || []).map(s => s.id));
+    const turns = (store.closedTurns || []).filter(t => shiftIds.has(t.caja_shift_id));
+    // Si no hay turns por caja_shift_id, exportar todos los cerrados del branch
+    const toExport = turns.length > 0 ? turns : (store.closedTurns || []);
+    const label = filtroTipo === 'todos' ? 'historial' : filtroTipo;
+    exportTurnsCSV(toExport, `caja-${label}-${new Date().toISOString().slice(0,10)}.csv`);
+  }
 
   useEffect(() => {
     async function load() {
@@ -82,19 +93,29 @@ export default function ShiftHistory() {
 
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:18 }}>
-      {/* Filtros */}
-      <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
-        {FILTROS.map(f => (
-          <button key={f.key} onClick={()=>setFiltroTipo(f.key)}
-            style={{
-              padding:'6px 14px', fontSize:12, fontWeight:500, borderRadius:99, cursor:'pointer',
-              border: filtroTipo===f.key ? 'none' : '1px solid #E2E8F0',
-              background: filtroTipo===f.key ? '#1D9E75' : '#FFFFFF',
-              color: filtroTipo===f.key ? 'white' : '#374151',
-            }}>
-            {f.label}
+      {/* Filtros + Export */}
+      <div style={{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'center', justifyContent:'space-between' }}>
+        <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+          {FILTROS.map(f => (
+            <button key={f.key} onClick={()=>setFiltroTipo(f.key)}
+              style={{
+                padding:'6px 14px', fontSize:12, fontWeight:500, borderRadius:99, cursor:'pointer',
+                border: filtroTipo===f.key ? 'none' : '1px solid #E2E8F0',
+                background: filtroTipo===f.key ? '#1D9E75' : '#FFFFFF',
+                color: filtroTipo===f.key ? 'white' : '#374151',
+              }}>
+              {f.label}
+            </button>
+          ))}
+        </div>
+        {(filtered || []).length > 0 && (
+          <button onClick={handleExport}
+            title="Exportar ventas a Excel/CSV"
+            style={{ padding:'6px 12px', borderRadius:10, fontSize:12, fontWeight:600, cursor:'pointer', background:'#FFFFFF', color:'#64748B', border:'1px solid #E2E8F0', display:'flex', alignItems:'center', gap:5 }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Exportar CSV
           </button>
-        ))}
+        )}
       </div>
 
       {grouped.length === 0 ? (
