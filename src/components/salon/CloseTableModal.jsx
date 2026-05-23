@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { money } from '@/lib/fmt';
 import { useStore } from '@/lib/store';
 import { getPrinterConfig, printReceipt } from '@/lib/printer';
 import { supabase } from '@/api/supabaseClient';
+import { searchCustomers, addCustomerVisit } from '@/lib/crmApi';
 
 const LAST_EMAIL_KEY = 'mimenu_last_client_email';
 
@@ -34,14 +35,46 @@ export default function CloseTableModal({ table, total, branchId, onClose, onCon
   const [clientEmail, setClientEmail] = useState(() => localStorage.getItem(LAST_EMAIL_KEY) || '');
   const [sendingEmail, setSendingEmail] = useState(false);
 
+  // CRM — identificación de cliente y puntos
+  const [clienteQ, setClienteQ] = useState('');
+  const [clienteResults, setClienteResults] = useState([]);
+  const [cliente, setCliente] = useState(null);       // cliente seleccionado
+  const [puntosARedimir, setPuntosARedimir] = useState(0);
+  const [crmSearching, setCrmSearching] = useState(false);
+  const crmTimerRef = useRef(null);
+
   const discAmount = (() => {
     if (!disc || !discVal) return 0;
     const v = parseFloat(discVal) || 0;
     return discType === '%' ? Math.round(total * v / 100) : Math.min(v, total);
   })();
   const propinaAmount = parseFloat(propina) || 0;
-  const finalTotal = total - discAmount;
+  // Points discount: 1 punto = $1 de descuento
+  const descuentoPuntos = puntosARedimir;
+  const finalTotal = Math.max(0, total - discAmount - descuentoPuntos);
   const totalConPropina = finalTotal + propinaAmount;
+
+  // Búsqueda de cliente con debounce
+  useEffect(() => {
+    clearTimeout(crmTimerRef.current);
+    if (!clienteQ.trim() || clienteQ.trim().length < 2) {
+      setClienteResults([]);
+      return;
+    }
+    setCrmSearching(true);
+    crmTimerRef.current = setTimeout(async () => {
+      try {
+        const restaurantId = store.restaurantId;
+        if (restaurantId) {
+          const results = await searchCustomers(restaurantId, clienteQ);
+          setClienteResults(results);
+        }
+      } catch { /* ignore */ }
+      finally { setCrmSearching(false); }
+    }, 350);
+    return () => clearTimeout(crmTimerRef.current);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clienteQ]);
 
   const suma = (Number(amount1)||0) + (Number(amount2)||0);
   const montosCuadran = !mixMode || suma === totalConPropina;
@@ -109,6 +142,12 @@ export default function CloseTableModal({ table, total, branchId, onClose, onCon
           restaurantPhone: store.restaurante?.telefono || '',
         },
       }).catch(() => {}).finally(() => setSendingEmail(false));
+    }
+
+    // Registrar visita de cliente (fire-and-forget — no bloquea el cierre)
+    if (cliente && store.restaurantId) {
+      addCustomerVisit(store.restaurantId, cliente.id, table.turnId || null, finalTotal, puntosARedimir)
+        .catch(() => {}); // non-blocking
     }
 
     if (store.refreshCharts && branchId) store.refreshCharts(branchId);
@@ -259,6 +298,12 @@ export default function CloseTableModal({ table, total, branchId, onClose, onCon
               <span>−{money(discAmount)}</span>
             </div>
           )}
+          {descuentoPuntos > 0 && (
+            <div style={{ display:'flex', justifyContent:'space-between', fontSize:13, color:'#1D9E75' }}>
+              <span>Descuento puntos ({puntosARedimir} pts)</span>
+              <span>−{money(descuentoPuntos)}</span>
+            </div>
+          )}
           {propinaAmount > 0 && (
             <div style={{ display:'flex', justifyContent:'space-between', fontSize:13, color:'#EF9F27' }}>
               <span>Propina</span><span>+{money(propinaAmount)}</span>
@@ -275,6 +320,101 @@ export default function CloseTableModal({ table, total, branchId, onClose, onCon
             {printError}
           </div>
         )}
+
+        {/* CRM — identificación de cliente */}
+        <div style={{ marginBottom:12 }}>
+          <div style={{ fontSize:11, fontWeight:600, color:'#6B7280', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:5 }}>
+            ¿El cliente tiene cuenta? <span style={{ fontWeight:400, color:'#9CA3AF' }}>(opcional)</span>
+          </div>
+
+          {cliente ? (
+            // Cliente seleccionado
+            <div style={{ background:'rgba(29,158,117,0.07)', border:'1px solid rgba(29,158,117,0.25)', borderRadius:9, padding:'8px 12px' }}>
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:8 }}>
+                <div>
+                  <span style={{ fontSize:13, fontWeight:700, color:'#111827' }}>{cliente.nombre}</span>
+                  {cliente.telefono && <span style={{ fontSize:11, color:'#6B7280', marginLeft:8 }}>{cliente.telefono}</span>}
+                  <div style={{ fontSize:11, color:'#1D9E75', fontWeight:600, marginTop:2 }}>
+                    {cliente.puntos > 0
+                      ? `★ ${cliente.puntos} puntos disponibles`
+                      : 'Sin puntos acumulados aún'}
+                  </div>
+                </div>
+                <button onClick={() => { setCliente(null); setPuntosARedimir(0); setClienteQ(''); }}
+                  style={{ background:'none', border:'none', cursor:'pointer', color:'#9CA3AF', padding:4 }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+              </div>
+
+              {/* Canje de puntos — solo si tiene puntos suficientes */}
+              {cliente.puntos >= 100 && (
+                <div style={{ marginTop:8, borderTop:'1px solid rgba(29,158,117,0.15)', paddingTop:8 }}>
+                  <div style={{ fontSize:11, color:'#374151', marginBottom:5 }}>
+                    Canjear puntos (100 pts = $100 de descuento):
+                  </div>
+                  <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+                    {[0, 100, 200, 500].filter(v => v <= cliente.puntos).map(v => (
+                      <button key={v} onClick={() => setPuntosARedimir(v)}
+                        style={{
+                          padding:'4px 12px', borderRadius:99, fontSize:11, fontWeight:700, cursor:'pointer', transition:'all .12s',
+                          background: puntosARedimir === v ? '#1D9E75' : '#F1F5F9',
+                          color: puntosARedimir === v ? '#FFF' : '#374151',
+                          border: puntosARedimir === v ? 'none' : '1px solid #E2E8F0',
+                        }}>
+                        {v === 0 ? 'Sin canje' : `${v} pts (-${money(v)})`}
+                      </button>
+                    ))}
+                    {/* Canje personalizado si tiene más de 500 */}
+                    {cliente.puntos > 500 && puntosARedimir > 500 && (
+                      <span style={{ fontSize:11, color:'#1D9E75', fontWeight:600, alignSelf:'center' }}>
+                        {puntosARedimir} pts (-{money(puntosARedimir)})
+                      </span>
+                    )}
+                  </div>
+                  {puntosARedimir > 0 && (
+                    <div style={{ marginTop:5, fontSize:11, color:'#1D9E75', fontWeight:600 }}>
+                      ✓ Descuento aplicado: -{money(puntosARedimir)}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          ) : (
+            // Búsqueda de cliente
+            <div style={{ position:'relative' }}>
+              <input
+                value={clienteQ}
+                onChange={e => setClienteQ(e.target.value)}
+                placeholder="Buscar por nombre o teléfono..."
+                style={{ width:'100%', padding:'8px 10px', border:'1px solid #E2E8F0', borderRadius:8, fontSize:13, outline:'none', boxSizing:'border-box' }}
+              />
+              {crmSearching && (
+                <div style={{ position:'absolute', right:10, top:'50%', transform:'translateY(-50%)', width:14, height:14, border:'2px solid #E2E8F0', borderTopColor:'#1D9E75', borderRadius:'50%', animation:'spin 0.7s linear infinite' }} />
+              )}
+              {clienteResults.length > 0 && (
+                <div style={{ position:'absolute', top:'100%', left:0, right:0, zIndex:10, background:'#FFF', border:'1px solid #E2E8F0', borderRadius:8, boxShadow:'0 4px 12px rgba(0,0,0,0.10)', marginTop:2, overflow:'hidden' }}>
+                  {clienteResults.map(c => (
+                    <button key={c.id}
+                      onClick={() => { setCliente(c); setClienteQ(''); setClienteResults([]); }}
+                      style={{ display:'flex', alignItems:'center', justifyContent:'space-between', width:'100%', padding:'9px 12px', background:'none', border:'none', cursor:'pointer', textAlign:'left', borderBottom:'1px solid #F1F5F9' }}
+                      onMouseEnter={e => e.currentTarget.style.background='#F8FAFC'}
+                      onMouseLeave={e => e.currentTarget.style.background='none'}>
+                      <div>
+                        <div style={{ fontSize:13, fontWeight:600, color:'#111827' }}>{c.nombre}</div>
+                        <div style={{ fontSize:11, color:'#6B7280' }}>{c.telefono || c.email || ''}</div>
+                      </div>
+                      {c.puntos > 0 && (
+                        <span style={{ fontSize:10, fontWeight:700, background:'rgba(29,158,117,0.10)', color:'#1D9E75', padding:'2px 7px', borderRadius:99, flexShrink:0 }}>
+                          {c.puntos} pts
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
 
         {/* Email de recibo — opcional */}
         <div style={{ marginBottom:12 }}>
