@@ -459,6 +459,16 @@ export function AppProvider({ children }) {
   const closeTable = (bid, tid) => setS(p => ({
     ...p, tables: { ...p.tables, [bid]: p.tables[bid].map(t => t.id === tid ? { ...t, status:'libre', openedAt:null, order:[], mozo:null, turnId:null } : t) }
   }));
+  // Cobro offline: marca la mesa como "pendiente de sincronización" (amber).
+  // La mesa sigue visible pero no operable hasta que drainQueue la cierre en DB.
+  const closeTableOffline = (bid, tid, cobroData) => setS(p => ({
+    ...p, tables: {
+      ...p.tables,
+      [bid]: (p.tables[bid] || []).map(t =>
+        t.id === tid ? { ...t, status: 'pendiente_cobro', cobroOffline: cobroData } : t
+      ),
+    },
+  }));
   const openTableWithTurn = (bid, tid, turnId, mozo, openedAt) => setS(p => ({
     ...p, tables: { ...p.tables, [bid]: p.tables[bid].map(t => t.id === tid ? { ...t, status:'ocupada', openedAt: openedAt || Date.now(), order:[], mozo: mozo || t.mozo, turnId } : t) }
   }));
@@ -880,7 +890,7 @@ export function AppProvider({ children }) {
 
   const ctx = {
     ...s, setBranchId, updateRestaurante,
-    openTable, closeTable, openTableWithTurn, setTableTurnId, setTableComandaLista, setOrderItemTurnItemId, setOrderItemTurnItemIdByUid,
+    openTable, closeTable, closeTableOffline, openTableWithTurn, setTableTurnId, setTableComandaLista, setOrderItemTurnItemId, setOrderItemTurnItemIdByUid,
     updateTableOrder, saveLayout,
     addReservation, updateReservation,
     addStockItem, updateStockItem, deleteStockItem,

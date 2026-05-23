@@ -178,7 +178,27 @@ export default function Salon() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [displayBranch]);
 
+  // Listener para cobros offline que se sincronizaron al reconectar.
+  // drainQueue dispara 'mimenu-table-synced' cuando CLOSE_TABLE se procesa exitosamente.
+  useEffect(() => {
+    const handler = (e) => {
+      const { branchId: bid, tableId } = e.detail || {};
+      if (!bid || !tableId) return;
+      const s = storeRef.current;
+      s.closeTable(bid, tableId);
+      addToast('Cobro offline sincronizado con el servidor.', 'success');
+    };
+    window.addEventListener('mimenu-table-synced', handler);
+    return () => window.removeEventListener('mimenu-table-synced', handler);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   function handleClick(table) {
+    // Mesa con cobro offline pendiente → no operable hasta que sincronice
+    if (table.status === 'pendiente_cobro') {
+      addToast('Mesa pendiente de sincronización — reconectate a internet para confirmar el cobro.', 'info');
+      return;
+    }
     if (table.status === 'libre') {
       if (abriendo) return;
       setAbriendo(table.id);

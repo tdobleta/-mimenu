@@ -2,10 +2,12 @@ import { elapsedMin, fmtTableTime, tableTotal, money } from '@/lib/fmt';
 import { G } from '@/lib/glass';
 
 const S = {
-  libre:    { bg:'rgba(255,255,255,0.6)', border:'rgba(209,213,219,0.8)', numColor:'#9CA3AF', dot:null,    shadow:'none' },
-  ocupada:  { bg:'rgba(29,158,117,0.10)', border:G.teal,                  numColor:G.teal,   dot:G.teal,  shadow:'0 4px 16px rgba(29,158,117,0.18)' },
-  demorada: { bg:'rgba(226,75,74,0.09)',  border:G.red,                   numColor:G.red,    dot:G.red,   shadow:'0 4px 16px rgba(226,75,74,0.18)' },
-  reservada:{ bg:'rgba(55,138,221,0.09)', border:G.blue,                  numColor:G.blue,   dot:G.blue,  shadow:'0 4px 16px rgba(55,138,221,0.18)' },
+  libre:           { bg:'rgba(255,255,255,0.6)', border:'rgba(209,213,219,0.8)', numColor:'#9CA3AF', dot:null,      shadow:'none' },
+  ocupada:         { bg:'rgba(29,158,117,0.10)', border:G.teal,                  numColor:G.teal,   dot:G.teal,    shadow:'0 4px 16px rgba(29,158,117,0.18)' },
+  demorada:        { bg:'rgba(226,75,74,0.09)',  border:G.red,                   numColor:G.red,    dot:G.red,     shadow:'0 4px 16px rgba(226,75,74,0.18)' },
+  reservada:       { bg:'rgba(55,138,221,0.09)', border:G.blue,                  numColor:G.blue,   dot:G.blue,    shadow:'0 4px 16px rgba(55,138,221,0.18)' },
+  // Cobro registrado sin internet — esperando sincronización con el servidor
+  pendiente_cobro: { bg:'rgba(245,158,11,0.10)', border:'#F59E0B',               numColor:'#D97706', dot:'#F59E0B', shadow:'0 4px 16px rgba(245,158,11,0.18)' },
 };
 
 export default function TableCard({ table, isSelected, onClick, onComandaListaClick, loading = false }) {
@@ -13,6 +15,7 @@ export default function TableCard({ table, isSelected, onClick, onComandaListaCl
   const elapsed = table.openedAt ? elapsedMin(table.openedAt) : 0;
   const total   = tableTotal(table.order);
   const showYellow = table.comandaLista && table.status === 'ocupada';
+  const isPendiente = table.status === 'pendiente_cobro';
   const ocupada = table.status !== 'libre';
 
   return (
@@ -44,8 +47,19 @@ export default function TableCard({ table, isSelected, onClick, onComandaListaCl
         </div>
 
         {/* Dot estado */}
-        {s.dot && !showYellow && (
+        {s.dot && !showYellow && !isPendiente && (
           <span style={{ width:9, height:9, borderRadius:'50%', background:s.dot, boxShadow:`0 0 6px ${s.dot}60`, marginTop:4 }} />
+        )}
+
+        {/* Badge "↑ sync" — cobro offline pendiente de sincronización */}
+        {isPendiente && (
+          <span style={{
+            fontSize:9, fontWeight:700, color:'#D97706',
+            background:'rgba(245,158,11,0.15)', border:'1px solid rgba(245,158,11,0.4)',
+            borderRadius:4, padding:'2px 5px', letterSpacing:'0.04em',
+          }}>
+            ↑ sync
+          </span>
         )}
 
         {/* Dot amarillo comanda lista */}

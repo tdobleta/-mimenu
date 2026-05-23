@@ -148,6 +148,33 @@ async function processOperation(op) {
       break;
     }
 
+    case 'CLOSE_TABLE': {
+      // Cobro diferido: el mozo cobró sin internet.
+      // Ahora que hay conexión, ejecutamos el RPC atómico cerrar_mesa_atomico.
+      const { error: rpcError } = await supabase.rpc('cerrar_mesa_atomico', {
+        p_turn_id:       op.turnId,
+        p_total:         op.total,
+        p_propina:       op.propina || 0,
+        p_metodo:        op.metodo,
+        p_mozo:          op.mozo || '',
+        p_caja_shift_id: op.cajaShiftId || null,
+        p_pagos_detalle: op.pagosDetalle || null,
+      });
+      if (rpcError) {
+        const msgLower = rpcError.message?.toLowerCase() || '';
+        // Idempotencia: si ya fue cerrado (por el polling de Salon.jsx p.e.) → ok silencioso
+        if (msgLower.includes('ya cerrado') || rpcError.code === 'P0001') break;
+        throw rpcError;
+      }
+      // Notificar a Salon.jsx para que limpie el estado pendiente_cobro → libre
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('mimenu-table-synced', {
+          detail: { branchId: op.branchId, tableId: op.tableId },
+        }));
+      }
+      break;
+    }
+
     case 'KITCHEN_STATE_CHANGE': {
       const updateData = {};
       if (op.cocina_estado !== undefined) updateData.cocina_estado = op.cocina_estado;

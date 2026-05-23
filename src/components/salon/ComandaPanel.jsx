@@ -3,6 +3,7 @@ import { useStore } from '@/lib/store';
 import { money, elapsedMin, fmtTableTime, tableTotal } from '@/lib/fmt';
 import CloseTableModal from './CloseTableModal';
 import { dbAddTurnItem, dbUpdateTurnItem, dbSaveNota, dbLoadTurnItems } from '@/lib/posApi';
+import { enqueue } from '@/lib/offlineQueue';
 import { supabase } from '@/api/supabaseClient';
 import { base44 } from '@/api/base44Client';
 import { getPrinterConfig, printComanda } from '@/lib/printer';
@@ -461,10 +462,31 @@ export default function ComandaPanel({ table, branchId, onClose, addToast }) {
             if (cerrando) return;
             setCerrando(true);
             if (!store.turnoActivo) { addToast('No hay turno de caja abierto. Abrí la caja antes de cerrar mesas.', 'error'); setCerrando(false); return; }
-            // Guard offline: el RPC cerrar_mesa_atomico requiere internet
+            // Guard offline: si no hay internet, guardar en queue y marcar mesa como "pendiente"
             if (!navigator.onLine) {
-              addToast('Sin conexión — no se puede cobrar hasta reconectar. Anotá el total manualmente.', 'error');
-              setCerrando(false);
+              try {
+                await enqueue({
+                  type:         'CLOSE_TABLE',
+                  turnId:       table.turnId,
+                  tableId:      table.id,
+                  branchId,
+                  total:        finalTotal,
+                  propina:      propinaAmount || 0,
+                  metodo:       method,
+                  mozo:         table.mozo || '',
+                  cajaShiftId:  store.turnoActivo?.id || null,
+                  pagosDetalle: pagos?.length > 0 ? pagos : null,
+                });
+                store.closeTableOffline(branchId, table.id, { method, finalTotal, pagos });
+                addToast(`Mesa ${table.num} cobrada offline · ${money(finalTotal)} · Se sincronizará al reconectar.`, 'warning');
+                setShowClose(false);
+                onClose();
+              } catch(qErr) {
+                console.error('[offline cobro]', qErr);
+                addToast('Sin conexión y no se pudo guardar. Anotá el total manualmente.', 'error');
+              } finally {
+                setCerrando(false);
+              }
               return;
             }
             // La verificación de doble cierre se hace dentro de cerrar_mesa_atomico con FOR UPDATE lock
