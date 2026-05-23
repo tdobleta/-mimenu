@@ -2,6 +2,9 @@ import { useState } from 'react';
 import { money } from '@/lib/fmt';
 import { useStore } from '@/lib/store';
 import { getPrinterConfig, printReceipt } from '@/lib/printer';
+import { supabase } from '@/api/supabaseClient';
+
+const LAST_EMAIL_KEY = 'mimenu_last_client_email';
 
 const METHODS = ['Efectivo','Tarjeta','MercadoPago','Transferencia'];
 const METHOD_COLOR = { 'Efectivo':'#1D9E75','Tarjeta':'#7F77DD','MercadoPago':'#EF9F27','Transferencia':'#378ADD' };
@@ -28,6 +31,8 @@ export default function CloseTableModal({ table, total, branchId, onClose, onCon
   const [propina, setPropina] = useState('');
   const [printing, setPrinting] = useState(false);
   const [printError, setPrintError] = useState('');
+  const [clientEmail, setClientEmail] = useState(() => localStorage.getItem(LAST_EMAIL_KEY) || '');
+  const [sendingEmail, setSendingEmail] = useState(false);
 
   const discAmount = (() => {
     if (!disc || !discVal) return 0;
@@ -76,6 +81,34 @@ export default function CloseTableModal({ table, total, branchId, onClose, onCon
         setPrintError('Mesa cerrada pero no se pudo imprimir: ' + e.message);
       }
       setPrinting(false);
+    }
+
+    // Enviar recibo por email (fire-and-forget — no bloquea el cierre)
+    if (clientEmail && clientEmail.includes('@')) {
+      localStorage.setItem(LAST_EMAIL_KEY, clientEmail);
+      setSendingEmail(true);
+      supabase.functions.invoke('send-receipt', {
+        body: {
+          email: clientEmail,
+          turn: {
+            mesa_num: table.num,
+            mozo: table.mozo || '',
+            metodo_pago: finalMethod,
+            total_facturado: totalConPropina,
+            propina: propinaAmount,
+            descuento: disc ? discAmount : 0,
+            closed_at: new Date().toISOString(),
+          },
+          items: (table.order || []).map(it => ({
+            menu_item_name: it.nombre,
+            cantidad: it.qty || it.cantidad || 1,
+            precio: it.precio,
+            notas: it.nota || it.notas || '',
+          })),
+          restaurantName: store.restaurante?.nombre || 'Restaurante',
+          restaurantPhone: store.restaurante?.telefono || '',
+        },
+      }).catch(() => {}).finally(() => setSendingEmail(false));
     }
 
     if (store.refreshCharts && branchId) store.refreshCharts(branchId);
@@ -242,6 +275,30 @@ export default function CloseTableModal({ table, total, branchId, onClose, onCon
             {printError}
           </div>
         )}
+
+        {/* Email de recibo — opcional */}
+        <div style={{ marginBottom:12 }}>
+          <div style={{ fontSize:11, fontWeight:600, color:'#6B7280', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:5 }}>
+            Enviar recibo por email <span style={{ fontWeight:400, color:'#9CA3AF' }}>(opcional)</span>
+          </div>
+          <div style={{ position:'relative' }}>
+            <input
+              type="email"
+              value={clientEmail}
+              onChange={e => setClientEmail(e.target.value)}
+              placeholder="cliente@email.com"
+              style={{ width:'100%', padding:'8px 34px 8px 10px', border:'1px solid #E2E8F0', borderRadius:8, fontSize:13, color:'#111827', background:'#FFFFFF', outline:'none', boxSizing:'border-box' }}
+            />
+            {clientEmail && clientEmail.includes('@') && (
+              <span style={{ position:'absolute', right:10, top:'50%', transform:'translateY(-50%)', fontSize:14 }}>
+                {sendingEmail ? '⏳' : '✉️'}
+              </span>
+            )}
+          </div>
+          {clientEmail && !clientEmail.includes('@') && (
+            <div style={{ fontSize:11, color:'#EF4444', marginTop:3 }}>Email inválido</div>
+          )}
+        </div>
 
         {/* Botones */}
         <div style={{ display:'flex', gap:8 }}>
