@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { getAfipConfig, saveAfipConfig, DEFAULT_AFIP_CONFIG, testAfipConexion, CONDICION_IVA_EMISOR } from '@/lib/afip';
 import { G, glass, glassDeep, glassLight, labelStyle, fontDisplay } from '@/lib/glass';
+import { supabase } from '@/api/supabaseClient';
 
 function Field({ label, children, hint }) {
   return (
@@ -39,11 +40,52 @@ export default function FacturacionSetup() {
   const [testResult, setTestResult] = useState(null); // null | 'ok' | 'error'
   const [testMsg, setTestMsg] = useState('');
   const [saved, setSaved] = useState(false);
+  const [restaurantId, setRestaurantId] = useState(null);
+
+  // Al montar, leer config de DB (fuente de verdad) y mergear con localStorage
+  useEffect(() => {
+    async function loadFromDb() {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        // Obtener restaurant_id del usuario actual
+        const { data: rest } = await supabase
+          .from('restaurants').select('id').eq('owner_id', user.id).single();
+        if (!rest?.id) return;
+        setRestaurantId(rest.id);
+        // Leer config AFIP de restaurant_settings
+        const { data: settings } = await supabase
+          .from('restaurant_settings').select('afip_config')
+          .eq('restaurant_id', rest.id).single();
+        if (settings?.afip_config) {
+          const dbCfg = { ...DEFAULT_AFIP_CONFIG, ...settings.afip_config };
+          setCfg(dbCfg);
+          // Actualizar localStorage como caché
+          saveAfipConfig(dbCfg);
+        }
+      } catch {
+        // Silencioso: usar lo que ya está en localStorage
+      }
+    }
+    loadFromDb();
+  }, []);
 
   function set(key, val) { setCfg(prev => ({ ...prev, [key]: val })); setSaved(false); setTestResult(null); }
 
-  function handleSave() {
+  async function handleSave() {
+    // 1. Guardar en localStorage (carga instantánea en próxima sesión del mismo device)
     saveAfipConfig(cfg);
+    // 2. Persistir en DB para que sobreviva browser clears y otros dispositivos
+    if (restaurantId) {
+      try {
+        await supabase.from('restaurant_settings').upsert({
+          restaurant_id: restaurantId,
+          afip_config:   cfg,
+        }, { onConflict: 'restaurant_id' });
+      } catch {
+        // Silencioso: localStorage ya tiene los datos, la emisión seguirá funcionando
+      }
+    }
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   }
