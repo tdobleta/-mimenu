@@ -13,7 +13,6 @@ import { G, glass, glassLight, fontDisplay } from '@/lib/glass';
 import FacturaModal from '../facturacion/FacturaModal';
 import { getAfipConfig } from '@/lib/afip';
 import { MENU_CATEGORIES, DEFAULT_CATEGORY, getCategoryColor } from '@/lib/menuCategories';
-import { descontarStockPorMesa } from '@/lib/stockApi';
 import { cerrarMesaOnline } from '@/lib/cajaService';
 import { localRelay } from '@/lib/localRelay';
 import { getActiveStaff, touchActiveStaff } from '@/lib/useActiveStaff';

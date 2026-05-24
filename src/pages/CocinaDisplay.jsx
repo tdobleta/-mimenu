@@ -8,19 +8,62 @@ import { subscribeToTurns, subscribeToTurnItems, registerActiveTurns } from '@/l
 import { localRelay } from '@/lib/localRelay';
 import { useToast } from '@/lib/toast';
 
-// ── Helper: actualizar estado via Edge Function cocina-update (usa service_role, bypasea RLS)
-// Funciona tanto para sesiones autenticadas como para el display público sin auth.
-// La anon key es suficiente para invocar la Edge Function; ella valida turn_id+branch_id internamente.
+// ── Device token para autenticación en cocina-update ─────────────────────
+// El display de cocina usa un token de dispositivo (hex 64 chars) en lugar de la anon key.
+// Ventaja: el anon key es público (está en el bundle JS); el device token es único por dispositivo
+// y se puede revocar desde Configuración → Cocina sin afectar otros dispositivos.
+//
+// Flujo de setup:
+//   1. Dueño va a Configuración → Cocina → "Nuevo dispositivo" → copia URL con token
+//   2. Abre esa URL en el monitor de cocina → token se guarda en localStorage
+//   3. Próximas visitas usan localStorage (sin necesidad de la URL larga)
+
 const _SUPA_URL      = import.meta.env.VITE_SUPABASE_URL;
 const _SUPA_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-async function updateCocinaEstado(turnId, branchId, updates) {
+const DEVICE_TOKEN_KEY = 'mimenu_cocina_device_token';
+
+/**
+ * Obtiene el device token para este display.
+ * 1. Primero busca en la URL (?token=...) y lo persiste en localStorage.
+ * 2. Si no está en la URL, lo lee de localStorage.
+ * Retorna null si el dispositivo no está configurado.
+ */
+function getOrSaveDeviceToken() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const urlToken = params.get('token');
+    // Formato válido: 64 caracteres hex (32 bytes = gen_random_bytes)
+    const isValidToken = (t) => typeof t === 'string' && t.length === 64 && /^[0-9a-f]+$/.test(t);
+
+    if (isValidToken(urlToken)) {
+      // Guardar en localStorage y limpiar la URL para no exponer el token en el historial
+      localStorage.setItem(DEVICE_TOKEN_KEY, urlToken);
+      // Reemplaza la URL sin el token (sin recargar la página)
+      const clean = new URL(window.location.href);
+      clean.searchParams.delete('token');
+      window.history.replaceState(null, '', clean.toString());
+      return urlToken;
+    }
+
+    const stored = localStorage.getItem(DEVICE_TOKEN_KEY);
+    if (isValidToken(stored)) return stored;
+  } catch (e) { /* localStorage bloqueado o sin acceso */ }
+  return null;
+}
+
+async function updateCocinaEstado(turnId, branchId, updates, deviceToken) {
+  if (!deviceToken) {
+    throw new Error('Dispositivo no configurado — generá un token en Configuración → Cocina');
+  }
   const res = await fetch(`${_SUPA_URL}/functions/v1/cocina-update`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${_SUPA_ANON_KEY}`,
+      // apikey: requerido por Supabase para invocar Edge Functions (rate limiting)
       'apikey': _SUPA_ANON_KEY,
+      // Authorization: device token (no la anon key pública)
+      'Authorization': `Bearer ${deviceToken}`,
     },
     body: JSON.stringify({ turn_id: turnId, branch_id: branchId, ...updates }),
   });
@@ -67,6 +110,11 @@ export default function CocinaDisplay() {
   // Mismo patrón que storeRef en Salon.jsx
   const comandasRef = useRef([]);
   useEffect(() => { comandasRef.current = comandas; }, [comandas]);
+
+  // Device token: leído de URL (?token=...) o localStorage.
+  // Se inicializa una sola vez al montar (la URL ya fue limpiada en getOrSaveDeviceToken).
+  const [deviceToken] = useState(() => getOrSaveDeviceToken());
+  const deviceConfigured = Boolean(deviceToken);
 
   // Detectar cambios de conectividad para el banner offline
   useEffect(() => {
@@ -204,7 +252,7 @@ export default function CocinaDisplay() {
       const bid = comanda?.turn?.branch_id || activeBranchId;
 
       if (nuevoEstado === 'lista') {
-        await updateCocinaEstado(turnId, bid, { cocina_estado: 'lista', comanda_lista: true });
+        await updateCocinaEstado(turnId, bid, { cocina_estado: 'lista', comanda_lista: true }, deviceToken);
 
         // Remover la comanda después de 90s
         if (removalTimers.current[turnId]) clearTimeout(removalTimers.current[turnId]);
@@ -214,7 +262,7 @@ export default function CocinaDisplay() {
           delete removalTimers.current[turnId];
         }, 90000);
       } else {
-        await updateCocinaEstado(turnId, bid, { cocina_estado: nuevoEstado, comanda_lista: false });
+        await updateCocinaEstado(turnId, bid, { cocina_estado: nuevoEstado, comanda_lista: false }, deviceToken);
       }
     } catch(err) {
       console.error('Error cambiando estado cocina:', err);
@@ -274,6 +322,24 @@ export default function CocinaDisplay() {
         <div style={{ position:'sticky', top:63, zIndex:9, background:'#D97706', color:'white', padding:'10px 20px', fontSize:14, fontWeight:700, textAlign:'center', display:'flex', alignItems:'center', justifyContent:'center', gap:10 }}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>
           Sin internet · Relay local activo — comandas llegan vía red WiFi
+        </div>
+      )}
+
+      {/* Banner dispositivo no configurado — visible para que el dueño sepa qué hacer */}
+      {!deviceConfigured && (
+        <div style={{ margin:'20px', borderRadius:14, border:'2px dashed rgba(251,191,36,0.5)', backgroundColor:'rgba(251,191,36,0.08)', padding:'32px 24px', textAlign:'center' }}>
+          <div style={{ fontSize:36, marginBottom:12 }}>🔧</div>
+          <div style={{ fontSize:18, fontWeight:700, color:'#FBB824', marginBottom:8 }}>
+            Este dispositivo no está configurado
+          </div>
+          <div style={{ fontSize:14, color:'rgba(255,255,255,0.6)', lineHeight:1.6, maxWidth:480, margin:'0 auto', marginBottom:20 }}>
+            Para activar este monitor de cocina, el dueño debe ir a{' '}
+            <strong style={{ color:'rgba(255,255,255,0.85)' }}>Configuración → Cocina</strong>,
+            crear un nuevo dispositivo y abrir la URL generada en este monitor.
+          </div>
+          <div style={{ fontSize:12, color:'rgba(255,255,255,0.35)', fontFamily:'monospace' }}>
+            Los botones "Tomar pedido" y "Marcar listo" no funcionarán hasta configurar el dispositivo.
+          </div>
         </div>
       )}
 

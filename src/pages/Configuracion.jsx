@@ -8,6 +8,7 @@ import FacturacionSetup from '../components/facturacion/FacturacionSetup';
 import TerminalTab from '../components/configuracion/TerminalTab';
 import RelayTab from '../components/configuracion/RelayTab';
 import StaffPinsTab from '../components/configuracion/StaffPinsTab';
+import DeviceTokensTab from '../components/configuracion/DeviceTokensTab';
 import { G, fontDisplay } from '@/lib/glass';
 
 const TABS = [
@@ -18,6 +19,7 @@ const TABS = [
   ['impresora',   'Impresora'],
   ['facturacion', 'Facturación AFIP'],
   ['terminal',    'Terminal de pago'],
+  ['cocina',      'Cocina'],
   ['relay',       'Red local'],
   ['auditoria',   'Auditoría'],
 ];
@@ -51,6 +53,7 @@ export default function Configuracion() {
         {tab === 'facturacion' && <FacturacionSetup />}
         {tab === 'terminal'    && <TerminalTab />}
         {tab === 'mozos'       && <StaffPinsTab />}
+        {tab === 'cocina'      && <DeviceTokensTab />}
         {tab === 'relay'       && <RelayTab />}
         {tab === 'auditoria'   && <AuditoriaTab />}
       </div>
