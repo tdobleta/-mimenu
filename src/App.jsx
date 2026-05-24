@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import { Toaster } from 'sonner'
 import { supabase } from '@/api/supabaseClient'
 import { QueryClientProvider } from '@tanstack/react-query'
@@ -11,27 +12,44 @@ import { AppProvider, useStore } from '@/lib/store';
 import { ToastProvider } from '@/lib/toast';
 import OfflineBanner from '@/components/OfflineBanner';
 import Layout from './components/Layout';
-import TerminosServicio from './pages/legal/TerminosServicio';
-import PoliticaPrivacidad from './pages/legal/PoliticaPrivacidad';
-import Dashboard from './pages/Dashboard';
-import Salon from './pages/Salon';
-import Reservas from './pages/Reservas';
-import Stock from './pages/Stock';
-import Conexion from './pages/Conexion';
-import Reportes from './pages/Reportes';
-import Analiticas from './pages/Analiticas';
-import Caja from './pages/Caja';
-import PublicReservation from './pages/public/PublicReservation';
-import Cocina from './pages/public/Cocina';
-import Configuracion from './pages/Configuracion';
-import CocinaDisplay from './pages/CocinaDisplay';
-import ControlCocina from './pages/ControlCocina';
-import OnboardingFlow from './pages/OnboardingFlow';
-import Login from './pages/Login';
-import POSView from './pages/POSView';
-import Clientes from './pages/Clientes';
-import Delivery from './pages/Delivery';
 import PinGuard from './components/pin/PinGuard';
+
+// ── Lazy-loaded pages (code splitting por ruta) ────────────────────────────────
+// Vite genera un chunk separado por cada import() dinámico.
+// El bundle inicial pasa de 1.6 MB a ~200-300 KB — el resto se carga on-demand.
+const Login              = lazy(() => import('./pages/Login'));
+const OnboardingFlow     = lazy(() => import('./pages/OnboardingFlow'));
+const Dashboard          = lazy(() => import('./pages/Dashboard'));
+const Salon              = lazy(() => import('./pages/Salon'));
+const Reservas           = lazy(() => import('./pages/Reservas'));
+const Stock              = lazy(() => import('./pages/Stock'));
+const Conexion           = lazy(() => import('./pages/Conexion'));
+const Reportes           = lazy(() => import('./pages/Reportes'));
+const Analiticas         = lazy(() => import('./pages/Analiticas'));
+const Caja               = lazy(() => import('./pages/Caja'));
+const Configuracion      = lazy(() => import('./pages/Configuracion'));
+const CocinaDisplay      = lazy(() => import('./pages/CocinaDisplay'));
+const ControlCocina      = lazy(() => import('./pages/ControlCocina'));
+const POSView            = lazy(() => import('./pages/POSView'));
+const Clientes           = lazy(() => import('./pages/Clientes'));
+const Delivery           = lazy(() => import('./pages/Delivery'));
+const PublicReservation  = lazy(() => import('./pages/public/PublicReservation'));
+const Cocina             = lazy(() => import('./pages/public/Cocina'));
+const TerminosServicio   = lazy(() => import('./pages/legal/TerminosServicio'));
+const PoliticaPrivacidad = lazy(() => import('./pages/legal/PoliticaPrivacidad'));
+
+// ── Spinner compartido para Suspense fallback ──────────────────────────────────
+function PageLoader() {
+  return (
+    <div style={{ height:'100vh', display:'flex', alignItems:'center', justifyContent:'center', backgroundColor:'#F6F8FA' }}>
+      <div style={{ textAlign:'center' }}>
+        <div style={{ width:32, height:32, border:'3px solid #E5E7EB', borderTopColor:'#1D9E75', borderRadius:'50%', animation:'spin 0.8s linear infinite', margin:'0 auto 12px' }} />
+        <style>{`@keyframes spin { to { transform:rotate(360deg); } }`}</style>
+        <div style={{ fontSize:13, color:'#9CA3AF' }}>Cargando...</div>
+      </div>
+    </div>
+  );
+}
 
 const RoleGuard = ({ roles, children }) => {
   const role = useUserRole();
@@ -105,7 +123,11 @@ const AuthenticatedApp = () => {
     </div>
   );
 
-  return <RoutedApp />;
+  return (
+    <Suspense fallback={<PageLoader />}>
+      <RoutedApp />
+    </Suspense>
+  );
 };
 
 const RoutedApp = () => {
@@ -165,14 +187,16 @@ function App() {
           <QueryClientProvider client={queryClientInstance}>
             <Router>
               <OfflineBanner />
-              <Routes>
-                <Route path="/login" element={<Login />} />
-                <Route path="/public/reservas/:branchSlug" element={<PublicReservation />} />
-                <Route path="/public/cocina" element={<Cocina />} />
-                <Route path="/terminos" element={<TerminosServicio />} />
-                <Route path="/privacidad" element={<PoliticaPrivacidad />} />
-                <Route path="*" element={<AuthenticatedApp />} />
-              </Routes>
+              <Suspense fallback={<PageLoader />}>
+                <Routes>
+                  <Route path="/login" element={<Login />} />
+                  <Route path="/public/reservas/:branchSlug" element={<PublicReservation />} />
+                  <Route path="/public/cocina" element={<Cocina />} />
+                  <Route path="/terminos" element={<TerminosServicio />} />
+                  <Route path="/privacidad" element={<PoliticaPrivacidad />} />
+                  <Route path="*" element={<AuthenticatedApp />} />
+                </Routes>
+              </Suspense>
             </Router>
             <Toaster position="top-right" richColors closeButton />
           </QueryClientProvider>
@@ -183,5 +207,3 @@ function App() {
 }
 
 export default App;
-
-
