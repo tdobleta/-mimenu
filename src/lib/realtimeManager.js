@@ -110,42 +110,46 @@ export function registerActiveTurns(branchId, turnIds) {
 }
 
 /**
- * Suscribirse a cambios en la tabla `turn_items` con filtro por branchId.
- * Canal global compartido; el filtro se aplica client-side usando el Map de turns activos.
- * Supabase Realtime v2 no soporta subqueries como filtros, por eso el filtro es client-side.
+ * Suscribirse a cambios en la tabla `turn_items` para una sucursal específica.
+ * Usa filtro SERVER-SIDE `branch_id=eq.{branchId}` — solo recibe eventos de esta sucursal.
  *
- * @param {string} branchId - UUID de la sucursal (para filtrar eventos de otros restaurants)
- * @param {function} callback - fn(payload) llamado solo para items del branch indicado
+ * Antes era un canal global 'turn_items_global' con filtro client-side. El problema:
+ * con 100 restaurantes, todos los eventos de todos llegaban a todos los clientes.
+ * Ahora cada sucursal tiene su propio canal y solo recibe sus propios eventos.
+ *
+ * Prerequisito: índice en turn_items(branch_id) — ver migración 20260524000005.
+ *
+ * @param {string} branchId - UUID de la sucursal
+ * @param {function} callback - fn(payload) llamado en cada evento del branch
  * @returns {function} unsub — llamar en el cleanup del useEffect
  */
 export function subscribeToTurnItems(branchId, callback) {
-  const key = 'turn_items_global';
+  if (!branchId) return () => {};
 
-  // Wrapper que filtra por branch antes de llamar al callback real
-  const filteredCallback = (payload) => {
-    const activeTurns = activeTurnIdsByBranch.get(branchId);
-    const itemTurnId = payload?.new?.turn_id || payload?.old?.turn_id;
-    // Si el Map ya tiene datos para este branch, filtrar estrictamente.
-    // Si el Map aún está vacío (antes del primer evento de turns), dejar pasar todo
-    // para no perder eventos al inicio.
-    if (activeTurns && activeTurns.size > 0 && itemTurnId && !activeTurns.has(itemTurnId)) return;
-    callback(payload);
-  };
+  // Canal por branch — no global. Compartido entre suscriptores del mismo branch en la misma pestaña.
+  const key = `turn_items_${branchId}`;
 
   const entry = getOrCreate(key, (subs) =>
     supabase
       .channel(key)
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'turn_items' },
+        {
+          event:  '*',
+          schema: 'public',
+          table:  'turn_items',
+          // Filtro server-side: Supabase solo envía eventos donde branch_id = branchId.
+          // Requiere índice en turn_items(branch_id) para eficiencia.
+          filter: `branch_id=eq.${branchId}`,
+        },
         (payload) => subs.forEach(fn => fn(payload))
       )
       .subscribe()
   );
-  entry.subs.add(filteredCallback);
+  entry.subs.add(callback);
 
   return () => {
-    entry.subs.delete(filteredCallback);
+    entry.subs.delete(callback);
     if (entry.subs.size === 0) {
       supabase.removeChannel(entry.channel);
       registry.delete(key);
