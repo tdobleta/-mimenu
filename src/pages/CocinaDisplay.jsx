@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
+import { supabase } from '@/api/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
 import { useStore } from '@/lib/store';
 import { fetchTurnItemsBatch } from '@/lib/pagination';
@@ -253,7 +254,7 @@ export default function CocinaDisplay() {
           {segundosDesdeUpdate !== null && <span style={{ color:'rgba(29,158,117,0.7)', fontWeight:400, fontSize:11 }}>· {segundosDesdeUpdate}s</span>}
         </div>
         <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-          <span style={{ fontSize:12, color:'rgba(255,255,255,0.5)' }}>{user?.email||''}</span>
+          <span style={{ fontSize:12, color:'rgba(255,255,255,0.5)' }}>{user?.email ? '● Sesión activa' : ''}</span>
           <button onClick={() => supabase.auth.signOut().then(() => window.location.href='/login')}
             style={{ padding:'6px 12px', border:'0.5px solid rgba(255,255,255,0.15)', borderRadius:7, fontSize:12, color:'rgba(255,255,255,0.7)', backgroundColor:'transparent', cursor:'pointer' }}>
             Cerrar sesión
