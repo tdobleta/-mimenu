@@ -64,8 +64,14 @@ async function processOperation(op) {
         precio:         op.precio,
         notas:          op.notas || null,
         modificadores:  op.modificadores || [],
+        // IDEMPOTENCIA: client_uid = op.id (ID estable de IndexedDB).
+        // Si la red cae después de que PG insertó pero antes de recibir la respuesta,
+        // el retry encontrará el mismo client_uid y recibirá error 23505.
+        // Tratamos 23505 como éxito: el ítem ya está en la DB, no hay duplicado.
+        client_uid:     op.id,
       });
-      if (error) throw error;
+      // 23505 = unique_violation en client_uid → ítem ya insertado → éxito silencioso
+      if (error && error.code !== '23505') throw error;
       break;
     }
 

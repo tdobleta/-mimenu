@@ -532,8 +532,9 @@ export default function ComandaPanel({ table, branchId, onClose, addToast }) {
                 await Promise.all((table.order||[]).map(item => base44.entities.TurnItem.create({ turn_id:turn.id, branch_id:branchId, menu_item_name:item.nombre, menu_item_id:item.itemId, cantidad:item.qty, precio:item.precio, notas:item.nota||null })));
               }
               store.closeTable(branchId, table.id);
-              // Descontar stock automáticamente según recetas configuradas
-              descontarStockPorMesa(table.order || [], branchId, store).catch((err) => {
+              // Descontar stock automáticamente según recetas configuradas.
+              // Se pasa table.turnId para idempotencia en retries offline.
+              descontarStockPorMesa(table.order || [], branchId, store, table.turnId || null).catch((err) => {
                 console.error('[Stock] Fallo al descontar stock:', err);
                 addToast('Mesa cerrada. Nota: el descuento de stock falló — revisalo manualmente.', 'warning');
               });

@@ -544,8 +544,10 @@ export default function POSView() {
         } catch(e) {}
       }
       if(selectedTurn?.id){const tables=store.getTables(branchId);const table=tables.find(t=>t.turnId===selectedTurn.id);if(table)store.closeTable(branchId,table.id);}
-      // Descontar stock automáticamente según recetas (no bloquea el cobro)
-      descontarStockPorMesa(order, branchId, store).catch((err) => {
+      // Descontar stock automáticamente según recetas (no bloquea el cobro).
+      // Se pasa selectedTurn?.id para idempotencia: si descontarStockPorMesa
+      // se reintenta, los egresos con el mismo turn_id son ignorados (23505).
+      descontarStockPorMesa(order, branchId, store, selectedTurn?.id || null).catch((err) => {
         console.error('[Stock] Fallo al descontar stock en POSView:', err);
         addToast('Cobrado. Nota: el descuento de stock falló — revisalo manualmente.', 'warning');
       });

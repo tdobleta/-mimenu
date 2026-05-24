@@ -160,14 +160,16 @@ export async function fetchEgresos(branchId, limit = 100) {
  * @param {Array}  order    - items del pedido [{itemId, qty}]
  * @param {string} branchId
  * @param {Object} store    - store de la app (para leer y actualizar stock local)
+ * @param {string} [turnId] - UUID del turn (opcional, para idempotencia de egresos en retry)
  */
-export async function descontarStockPorMesa(order, branchId, store) {
+export async function descontarStockPorMesa(order, branchId, store, turnId = null) {
   try {
     const recetas = await fetchRecetas(branchId);
     if (!recetas || Object.keys(recetas).length === 0) return;
     const stockItems = store.getStock ? store.getStock() : (store.stock?.[branchId] || []);
     for (const item of order) {
-      const rec = recetas[item.itemId || item.id];
+      const menuItemId = item.itemId || item.id;
+      const rec = recetas[menuItemId];
       if (!rec || rec.length === 0) continue;
       for (const r of rec) {
         const ing = stockItems.find(s => s.id === r.ingredienteId);
@@ -185,6 +187,11 @@ export async function descontarStockPorMesa(order, branchId, store) {
           });
           if (error) throw error;
           store.updateStockItem(branchId, ing.id, { actual: nuevoActual });
+          // IDEMPOTENCIA: Si tenemos turnId, generamos un client_uid determinístico.
+          // Si este egreso ya fue registrado (retry), addEgreso lo ignorará silenciosamente.
+          const egresoClientUid = turnId
+            ? `stock_${turnId}_${menuItemId}_${ing.id}`
+            : null;
           await addEgreso(branchId, {
             ingredienteId:      ing.id,
             ingredienteNombre:  ing.nombre,
@@ -192,6 +199,7 @@ export async function descontarStockPorMesa(order, branchId, store) {
             unidad:             ing.unidad,
             motivo:             `Mesa (automático)`,
             origen:             'automatico',
+            clientUid:          egresoClientUid,
           });
         } catch(e) { /* un error en un ítem no debe abortar el resto */ }
       }
@@ -274,6 +282,9 @@ export async function addIngreso(branchId, { stockItemId, cantidad, costoUnit, p
 
 /**
  * Registra un egreso de stock.
+ * @param {string} [clientUid] - ID idempotente para retries offline.
+ *   Si se provee, un segundo INSERT con el mismo clientUid retornará
+ *   silenciosamente (código 23505) sin lanzar error.
  */
 export async function addEgreso(branchId, {
   ingredienteId,
@@ -282,21 +293,27 @@ export async function addEgreso(branchId, {
   unidad,
   motivo,
   origen = 'manual',
+  clientUid = null,
 }) {
+  const row = {
+    branch_id:          branchId,
+    ingrediente_id:     ingredienteId,
+    ingrediente_nombre: ingredienteNombre || '',
+    cantidad:           Number(cantidad),
+    unidad:             unidad || '',
+    motivo:             motivo || '',
+    origen,
+    ts:                 new Date().toISOString(),
+  };
+  if (clientUid) row.client_uid = clientUid;
+
   const { data, error } = await supabase
     .from('stock_egresos')
-    .insert({
-      branch_id:          branchId,
-      ingrediente_id:     ingredienteId,
-      ingrediente_nombre: ingredienteNombre || '',
-      cantidad:           Number(cantidad),
-      unidad:             unidad || '',
-      motivo:             motivo || '',
-      origen,
-      ts:                 new Date().toISOString(),
-    })
+    .insert(row)
     .select()
     .single();
-  if (error) throw error;
-  return data;
+
+  // 23505 = unique_violation en client_uid → egreso ya registrado → éxito silencioso
+  if (error && error.code !== '23505') throw error;
+  return data || null;
 }
