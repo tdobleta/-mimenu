@@ -167,6 +167,13 @@ export async function descontarStockPorMesa(order, branchId, store, turnId = nul
     const recetas = await fetchRecetas(branchId);
     if (!recetas || Object.keys(recetas).length === 0) return;
     const stockItems = store.getStock ? store.getStock() : (store.stock?.[branchId] || []);
+    // Acumulador de decrementos locales por ingrediente.
+    // Evita el race condition donde dos platos que comparten un ingrediente
+    // calculan ambos sobre el valor original del array congelado.
+    // Ejemplo: 10 medallones, pedido con 2 hamburguesas (1 medallón c/u):
+    //   Sin acumulador: iteración 1→9, iteración 2→9 (UI muestra 9, real es 8)
+    //   Con acumulador: iteración 1→9, iteración 2→8 (UI y DB coinciden)
+    const decrementosLocales = {}; // { [ingredienteId]: totalDecrementado }
     for (const item of order) {
       const menuItemId = item.itemId || item.id;
       const rec = recetas[menuItemId];
@@ -175,12 +182,12 @@ export async function descontarStockPorMesa(order, branchId, store, turnId = nul
         const ing = stockItems.find(s => s.id === r.ingredienteId);
         if (!ing) continue;
         const cantidad = Number(r.cantidad) * (item.qty || 1);
-        // FIX: usar RPC atómico decrement_stock en lugar de SELECT+calcular+UPDATE.
-        // Previene double-decrement en retries offline (la operación es idempotente
-        // en términos de no producir stock negativo, pero no en cantidad decrementada).
-        // El valor local para el store se calcula igual que el RPC: GREATEST(0, actual-qty).
-        const nuevoActual = Math.max(0, Number(ing.actual) - cantidad);
+        // Acumular el decremento total de este ingrediente en este pedido
+        decrementosLocales[ing.id] = (decrementosLocales[ing.id] || 0) + cantidad;
+        // El store local usa el acumulador (refleja todos los decrementos anteriores del mismo ingrediente)
+        const nuevoActual = Math.max(0, Number(ing.actual) - decrementosLocales[ing.id]);
         try {
+          // DB: RPC atómico — siempre correcto independientemente del orden de ejecución
           const { error } = await supabase.rpc('decrement_stock', {
             p_id:  ing.id,
             p_qty: cantidad,

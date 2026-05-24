@@ -353,7 +353,19 @@ export function AppProvider({ children }) {
             id: t.id, num: t.num, gridCol: t.gridCol, gridRow: t.gridRow,
             status: t.status, openedAt: t.openedAt || null,
             turnId: t.turnId || null, mozo: t.mozo || '',
-            // NO guardamos order[] — los items se recargan de DB al reconectar
+            // Persistir order[] para que un reinicio offline muestre la comanda completa.
+            // Acotado a 50 ítems por mesa para no saturar la quota de IndexedDB.
+            // Si la DB está disponible al reconectar, se recarga desde allí (fuente de verdad).
+            order: (t.order || []).slice(0, 50).map(i => ({
+              id: i.id,
+              itemId: i.itemId || i.id,
+              nombre: i.nombre || '',
+              precio: i.precio || 0,
+              qty: i.qty || 1,
+              nota: i.nota || '',
+              turnItemId: i.turnItemId || null,
+              extra: i.extra || 0,
+            })),
           }));
         });
         saveSnapshot({

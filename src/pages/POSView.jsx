@@ -498,9 +498,31 @@ export default function POSView() {
   }
 
   async function handleCobro({pagos,metodo,total:tot,propina}){
-    // Guard offline: cerrar_mesa_atomico requiere internet
+    // ── COBRO OFFLINE ────────────────────────────────────────────────────
+    // Si no hay red, encolamos CLOSE_TABLE en IndexedDB y marcamos la mesa
+    // en ámbar (pendiente_cobro). drainQueue ejecutará cerrar_mesa_atomico
+    // al reconectar (idempotente por P0001).
     if (!navigator.onLine) {
-      addToast('Sin conexión — no se puede cobrar hasta reconectar.', 'error');
+      const tableLocal = store.getTables(branchId).find(t => t.turnId === selectedTurn?.id);
+      if (selectedTurn?.id && tableLocal) {
+        const cobroData = { total: tot, propina: propina||0, metodo, pagos, mozo: selectedTurn.mozo||'' };
+        store.closeTableOffline(branchId, tableLocal.id, cobroData);
+        enqueue({
+          type: 'CLOSE_TABLE',
+          turn_id: selectedTurn.id,
+          branch_id: branchId,
+          caja_shift_id: store.turnoActivo?.id || null,
+          total: tot,
+          propina: propina || 0,
+          metodo,
+          mozo: selectedTurn.mozo || '',
+          pagos: pagos?.length > 0 ? pagos : null,
+        }).catch(() => {});
+        addToast('Mesa cobrada localmente (offline). Se sincroniza al reconectar.', 'warning');
+        setShowCobro(false);
+      } else {
+        addToast('Sin conexión y sin turno activo — reconectate para cobrar.', 'error');
+      }
       return;
     }
     try{

@@ -14,6 +14,7 @@ import { useAuth } from '@/lib/AuthContext';
 import useUserRole from '@/lib/useUserRole';
 import { G, glass, glassDeep, glassLight, fontDisplay } from '@/lib/glass';
 import { getActiveStaff } from '@/lib/useActiveStaff';
+import { enqueue } from '@/lib/offlineQueue';
 
 export default function Salon() {
   const store = useStore();
@@ -204,17 +205,44 @@ export default function Salon() {
       if (abriendo) return;
       setAbriendo(table.id);
       const openedAt = Date.now();
+      const mozoNombre = getActiveStaff()?.nombre || store.teamMembers?.find(m => m.email === user?.email)?.nombre || user?.email || '';
+
+      // ── APERTURA OFFLINE ────────────────────────────────────────────────
+      // Si no hay red, no intentamos el API call. Generamos un UUID local,
+      // abrimos la mesa en el store, y encolamos INSERT_TURN para sincronizar
+      // al reconectar. El mozo puede seguir tomando pedidos normalmente.
+      if (!navigator.onLine) {
+        const tempId = crypto.randomUUID();
+        store.openTableWithTurn(displayBranch, table.id, tempId, mozoNombre, openedAt);
+        enqueue({
+          type: 'INSERT_TURN',
+          id: tempId,
+          data: {
+            id: tempId,
+            branch_id: displayBranch,
+            mesa_num: table.num,
+            status: 'abierta',
+            opened_at: new Date(openedAt).toISOString(),
+            total_facturado: 0,
+            mozo: mozoNombre,
+            caja_shift_id: store.turnoActivo?.id || null,
+          },
+        }).catch(() => {});
+        addToast(`Mesa ${table.num} abierta (offline — se sincroniza al reconectar)`, 'warning');
+        setAbriendo(null);
+        return;
+      }
+
+      // ── APERTURA ONLINE ─────────────────────────────────────────────────
       store.openTable(displayBranch, table.id, openedAt);
       addToast(`Mesa ${table.num} abierta`, 'success');
-      const mozoNombre = getActiveStaff()?.nombre || store.teamMembers?.find(m => m.email === user?.email)?.nombre || user?.email || '';
       base44.entities.Turn.create({ branch_id:displayBranch, mesa_num:table.num, status:'abierta', opened_at:new Date(openedAt).toISOString(), total_facturado:0, mozo:mozoNombre, caja_shift_id: store.turnoActivo?.id || null })
         .then(turn => store.setTableTurnId(displayBranch, table.id, turn.id))
         .catch((err) => {
-          // UNIQUE constraint: otra tablet abrió la misma mesa simultáneamente
           const isDuplicate = err?.code === '23505' || err?.message?.includes('unique');
           if (isDuplicate) {
+            // Otra tablet abrió la misma mesa simultáneamente — recargar el turno real
             addToast(`Mesa ${table.num} ya fue abierta por otro mozo`, 'warning');
-            // Recargar el turno real desde DB para sincronizar la pantalla
             dbLoadActiveTurns(displayBranch).then(turns => {
               turns.forEach(t => {
                 const existing = store.getTables(displayBranch).find(tb => tb.num === t.mesa_num);
@@ -223,8 +251,28 @@ export default function Salon() {
                 }
               });
             }).catch(() => {});
+            store.closeTable(displayBranch, table.id);
+          } else {
+            // Error de red u otro error: convertir en apertura offline en lugar de revertir.
+            // El mozo puede seguir tomando pedidos; la operación se sincroniza al reconectar.
+            const tempId = crypto.randomUUID();
+            store.openTableWithTurn(displayBranch, table.id, tempId, mozoNombre, openedAt);
+            enqueue({
+              type: 'INSERT_TURN',
+              id: tempId,
+              data: {
+                id: tempId,
+                branch_id: displayBranch,
+                mesa_num: table.num,
+                status: 'abierta',
+                opened_at: new Date(openedAt).toISOString(),
+                total_facturado: 0,
+                mozo: mozoNombre,
+                caja_shift_id: store.turnoActivo?.id || null,
+              },
+            }).catch(() => {});
+            addToast(`Mesa ${table.num} abierta (modo offline por error de red)`, 'warning');
           }
-          store.closeTable(displayBranch, table.id); // revertir apertura optimista local
         })
         .finally(() => setAbriendo(null));
     } else {
