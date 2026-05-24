@@ -376,7 +376,6 @@ export function AppProvider({ children }) {
         try {
           const snapshot = await loadSnapshot();
           if (snapshot) {
-            console.log('[store] Arrancando en modo offline desde snapshot de', new Date(snapshot.ts).toLocaleString());
             setS(prev => ({
               ...prev,
               loading: false,

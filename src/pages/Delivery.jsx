@@ -9,6 +9,9 @@ import { useToast } from '@/lib/toast';
 import { money } from '@/lib/fmt';
 import { G } from '@/lib/glass';
 import { subscribeToTurns } from '@/lib/realtimeManager';
+import { useAuth } from '@/lib/AuthContext';
+import useUserRole from '@/lib/useUserRole';
+import { getActiveStaff, touchActiveStaff } from '@/lib/useActiveStaff';
 
 // ── Constantes ─────────────────────────────────────────────────────────────────
 const ESTADOS = [
@@ -43,6 +46,8 @@ function BadgeEstado({ estado }) {
 export default function Delivery() {
   const store      = useStore();
   const { addToast } = useToast();
+  const { user } = useAuth();
+  const userRole = useUserRole();
   const branchId   = store.branchId !== 'todas' ? store.branchId : (store.sucursales?.[0]?.id || '');
 
   const [pedidos,     setPedidos]     = useState([]);
@@ -93,7 +98,20 @@ export default function Delivery() {
     ));
     const { error } = await supabase.from('turns').update(updates).eq('id', pedidoId);
     if (error) { addToast('Error al actualizar estado', 'error'); loadPedidos(); }
-    else if (nuevoEstado === 'entregado') addToast('Pedido entregado ✓', 'success');
+    else if (nuevoEstado === 'entregado') {
+      const pedido = pedidos.find(p => p.id === pedidoId);
+      const total = pedido?.turn_items?.reduce((s, i) => s + i.precio * i.cantidad, 0) || 0;
+      store.logAccion({
+        usuario: getActiveStaff()?.nombre || user?.email || 'Sistema',
+        rol: userRole,
+        categoria: 'Delivery',
+        accion: 'Pedido entregado',
+        detalle: (pedido?.mesa_num || pedidoId) + ' · ' + money(total),
+        sucursal: store.sucursales.find(s => s.id === branchId)?.nombre || '',
+      });
+      touchActiveStaff();
+      addToast('Pedido entregado ✓', 'success');
+    }
   }
 
   // ── Asignar repartidor ────────────────────────────────────────────────────
@@ -375,10 +393,12 @@ function NuevoPedidoModal({ branchId, store, addToast, onClose, onCreated }) {
   }
 
   const subtotal = selectedItems.reduce((s, si) => s + si.item.precio * si.qty, 0);
-  const numPedido = String(Date.now()).slice(-4);
 
   async function handleCreate() {
     if (!branchId) { addToast('Seleccioná una sucursal primero', 'error'); return; }
+    // Número único: 4 dígitos aleatorios — evita colisiones por timestamp truncado
+    const numPedido = (1000 + Math.floor(Math.random() * 9000)).toString();
+    const mozoNombre = getActiveStaff()?.nombre || '';
     setSaving(true);
     try {
       // 1. Crear turn de delivery
@@ -399,7 +419,7 @@ function NuevoPedidoModal({ branchId, store, addToast, onClose, onCreated }) {
           },
           opened_at:        new Date().toISOString(),
           total_facturado:  0,
-          mozo:             '',
+          mozo:             mozoNombre,
           caja_shift_id:    store.turnoActivo?.id || null,
         })
         .select()
@@ -422,6 +442,15 @@ function NuevoPedidoModal({ branchId, store, addToast, onClose, onCreated }) {
         if (itemsErr) throw itemsErr;
       }
 
+      store.logAccion({
+        usuario: mozoNombre || 'Sistema',
+        rol: '',
+        categoria: 'Delivery',
+        accion: 'Pedido creado',
+        detalle: `DEL-${numPedido} · ${form.plataforma} · ${money(subtotal)}`,
+        sucursal: store.sucursales.find(s => s.id === branchId)?.nombre || '',
+      });
+      touchActiveStaff();
       addToast(`Pedido DEL-${numPedido} creado — en cocina`, 'success');
       onCreated();
     } catch (err) {
