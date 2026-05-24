@@ -547,7 +547,7 @@ export default function ComandaPanel({ table, branchId, onClose, addToast }) {
               setShowClose(false);
 const afipCfg = getAfipConfig();
 if (afipCfg.habilitado) {
-  setFacturaDatos({ mesa:table.num, items:table.order||[], total:finalTotal + (propinaAmount||0), descuento:discAmount||0 });
+  setFacturaDatos({ mesa:table.num, items:table.order||[], total:finalTotal + (propinaAmount||0), descuento:discAmount||0, turnId:table.turnId||null, restaurantId:store.restaurantId, branchId });
   setShowFactura(true);
 } else {
   onClose();
@@ -570,6 +570,9 @@ if (afipCfg.habilitado) {
           items={facturaDatos.items}
           total={facturaDatos.total}
           descuento={facturaDatos.descuento}
+          restaurantId={facturaDatos.restaurantId}
+          branchId={facturaDatos.branchId}
+          turnId={facturaDatos.turnId}
           onClose={() => { setShowFactura(false); onClose(); }}
         />
       )}

@@ -6,6 +6,7 @@ import { money, stockStatus } from '@/lib/fmt';
 import { useAuth } from '@/lib/AuthContext';
 import useUserRole from '@/lib/useUserRole';
 import { G, glassDeep, glassLight, fontDisplay, labelStyle } from '@/lib/glass';
+import { exportStockCSV } from '@/lib/export';
 import MenuTab from '../components/configuracion/MenuTab';
 import {
   fetchRecetas, saveReceta,
@@ -322,11 +323,17 @@ export default function Stock() {
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:10 }}>
         <h1 style={{ fontSize:22, fontWeight:700, color:G.text, margin:0, fontFamily:FONT_UI, letterSpacing:'-0.02em' }}>Stock y Costos</h1>
         <div style={{ display:'flex', gap:8 }}>
-          {tab === 'Stock' && (
+          {tab === 'Stock' && (<>
+            <button
+              onClick={() => exportStockCSV(stock, `stock-${new Date().toISOString().slice(0,10)}.csv`)}
+              disabled={stock.length === 0}
+              style={{ padding:'8px 16px', background:'rgba(29,158,117,0.10)', border:`1px solid rgba(29,158,117,0.3)`, borderRadius:11, fontSize:13, fontWeight:700, color:G.teal, cursor:'pointer', opacity: stock.length === 0 ? 0.4 : 1 }}>
+              ↓ CSV
+            </button>
             <button onClick={() => setShowAdd(true)} style={{ padding:'8px 18px', background:G.teal, border:'none', borderRadius:11, fontSize:13, fontWeight:700, color:'white', cursor:'pointer', boxShadow:`0 4px 12px rgba(29,158,117,0.25)` }}>
               + Ingrediente
             </button>
-          )}
+          </>)}
           {tab === 'Compras' && (
             <button onClick={() => setShowIngresoModal(true)} style={{ padding:'8px 18px', background:'rgba(29,158,117,0.10)', border:`1px solid rgba(29,158,117,0.3)`, borderRadius:11, fontSize:13, fontWeight:700, color:G.teal, cursor:'pointer' }}>
               + Registrar compra

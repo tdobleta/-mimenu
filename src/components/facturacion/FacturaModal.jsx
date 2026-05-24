@@ -2,16 +2,20 @@ import { useState } from 'react';
 import { emitirFacturaB, emitirFacturaA, abrirPdfFactura, getAfipConfig } from '@/lib/afip';
 import { money } from '@/lib/fmt';
 import { G, glass, glassLight, fontDisplay } from '@/lib/glass';
+import { supabase } from '@/api/supabaseClient';
 
 // ── FacturaModal ──────────────────────────────────────────────────────────────
 // Se muestra después de cerrar una mesa.
 // Props:
-//   mesa     {number}   - número de mesa
-//   items    {array}    - [{ nombre, precio, qty, nota }]
-//   total    {number}   - total a facturar
-//   descuento {number}  - descuento aplicado
-//   onClose  {fn}       - cerrar el modal
-export default function FacturaModal({ mesa, items, total, descuento = 0, onClose }) {
+//   mesa         {number|string} - número de mesa
+//   items        {array}         - [{ nombre, precio, qty, nota }]
+//   total        {number}        - total a facturar
+//   descuento    {number}        - descuento aplicado
+//   restaurantId {string}        - UUID del restaurante (para guardar en facturas)
+//   branchId     {string}        - UUID de la sucursal
+//   turnId       {string|null}   - UUID del turn cerrado
+//   onClose      {fn}            - cerrar el modal
+export default function FacturaModal({ mesa, items, total, descuento = 0, restaurantId, branchId, turnId, onClose }) {
   const cfg = getAfipConfig();
   const [tipo, setTipo] = useState('B'); // 'B' | 'A'
   const [emitiendo, setEmitiendo] = useState(false);
@@ -41,6 +45,25 @@ export default function FacturaModal({ mesa, items, total, descuento = 0, onClos
         });
       }
       setResultado(res);
+
+      // Persistir en tabla facturas (fire-and-forget — no bloquea el flujo)
+      if (restaurantId) {
+        supabase.from('facturas').insert({
+          restaurant_id: restaurantId,
+          branch_id:     branchId   || null,
+          turn_id:       turnId     || null,
+          tipo:          tipo,
+          numero:        res.numero  || null,
+          punto_venta:   getAfipConfig().punto_venta || null,
+          cae:           res.cae    || null,
+          vto_cae:       res.cae_vto ? new Date(res.cae_vto).toISOString().slice(0,10) : null,
+          total:         res.total  || 0,
+          condicion_iva_receptor: tipo === 'B' ? 'Consumidor Final' : (razonCliente || 'Empresa'),
+          pdf_url:       res.pdf_link || null,
+        }).then(({ error: dbErr }) => {
+          if (dbErr) console.warn('[facturas] No se pudo guardar historial:', dbErr.message);
+        });
+      }
     } catch(e) {
       setError(e.message);
     }

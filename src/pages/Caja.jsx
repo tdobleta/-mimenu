@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useStore } from '@/lib/store';
 import { money } from '@/lib/fmt';
+import { supabase } from '@/api/supabaseClient';
+import { abrirPdfFactura } from '@/lib/afip';
 import OpenShiftModal from '../components/caja/OpenShiftModal';
 import AddRetiroModal from '../components/caja/AddRetiroModal';
 import CloseShiftModal from '../components/caja/CloseShiftModal';
@@ -164,7 +166,8 @@ export default function Caja() {
     <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
       <Header tab={tab} setTab={setTab} />
 
-      {tab === 'historial' && <ShiftHistory />}
+      {tab === 'historial'  && <ShiftHistory />}
+      {tab === 'facturas'   && <FacturasHistory />}
 
       {tab === 'actual' && turnoActivo && (
         <>
@@ -385,12 +388,94 @@ function ActividadReciente({ activity }) {
   );
 }
 
+// ── Historial de Facturas AFIP ────────────────────────────────────────────────
+function FacturasHistory() {
+  const store = useStore();
+  const [facturas, setFacturas] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    const rid = store.restaurantId;
+    if (!rid) return;
+    supabase
+      .from('facturas')
+      .select('*')
+      .eq('restaurant_id', rid)
+      .order('emitida_at', { ascending: false })
+      .limit(100)
+      .then(({ data, error: dbErr }) => {
+        if (dbErr) setError(dbErr.message);
+        else setFacturas(data || []);
+        setLoading(false);
+      });
+  }, [store.restaurantId]);
+
+  function fmtFecha(iso) {
+    if (!iso) return '—';
+    return new Date(iso).toLocaleString('es-AR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
+  }
+
+  const thStyle = { textAlign:'left', padding:'9px 14px', fontSize:11, fontWeight:700, color:G.textFaint, textTransform:'uppercase', letterSpacing:'0.05em', borderBottom:'1px solid #E2E8F0', background:'#F8FAFC', whiteSpace:'nowrap' };
+  const tdStyle = { padding:'9px 14px', fontSize:13, color:G.textMid, borderBottom:'1px solid #F1F5F9' };
+
+  if (loading) return <div style={{ textAlign:'center', padding:'40px 0', color:G.textFaint, fontSize:13 }}>Cargando facturas...</div>;
+  if (error) return <div style={{ padding:'16px', background:'rgba(226,75,74,0.08)', border:'1px solid rgba(226,75,74,0.25)', borderRadius:10, fontSize:13, color:G.red }}>Error: {error}. Asegurate de que la migración facturas.sql fue aplicada en Supabase.</div>;
+  if (facturas.length === 0) return (
+    <div style={{ textAlign:'center', padding:'48px 0' }}>
+      <div style={{ fontSize:36, marginBottom:12 }}>🧾</div>
+      <div style={{ fontSize:14, color:G.textMid, fontWeight:500 }}>Sin facturas emitidas</div>
+      <div style={{ fontSize:12, color:G.textFaint, marginTop:4 }}>Las facturas aparecerán acá cuando se emitan desde el cierre de mesa.</div>
+    </div>
+  );
+
+  return (
+    <div style={{ background:'#FFF', border:'1px solid #E2E8F0', borderRadius:12, overflow:'hidden' }}>
+      <div style={{ padding:'14px 18px', borderBottom:'1px solid #E2E8F0', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+        <div style={{ fontSize:14, fontWeight:700, color:G.text }}>Facturas emitidas ({facturas.length})</div>
+        <div style={{ fontSize:12, color:G.textFaint }}>Últimas 100</div>
+      </div>
+      <div style={{ overflowX:'auto' }}>
+        <table style={{ width:'100%', borderCollapse:'collapse', minWidth:640 }}>
+          <thead>
+            <tr>{['Fecha', 'Tipo', 'N°', 'CAE', 'Vto. CAE', 'Total', ''].map(h => <th key={h} style={thStyle}>{h}</th>)}</tr>
+          </thead>
+          <tbody>
+            {facturas.map(f => (
+              <tr key={f.id} onMouseEnter={e=>e.currentTarget.style.background='#F8FAFC'} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+                <td style={tdStyle}>{fmtFecha(f.emitida_at)}</td>
+                <td style={tdStyle}>
+                  <span style={{ padding:'2px 8px', borderRadius:99, fontSize:11, fontWeight:700, background:'rgba(29,158,117,0.10)', color:G.teal }}>
+                    Factura {f.tipo}
+                  </span>
+                </td>
+                <td style={{ ...tdStyle, fontWeight:600 }}>{f.numero ? `N° ${f.numero}` : '—'}</td>
+                <td style={{ ...tdStyle, fontSize:12, fontFamily:'monospace' }}>{f.cae || '—'}</td>
+                <td style={{ ...tdStyle, fontSize:12 }}>{f.vto_cae ? new Date(f.vto_cae).toLocaleDateString('es-AR') : '—'}</td>
+                <td style={{ ...tdStyle, fontWeight:700, color:G.text }}>{money(f.total)}</td>
+                <td style={tdStyle}>
+                  {f.pdf_url && (
+                    <button onClick={() => abrirPdfFactura({ pdf_link: f.pdf_url })}
+                      style={{ padding:'4px 10px', background:'rgba(29,158,117,0.10)', border:'none', borderRadius:7, fontSize:11, fontWeight:600, color:G.teal, cursor:'pointer' }}>
+                      Ver PDF
+                    </button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 function Header({ tab, setTab }) {
   return (
     <div>
       <h1 style={{ fontSize:20, fontWeight:700, color:G.text, margin:0, marginBottom:14, fontFamily:FONT_UI, letterSpacing:'-0.01em' }}>Caja</h1>
       <div style={{ display:'flex', borderBottom:'1px solid #E2E8F0' }}>
-        {[['actual','Turno actual'],['historial','Historial']].map(([k,l]) => (
+        {[['actual','Turno actual'],['historial','Historial'],['facturas','Facturas AFIP']].map(([k,l]) => (
           <button key={k} onClick={()=>setTab(k)}
             style={{ padding:'8px 16px', fontSize:13, border:'none', background:'none', cursor:'pointer', marginBottom:-1, fontWeight: tab===k?600:400, color: tab===k?G.teal:G.textFaint, borderBottom: tab===k?`2px solid ${G.teal}`:'2px solid transparent', fontFamily:FONT_UI }}>
             {l}

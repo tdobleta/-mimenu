@@ -355,6 +355,18 @@ function Step4({ store, numMesas, productosCount, onFinish }) {
           </div>
         ))}
       </div>
+      {/* PWA install tip — activa cobros offline confiables */}
+      <div style={{ width:'100%', maxWidth:420, marginBottom:20, backgroundColor:'rgba(29,158,117,0.07)', border:'1px solid rgba(29,158,117,0.25)', borderRadius:10, padding:'14px 16px', textAlign:'left' }}>
+        <div style={{ fontSize:13, fontWeight:700, color:'#064E3B', marginBottom:5 }}>
+          📲 Tip importante: instalá mimenú en tu pantalla de inicio
+        </div>
+        <div style={{ fontSize:12, color:'#374151', lineHeight:1.6 }}>
+          Para cobros offline <strong>100% confiables</strong>, instalá la app desde el navegador
+          (Chrome en Android: menú → "Agregar a pantalla de inicio").
+          Sin esta instalación, el sistema puede perder datos offline si el dispositivo queda sin espacio.
+        </div>
+      </div>
+
       <button onClick={onFinish} style={{ width:'100%', maxWidth:320, padding:14, backgroundColor:'#1D9E75', color:'white', borderRadius:8, fontSize:15, fontWeight:600, border:'none', cursor:'pointer' }}>
         Ir al Salón →
       </button>

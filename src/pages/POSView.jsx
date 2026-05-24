@@ -559,7 +559,7 @@ export default function POSView() {
       }
       const aCfg=getAfipConfig();
       if(aCfg.habilitado){
-        setFacturaDatos({mesa:selectedTurn?.mesa_num||'Directa',items:order.map(it=>({nombre:it.nombre,precio:it.precio+(it.extra||0),qty:it.qty})),total:tot,descuento:0});
+        setFacturaDatos({mesa:selectedTurn?.mesa_num||'Directa',items:order.map(it=>({nombre:it.nombre,precio:it.precio+(it.extra||0),qty:it.qty})),total:tot,descuento:0,turnId:selectedTurn?.id||null,restaurantId:store.restaurantId,branchId});
         setShowFactura(true);
       } else { handleBack(); }
     }catch(err){console.error(err);addToast('Error al cobrar','error');}
@@ -703,7 +703,7 @@ export default function POSView() {
       {showMod&&<ModModal item={showMod} onConfirm={({sel,nota,extra})=>{addToOrder(showMod,sel,nota,extra);setShowMod(null);}} onClose={()=>setShowMod(null)}/>}
       {showNota&&<NotaModal item={showNota} onConfirm={nota=>{setNotaFn(showNota.uid,nota);setShowNota(null);}} onClose={()=>setShowNota(null)}/>}
       {showFactura&&facturaDatos&&(
-        <FacturaModal mesa={facturaDatos.mesa} items={facturaDatos.items} total={facturaDatos.total} descuento={facturaDatos.descuento} onClose={()=>{setShowFactura(false);handleBack();}}/>
+        <FacturaModal mesa={facturaDatos.mesa} items={facturaDatos.items} total={facturaDatos.total} descuento={facturaDatos.descuento} restaurantId={facturaDatos.restaurantId} branchId={facturaDatos.branchId} turnId={facturaDatos.turnId} onClose={()=>{setShowFactura(false);handleBack();}}/>
       )}
       {showFree&&(
         <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.6)',zIndex:200,display:'flex',alignItems:'center',justifyContent:'center',backdropFilter:'blur(8px)'}}>

@@ -1,9 +1,10 @@
 // src/pages/Clientes.jsx
-// Módulo CRM: directorio de clientes, ranking, cumpleaños y WhatsApp marketing.
+// Módulo CRM: directorio de clientes, ranking, cumpleaños y Email marketing.
 
 import { useState, useEffect, useCallback } from 'react';
 import { useStore } from '@/lib/store';
 import { money } from '@/lib/fmt';
+import { supabase } from '@/api/supabaseClient';
 import {
   getAllCustomers, getTopCustomers, getCustomersBirthdays,
   createCustomer, updateCustomer, deleteCustomer,
@@ -14,7 +15,7 @@ const FONT = "'DM Sans', system-ui, sans-serif";
 const TEAL = '#1D9E75';
 const TEAL_BG = 'rgba(29,158,117,0.08)';
 
-const TABS = ['Directorio', 'Top clientes', 'Cumpleaños', 'WhatsApp'];
+const TABS = ['Directorio', 'Top clientes', 'Cumpleaños', 'Marketing'];
 
 function downloadCSV(filename, headers, rows) {
   const content = '﻿' + [headers.join(','), ...rows.map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(','))].join('\n');
@@ -392,10 +393,21 @@ function TabTopClientes({ restaurantId }) {
   );
 }
 
+// ─── Helper: invocar crm-email edge function ─────────────────────────────────
+async function sendCrmEmail({ type, to, customerName, restaurantName, puntos = 0, visitas = 0, descuento = '10%' }) {
+  const { error } = await supabase.functions.invoke('crm-email', {
+    body: { type, to, customerName, restaurantName, puntos, visitas, descuento },
+  });
+  if (error) throw new Error(error.message || 'Error al enviar email');
+}
+
 // ─── Tab 3: Cumpleaños ───────────────────────────────────────────────────────
 function TabCumpleanos({ restaurantId }) {
+  const store = useStore();
   const [bdayers, setBdayers] = useState([]);
   const [loading, setLoading] = useState(true);
+  // Map de customerId → estado del email: 'idle' | 'sending' | 'sent' | 'error'
+  const [emailState, setEmailState] = useState({});
 
   useEffect(() => {
     getCustomersBirthdays(restaurantId, 30)  // próximos 30 días
@@ -409,6 +421,24 @@ function TabCumpleanos({ restaurantId }) {
     return d.toLocaleDateString('es-AR', { day: 'numeric', month: 'long' });
   }
 
+  async function handleSendBirthday(c) {
+    if (!c.email || emailState[c.id] === 'sending' || emailState[c.id] === 'sent') return;
+    setEmailState(prev => ({ ...prev, [c.id]: 'sending' }));
+    try {
+      await sendCrmEmail({
+        type: 'birthday',
+        to: c.email,
+        customerName: c.nombre,
+        restaurantName: store.restaurante?.nombre || 'el restaurante',
+        puntos: c.puntos || 0,
+        descuento: '10%',
+      });
+      setEmailState(prev => ({ ...prev, [c.id]: 'sent' }));
+    } catch {
+      setEmailState(prev => ({ ...prev, [c.id]: 'error' }));
+    }
+  }
+
   if (loading) return <div style={{ textAlign: 'center', padding: '40px 0', color: '#9CA3AF', fontSize: 13 }}>Cargando...</div>;
 
   return (
@@ -418,8 +448,8 @@ function TabCumpleanos({ restaurantId }) {
         <BtnCSV
           disabled={bdayers.length === 0}
           onClick={() => downloadCSV('cumpleanos.csv',
-            ['Nombre', 'Teléfono', 'Nacimiento', 'Días'],
-            bdayers.map(c => [c.nombre, c.telefono || '', c.nacimiento || '', c._diasParaCumple ?? ''])
+            ['Nombre', 'Teléfono', 'Email', 'Nacimiento', 'Días'],
+            bdayers.map(c => [c.nombre, c.telefono || '', c.email || '', c.nacimiento || '', c._diasParaCumple ?? ''])
           )} />
       </div>
 
@@ -440,6 +470,7 @@ function TabCumpleanos({ restaurantId }) {
             const label = esHoy ? '¡Hoy!' : esMañana ? 'Mañana' : `En ${dias} días`;
             const labelColor = esHoy ? '#EF4444' : esMañana ? '#F59E0B' : '#64748B';
             const labelBg = esHoy ? '#FEE2E2' : esMañana ? '#FEF3C7' : '#F1F5F9';
+            const es = emailState[c.id] || 'idle';
 
             return (
               <div key={c.id} style={{ background: '#FFF', border: `1px solid ${esHoy ? '#FCA5A5' : '#E2E8F0'}`, borderRadius: 10, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -449,6 +480,7 @@ function TabCumpleanos({ restaurantId }) {
                   <div style={{ fontSize: 11, color: '#64748B' }}>
                     {fmtNacimiento(c.nacimiento)}
                     {c.telefono ? ` · ${c.telefono}` : ''}
+                    {c.email ? ` · ${c.email}` : ''}
                   </div>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
@@ -456,6 +488,21 @@ function TabCumpleanos({ restaurantId }) {
                     {label}
                   </span>
                   {c.puntos > 0 && <PuntosBadge puntos={c.puntos} />}
+                  {/* Botón email cumpleaños — solo si el cliente tiene email */}
+                  {c.email && (
+                    <button
+                      onClick={() => handleSendBirthday(c)}
+                      disabled={es === 'sending' || es === 'sent'}
+                      style={{
+                        padding: '3px 9px', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: es === 'sent' ? 'default' : 'pointer', border: 'none',
+                        background: es === 'sent' ? 'rgba(29,158,117,0.12)' : es === 'error' ? 'rgba(239,68,68,0.10)' : 'rgba(29,158,117,0.10)',
+                        color: es === 'sent' ? TEAL : es === 'error' ? '#EF4444' : TEAL,
+                        opacity: es === 'sending' ? 0.6 : 1,
+                        whiteSpace: 'nowrap',
+                      }}>
+                      {es === 'sending' ? '⏳ Enviando...' : es === 'sent' ? '✓ Email enviado' : es === 'error' ? '✗ Error' : '✉ Email cumpleaños'}
+                    </button>
+                  )}
                 </div>
               </div>
             );
@@ -463,56 +510,159 @@ function TabCumpleanos({ restaurantId }) {
         </div>
       )}
 
-      <div style={{ marginTop: 16, padding: '10px 14px', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 8 }}>
-        <div style={{ fontSize: 12, color: '#64748B' }}>
-          💡 <strong>Tip:</strong> Mandales un mensaje de cumpleaños con descuento especial para fidelizarlos. Configurá WhatsApp en la pestaña siguiente.
+      <div style={{ marginTop: 16, padding: '10px 14px', background: '#F0FDF4', border: '1px solid rgba(29,158,117,0.25)', borderRadius: 8 }}>
+        <div style={{ fontSize: 12, color: '#064E3B' }}>
+          ✉️ <strong>Emails automáticos activos:</strong> los clientes con email registrado reciben un saludo de cumpleaños con 10% de descuento. Usá el botón de cada cliente para enviar ahora.
         </div>
       </div>
     </div>
   );
 }
 
-// ─── Tab 4: WhatsApp ─────────────────────────────────────────────────────────
-function TabWhatsApp({ restaurantId }) {
+// ─── Tab 4: Marketing ────────────────────────────────────────────────────────
+function TabMarketing({ restaurantId }) {
+  const store = useStore();
+  const [customers, setCustomers] = useState([]);
+  const [loadingC, setLoadingC] = useState(false);
+  // Map de customerId → 'idle' | 'sending' | 'sent' | 'error'
+  const [ptState, setPtState] = useState({});
+  const [blastState, setBlastState] = useState('idle'); // 'idle' | 'sending' | 'done'
+  const [blastResult, setBlastResult] = useState({ sent: 0, skipped: 0 });
+
+  // Cargar clientes con email para el blast de puntos
+  async function loadCustomers() {
+    setLoadingC(true);
+    try {
+      const all = await getAllCustomers(restaurantId, { limit: 500 });
+      setCustomers(all.filter(c => c.email && c.puntos > 0));
+    } finally { setLoadingC(false); }
+  }
+
+  useEffect(() => { loadCustomers(); }, [restaurantId]);
+
+  async function handleSendPoints(c) {
+    if (ptState[c.id] === 'sending' || ptState[c.id] === 'sent') return;
+    setPtState(prev => ({ ...prev, [c.id]: 'sending' }));
+    try {
+      await sendCrmEmail({
+        type: 'points_summary',
+        to: c.email,
+        customerName: c.nombre,
+        restaurantName: store.restaurante?.nombre || 'el restaurante',
+        puntos: c.puntos || 0,
+        visitas: c._visitas || 0,
+      });
+      setPtState(prev => ({ ...prev, [c.id]: 'sent' }));
+    } catch {
+      setPtState(prev => ({ ...prev, [c.id]: 'error' }));
+    }
+  }
+
+  async function handleBlastPoints() {
+    if (blastState === 'sending' || customers.length === 0) return;
+    setBlastState('sending');
+    let sent = 0, skipped = 0;
+    // Rate limit: 1 email cada 200ms para no saturar
+    for (const c of customers) {
+      if (!c.email) { skipped++; continue; }
+      try {
+        await sendCrmEmail({
+          type: 'points_summary',
+          to: c.email,
+          customerName: c.nombre,
+          restaurantName: store.restaurante?.nombre || 'el restaurante',
+          puntos: c.puntos || 0,
+        });
+        sent++;
+        setPtState(prev => ({ ...prev, [c.id]: 'sent' }));
+      } catch {
+        skipped++;
+        setPtState(prev => ({ ...prev, [c.id]: 'error' }));
+      }
+      await new Promise(r => setTimeout(r, 200)); // rate limiting
+    }
+    setBlastResult({ sent, skipped });
+    setBlastState('done');
+  }
+
   return (
-    <div>
-      <div style={{ background: '#FFF', border: '1px solid #E2E8F0', borderRadius: 12, padding: '24px 20px', marginBottom: 14, textAlign: 'center' }}>
-        <div style={{ fontSize: 32, marginBottom: 12 }}>📱</div>
-        <div style={{ fontSize: 15, fontWeight: 700, color: '#0F172A', marginBottom: 6 }}>
-          WhatsApp Marketing
-        </div>
-        <div style={{ fontSize: 13, color: '#64748B', lineHeight: 1.6, maxWidth: 380, margin: '0 auto' }}>
-          Enviá mensajes personalizados a tus clientes — promociones, recordatorios de cumpleaños y novedades del menú.
-        </div>
-      </div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-      {/* Feature list */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
-        {[
-          { icon: '🎯', title: 'Audiencia segmentada', desc: 'Todos los clientes, top 20, o cumpleaños del mes' },
-          { icon: '✍️', title: 'Mensajes personalizados', desc: 'Variables {{nombre}}, {{puntos}}, {{restaurante}}' },
-          { icon: '⏱️', title: 'Envío responsable', desc: 'Rate limiting automático (máx. 10/min) para no ser bloqueado por WhatsApp' },
-          { icon: '🚫', title: 'Opt-out automático', desc: 'Los clientes pueden responder STOP para darse de baja' },
-        ].map(f => (
-          <div key={f.title} style={{ display: 'flex', gap: 12, padding: '10px 14px', background: '#FFF', border: '1px solid #E2E8F0', borderRadius: 10, alignItems: 'flex-start' }}>
-            <span style={{ fontSize: 18, flexShrink: 0 }}>{f.icon}</span>
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 600, color: '#0F172A' }}>{f.title}</div>
-              <div style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>{f.desc}</div>
-            </div>
+      {/* Email CRM — ACTIVO */}
+      <div style={{ background: '#F0FDF4', border: '1px solid rgba(29,158,117,0.3)', borderRadius: 12, padding: '18px 20px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+          <span style={{ fontSize: 22 }}>✉️</span>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#064E3B' }}>Email CRM — Activo</div>
+            <div style={{ fontSize: 11, color: '#047857', marginTop: 1 }}>Usa Resend · No requiere configuración adicional</div>
           </div>
-        ))}
+          <span style={{ marginLeft: 'auto', padding: '2px 8px', background: TEAL, color: 'white', borderRadius: 6, fontSize: 11, fontWeight: 700 }}>✓ Disponible</span>
+        </div>
+        <div style={{ fontSize: 12, color: '#374151', lineHeight: 1.6, marginBottom: 12 }}>
+          Enviá un resumen de puntos a todos tus clientes con email registrado. Cada cliente ve su balance actual y el nivel alcanzado (Bronze/Silver/Gold).
+        </div>
+
+        {/* Blast de puntos */}
+        {customers.length === 0 ? (
+          <div style={{ fontSize: 12, color: '#6B7280' }}>
+            {loadingC ? 'Cargando clientes...' : 'No hay clientes con email y puntos registrados aún.'}
+          </div>
+        ) : (
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+              <div style={{ fontSize: 12, color: '#374151' }}>
+                <strong>{customers.length}</strong> clientes con email y puntos
+              </div>
+              <button
+                onClick={handleBlastPoints}
+                disabled={blastState === 'sending' || blastState === 'done'}
+                style={{
+                  padding: '7px 16px', background: blastState === 'done' ? 'rgba(29,158,117,0.15)' : TEAL, border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 700, color: blastState === 'done' ? TEAL : 'white', cursor: blastState !== 'idle' ? 'default' : 'pointer',
+                  opacity: blastState === 'sending' ? 0.6 : 1,
+                }}>
+                {blastState === 'idle' && '✉ Enviar resumen de puntos a todos'}
+                {blastState === 'sending' && '⏳ Enviando...'}
+                {blastState === 'done' && `✓ ${blastResult.sent} enviados · ${blastResult.skipped} omitidos`}
+              </button>
+            </div>
+
+            {/* Lista individual */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 280, overflowY: 'auto' }}>
+              {customers.map(c => {
+                const es = ptState[c.id] || 'idle';
+                return (
+                  <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 10px', background: '#FFF', borderRadius: 8, border: '1px solid #E2E8F0' }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: '#0F172A' }}>{c.nombre}</div>
+                      <div style={{ fontSize: 11, color: '#64748B' }}>{c.email} · ★ {c.puntos} pts</div>
+                    </div>
+                    <button
+                      onClick={() => handleSendPoints(c)}
+                      disabled={es === 'sending' || es === 'sent'}
+                      style={{
+                        padding: '3px 9px', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: es === 'sent' ? 'default' : 'pointer', border: 'none', whiteSpace: 'nowrap', flexShrink: 0,
+                        background: es === 'sent' ? 'rgba(29,158,117,0.12)' : es === 'error' ? 'rgba(239,68,68,0.10)' : 'rgba(29,158,117,0.10)',
+                        color: es === 'sent' ? TEAL : es === 'error' ? '#EF4444' : TEAL,
+                        opacity: es === 'sending' ? 0.6 : 1,
+                      }}>
+                      {es === 'sending' ? '⏳' : es === 'sent' ? '✓ Enviado' : es === 'error' ? '✗ Error' : '✉ Enviar'}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
       </div>
 
-      {/* Setup required */}
+      {/* WhatsApp Marketing — próximamente */}
       <div style={{ padding: '14px 16px', background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 10 }}>
         <div style={{ fontSize: 13, fontWeight: 600, color: '#92400E', marginBottom: 6 }}>
-          ⚙️ Requiere configuración
+          📱 WhatsApp Marketing — Próximamente
         </div>
         <div style={{ fontSize: 12, color: '#78350F', lineHeight: 1.6 }}>
-          Esta función requiere un servidor <strong>Evolution API</strong> (open-source, ~$5 USD/mes en VPS) conectado a tu WhatsApp Business.
-          <br /><br />
-          Contactá al soporte de <strong>mimenú</strong> para activarlo en tu cuenta.
+          Esta función requiere un servidor <strong>Evolution API</strong> (open-source, ~$15 USD/mes en VPS 2GB RAM) conectado a tu WhatsApp Business.
+          Incluye rate limiting automático (máx. 10/min) y opt-out con la palabra STOP.
         </div>
         <a
           href="mailto:soporte@mimenu.ar?subject=Quiero activar WhatsApp Marketing"
@@ -581,7 +731,7 @@ export default function Clientes() {
           {tab === 0 && <TabDirectorio restaurantId={restaurantId} />}
           {tab === 1 && <TabTopClientes restaurantId={restaurantId} />}
           {tab === 2 && <TabCumpleanos restaurantId={restaurantId} />}
-          {tab === 3 && <TabWhatsApp restaurantId={restaurantId} />}
+          {tab === 3 && <TabMarketing restaurantId={restaurantId} />}
         </div>
       </div>
 
