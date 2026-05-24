@@ -166,8 +166,9 @@ export default function Caja() {
     <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
       <Header tab={tab} setTab={setTab} />
 
-      {tab === 'historial'  && <ShiftHistory />}
-      {tab === 'facturas'   && <FacturasHistory />}
+      {tab === 'historial'     && <ShiftHistory />}
+      {tab === 'facturas'      && <FacturasHistory />}
+      {tab === 'contingencia'  && <ContingenciaAfip />}
 
       {tab === 'actual' && turnoActivo && (
         <>
@@ -471,17 +472,195 @@ function FacturasHistory() {
 }
 
 function Header({ tab, setTab }) {
+  const [pendienteCount, setPendienteCount] = useState(0);
+  const store = useStore();
+  useEffect(() => {
+    const branchId = store.branchId !== 'todas' ? store.branchId : store.sucursales?.[0]?.id;
+    if (!branchId) return;
+    supabase.from('facturas_contingencia')
+      .select('id', { count: 'exact', head: true })
+      .eq('branch_id', branchId)
+      .eq('estado', 'pendiente')
+      .then(({ count }) => setPendienteCount(count || 0));
+  }, [store.branchId, store.sucursales]);
+
   return (
     <div>
       <h1 style={{ fontSize:20, fontWeight:700, color:G.text, margin:0, marginBottom:14, fontFamily:FONT_UI, letterSpacing:'-0.01em' }}>Caja</h1>
-      <div style={{ display:'flex', borderBottom:'1px solid #E2E8F0' }}>
-        {[['actual','Turno actual'],['historial','Historial'],['facturas','Facturas AFIP']].map(([k,l]) => (
+      <div style={{ display:'flex', borderBottom:'1px solid #E2E8F0', flexWrap:'wrap' }}>
+        {[['actual','Turno actual'],['historial','Historial'],['facturas','Facturas AFIP'],['contingencia','Contingencia AFIP']].map(([k,l]) => (
           <button key={k} onClick={()=>setTab(k)}
-            style={{ padding:'8px 16px', fontSize:13, border:'none', background:'none', cursor:'pointer', marginBottom:-1, fontWeight: tab===k?600:400, color: tab===k?G.teal:G.textFaint, borderBottom: tab===k?`2px solid ${G.teal}`:'2px solid transparent', fontFamily:FONT_UI }}>
+            style={{ padding:'8px 16px', fontSize:13, border:'none', background:'none', cursor:'pointer', marginBottom:-1, fontWeight: tab===k?600:400, color: tab===k?G.teal:G.textFaint, borderBottom: tab===k?`2px solid ${G.teal}`:'2px solid transparent', fontFamily:FONT_UI, display:'flex', alignItems:'center', gap:5 }}>
             {l}
+            {k === 'contingencia' && pendienteCount > 0 && (
+              <span style={{ backgroundColor:'#EF4444', color:'white', borderRadius:99, fontSize:10, fontWeight:800, padding:'1px 6px', lineHeight:1.4 }}>
+                {pendienteCount}
+              </span>
+            )}
           </button>
         ))}
       </div>
+    </div>
+  );
+}
+
+// ── Cola de Contingencia Fiscal ───────────────────────────────────────────────
+function ContingenciaAfip() {
+  const store = useStore();
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [reintentando, setReintentando] = useState(null);
+  const [error, setError] = useState('');
+
+  const branchId = store.branchId !== 'todas' ? store.branchId : store.sucursales?.[0]?.id;
+
+  useEffect(() => { loadPendientes(); }, [branchId]);
+
+  async function loadPendientes() {
+    if (!branchId) return;
+    setLoading(true);
+    const { data } = await supabase
+      .from('facturas_contingencia')
+      .select('*')
+      .eq('branch_id', branchId)
+      .neq('estado', 'descartado')
+      .order('created_at', { ascending: false })
+      .limit(50);
+    setItems(data || []);
+    setLoading(false);
+  }
+
+  async function reintentar(item) {
+    setReintentando(item.id); setError('');
+    try {
+      const { emitirFacturaB, emitirFacturaA, getAfipConfig } = await import('@/lib/afip');
+      const cfg = getAfipConfig();
+      if (!cfg.habilitado) throw new Error('AFIP no configurado');
+
+      let res;
+      if (item.tipo === 'B') {
+        res = await emitirFacturaB({ items: item.items, total: item.total, descuento: item.descuento, mesa: item.mesa });
+      } else {
+        if (!item.cliente_data?.cuit) throw new Error('Faltan datos del cliente (CUIT) para Factura A');
+        res = await emitirFacturaA({ items: item.items, total: item.total, descuento: item.descuento, mesa: item.mesa, cliente: item.cliente_data });
+      }
+
+      // Guardar en historial oficial
+      const { data: facturaRow } = await supabase.from('facturas').insert({
+        restaurant_id: item.restaurant_id,
+        branch_id:     item.branch_id,
+        turn_id:       item.turn_id || null,
+        tipo:          item.tipo,
+        numero:        res.numero || null,
+        punto_venta:   cfg.punto_venta || null,
+        cae:           res.cae || null,
+        vto_cae:       res.cae_vto ? new Date(res.cae_vto).toISOString().slice(0,10) : null,
+        total:         res.total || item.total,
+        condicion_iva_receptor: item.tipo === 'B' ? 'Consumidor Final' : (item.cliente_data?.razon_social || 'Empresa'),
+        pdf_url:       res.pdf_link || null,
+      }).select('id').single();
+
+      // Marcar como procesada
+      await supabase.from('facturas_contingencia').update({
+        estado: 'procesado',
+        factura_id: facturaRow?.id || null,
+        procesado_at: new Date().toISOString(),
+        error_mensaje: null,
+      }).eq('id', item.id);
+
+      setItems(prev => prev.map(i => i.id === item.id ? { ...i, estado: 'procesado' } : i));
+    } catch(e) {
+      setError(`Error al re-emitir: ${e.message}`);
+      // Actualizar el error en la DB
+      await supabase.from('facturas_contingencia').update({ error_mensaje: e.message }).eq('id', item.id);
+    }
+    setReintentando(null);
+  }
+
+  async function descartar(itemId) {
+    await supabase.from('facturas_contingencia').update({ estado: 'descartado' }).eq('id', itemId);
+    setItems(prev => prev.filter(i => i.id !== itemId));
+  }
+
+  const pendientes = items.filter(i => i.estado === 'pendiente');
+  const procesadas = items.filter(i => i.estado === 'procesado');
+
+  return (
+    <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+      <div>
+        <h2 style={{ fontSize:16, fontWeight:700, color:G.text, margin:'0 0 4px', fontFamily:FONT_UI }}>Contingencia fiscal AFIP</h2>
+        <p style={{ fontSize:13, color:G.textFaint, margin:0 }}>
+          Facturas que fallaron al emitirse. Podés re-intentar cuando AFIP o internet estén disponibles.
+        </p>
+      </div>
+
+      {error && (
+        <div style={{ backgroundColor:'#FEF2F2', border:'1px solid #FECACA', borderRadius:8, padding:'10px 14px', fontSize:13, color:'#DC2626' }}>{error}</div>
+      )}
+
+      {loading ? (
+        <div style={{ textAlign:'center', padding:32, color:G.textFaint, fontSize:13 }}>Cargando...</div>
+      ) : pendientes.length === 0 ? (
+        <div style={{ textAlign:'center', padding:48, color:G.textFaint }}>
+          <div style={{ fontSize:32, marginBottom:8 }}>✓</div>
+          <div style={{ fontSize:15, fontWeight:600, color:G.text, marginBottom:4 }}>Sin pendientes</div>
+          <div style={{ fontSize:13 }}>Todas las facturas fueron emitidas correctamente.</div>
+        </div>
+      ) : (
+        <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+          <div style={{ fontSize:12, fontWeight:600, color:G.textFaint, textTransform:'uppercase', letterSpacing:'0.05em' }}>
+            {pendientes.length} pendiente{pendientes.length !== 1 ? 's' : ''}
+          </div>
+          {pendientes.map(item => (
+            <div key={item.id} style={{ backgroundColor:'#FFF', border:'1px solid #FCA5A5', borderRadius:10, padding:16 }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:8, flexWrap:'wrap' }}>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:14, fontWeight:600, color:G.text, marginBottom:2 }}>
+                    Factura {item.tipo} — Mesa {item.mesa} — ${Number(item.total - item.descuento).toLocaleString('es-AR')}
+                  </div>
+                  <div style={{ fontSize:11, color:G.textFaint, marginBottom:4 }}>
+                    {new Date(item.created_at).toLocaleString('es-AR')}
+                  </div>
+                  {item.error_mensaje && (
+                    <div style={{ fontSize:11, color:'#DC2626', backgroundColor:'#FEF2F2', padding:'4px 8px', borderRadius:5 }}>
+                      {item.error_mensaje}
+                    </div>
+                  )}
+                </div>
+                <div style={{ display:'flex', gap:6, flexShrink:0 }}>
+                  <button
+                    onClick={() => reintentar(item)}
+                    disabled={reintentando === item.id}
+                    style={{ padding:'7px 14px', borderRadius:7, border:'none', cursor:'pointer', fontSize:12, fontWeight:600, backgroundColor: reintentando === item.id ? '#9CA3AF' : G.teal, color:'white' }}
+                  >
+                    {reintentando === item.id ? 'Emitiendo...' : '↻ Re-intentar'}
+                  </button>
+                  <button
+                    onClick={() => descartar(item.id)}
+                    style={{ padding:'7px 12px', borderRadius:7, border:'1px solid #D1D5DB', cursor:'pointer', fontSize:12, color:G.textFaint, backgroundColor:'white' }}
+                  >
+                    Descartar
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {procesadas.length > 0 && (
+        <div style={{ marginTop:8 }}>
+          <div style={{ fontSize:12, fontWeight:600, color:G.textFaint, textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:8 }}>
+            {procesadas.length} procesada{procesadas.length !== 1 ? 's' : ''}
+          </div>
+          {procesadas.map(item => (
+            <div key={item.id} style={{ backgroundColor:'#F0FDF4', border:'1px solid #BBF7D0', borderRadius:10, padding:'10px 14px', marginBottom:6, fontSize:13 }}>
+              <span style={{ color:'#16A34A', fontWeight:600 }}>✓</span> Factura {item.tipo} — Mesa {item.mesa} — ${Number(item.total - item.descuento).toLocaleString('es-AR')}
+              <span style={{ color:G.textFaint, fontSize:11, marginLeft:8 }}>{new Date(item.procesado_at || item.created_at).toLocaleString('es-AR')}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

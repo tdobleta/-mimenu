@@ -66,6 +66,29 @@ export default function FacturaModal({ mesa, items, total, descuento = 0, restau
       }
     } catch(e) {
       setError(e.message);
+      // ── Cola de contingencia fiscal ────────────────────────────────────
+      // El cobro ya ocurrió (el turn está cerrado). Si AFIP falla, guardamos
+      // todos los datos necesarios para re-emitir desde Caja → Facturas AFIP.
+      if (restaurantId && branchId) {
+        const clienteData = tipo === 'A' && cuitCliente
+          ? { cuit: cuitCliente, razon_social: razonCliente, email: emailCliente, domicilio: domicilioCliente }
+          : null;
+        supabase.from('facturas_contingencia').insert({
+          restaurant_id: restaurantId,
+          branch_id:     branchId,
+          turn_id:       turnId || null,
+          mesa:          String(mesa),
+          items:         items,
+          total:         total,
+          descuento:     descuento || 0,
+          tipo:          tipo,
+          cliente_data:  clienteData,
+          error_mensaje: e.message,
+          estado:        'pendiente',
+        }).then(({ error: dbErr }) => {
+          if (dbErr) console.warn('[contingencia] No se pudo guardar:', dbErr.message);
+        });
+      }
     }
     setEmitiendo(false);
   }
