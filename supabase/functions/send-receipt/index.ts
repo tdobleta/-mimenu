@@ -15,11 +15,19 @@
 // No bloquea el cierre de mesa — se llama después de cerrar exitosamente.
 
 import { Resend } from 'https://esm.sh/resend@3';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+// Cliente para validar JWT del usuario autenticado.
+// SUPABASE_URL y SUPABASE_ANON_KEY están disponibles automáticamente en Edge Functions.
+const supabaseAuth = createClient(
+  Deno.env.get('SUPABASE_URL')!,
+  Deno.env.get('SUPABASE_ANON_KEY')!,
+);
 
 function money(n: number): string {
   return '$' + (n || 0).toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
@@ -38,6 +46,25 @@ function fmtFecha(isoStr: string): string {
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+
+  // ── Verificación JWT ───────────────────────────────────────────────────────
+  // La función solo puede ser llamada por usuarios autenticados (mozos/dueños).
+  // El cliente Supabase JS adjunta automáticamente el JWT al llamar via
+  // supabase.functions.invoke(). Sin auth, rechazamos para evitar abuso de cuota.
+  const authHeader = req.headers.get('Authorization');
+  if (!authHeader?.startsWith('Bearer ')) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+  const token = authHeader.replace('Bearer ', '');
+  const { data: { user }, error: authError } = await supabaseAuth.auth.getUser(token);
+  if (authError || !user) {
+    return new Response(JSON.stringify({ error: 'Token inválido' }), {
+      status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+  // ── Fin verificación JWT ───────────────────────────────────────────────────
 
   try {
     const {

@@ -173,12 +173,16 @@ export async function descontarStockPorMesa(order, branchId, store) {
         const ing = stockItems.find(s => s.id === r.ingredienteId);
         if (!ing) continue;
         const cantidad = Number(r.cantidad) * (item.qty || 1);
+        // FIX: usar RPC atómico decrement_stock en lugar de SELECT+calcular+UPDATE.
+        // Previene double-decrement en retries offline (la operación es idempotente
+        // en términos de no producir stock negativo, pero no en cantidad decrementada).
+        // El valor local para el store se calcula igual que el RPC: GREATEST(0, actual-qty).
         const nuevoActual = Math.max(0, Number(ing.actual) - cantidad);
         try {
-          const { error } = await supabase
-            .from('stock_items')
-            .update({ actual: nuevoActual })
-            .eq('id', ing.id);
+          const { error } = await supabase.rpc('decrement_stock', {
+            p_id:  ing.id,
+            p_qty: cantidad,
+          });
           if (error) throw error;
           store.updateStockItem(branchId, ing.id, { actual: nuevoActual });
           await addEgreso(branchId, {
