@@ -31,6 +31,7 @@ import Login from './pages/Login';
 import POSView from './pages/POSView';
 import Clientes from './pages/Clientes';
 import Delivery from './pages/Delivery';
+import PinGuard from './components/pin/PinGuard';
 
 const RoleGuard = ({ roles, children }) => {
   const role = useUserRole();
@@ -136,10 +137,10 @@ const RoutedApp = () => {
   return (
     <Routes>
       <Route path="/cocina" element={<CocinaDisplay />} />
-      <Route path="/pos" element={<POSView />} />
+      <Route path="/pos" element={<PinGuard><POSView /></PinGuard>} />
       <Route element={<Layout />}>
         <Route path="/" element={<RoleGuard roles={['Dueno','Encargado']}><Dashboard /></RoleGuard>} />
-        <Route path="/salon" element={<Salon />} />
+        <Route path="/salon" element={<PinGuard><Salon /></PinGuard>} />
         <Route path="/caja" element={<RoleGuard roles={['Dueno','Encargado']}><Caja /></RoleGuard>} />
         <Route path="/reservas" element={<Reservas />} />
         <Route path="/stock" element={<RoleGuard roles={['Dueno','Encargado']}><Stock /></RoleGuard>} />
@@ -148,7 +149,7 @@ const RoutedApp = () => {
         <Route path="/control-cocina" element={<RoleGuard roles={['Dueno','Encargado']}><ControlCocina /></RoleGuard>} />
         <Route path="/analiticas" element={<RoleGuard roles={['Dueno','Encargado']}><Analiticas /></RoleGuard>} />
         <Route path="/clientes" element={<RoleGuard roles={['Dueno','Encargado']}><Clientes /></RoleGuard>} />
-        <Route path="/delivery" element={<RoleGuard roles={['Dueno','Encargado','Mozo']}><Delivery /></RoleGuard>} />
+        <Route path="/delivery" element={<PinGuard><RoleGuard roles={['Dueno','Encargado','Mozo']}><Delivery /></RoleGuard></PinGuard>} />
         <Route path="/configuracion" element={<RoleGuard roles={['Dueno']}><Configuracion /></RoleGuard>} />
         <Route path="*" element={<PageNotFound />} />
       </Route>

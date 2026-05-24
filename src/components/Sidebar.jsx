@@ -3,6 +3,7 @@ import { useStore } from '@/lib/store';
 import useUserRole from '@/lib/useUserRole';
 import { G } from '@/lib/glass';
 import { supabase } from '@/api/supabaseClient';
+import { useActiveStaff } from '@/lib/useActiveStaff';
 
 const ROLE_PATHS = {
   Dueno:    ['/','/salon','/caja','/reservas','/stock','/clientes','/delivery','/reportes','/analiticas','/conexion','/configuracion','/control-cocina','/public/cocina'],
@@ -41,6 +42,7 @@ export default function Sidebar({ onClose }) {
   const store = useStore();
   const { restaurante } = store;
   const role = useUserRole();
+  const { activeStaff, clearActiveStaff } = useActiveStaff();
   const allowed = ROLE_PATHS[role] || ROLE_PATHS.Encargado;
   const cocinaBranch = store.branchId !== 'todas' ? store.branchId : (store.sucursales?.[0]?.id || '');
   const navItems = NAV
@@ -135,38 +137,28 @@ export default function Sidebar({ onClose }) {
           </span>
         </div>
 
-        {/* Botón "Cambio de turno" — visible para Mozo y Cocinero
-            Permite al mozo saliente cerrar sesión limpiamente para que el mozo
-            entrante pueda ingresar con su propia cuenta, sin dejar sesiones abiertas. */}
-        {(role === 'Mozo' || role === 'Cocinero') && (
-          <button
-            onClick={() => supabase.auth.signOut().then(() => window.location.href = '/login')}
-            style={{
-              marginTop: 10,
-              width: '100%',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 7,
-              padding: '7px 10px',
-              background: 'rgba(255,255,255,0.05)',
-              border: '1px solid #21262D',
-              borderRadius: 8,
-              cursor: 'pointer',
-              color: '#6B7280',
-              fontSize: 12,
-              fontWeight: 500,
-              transition: 'all .15s',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.background='rgba(255,255,255,0.09)'; e.currentTarget.style.color='#E6EDF3'; }}
-            onMouseLeave={e => { e.currentTarget.style.background='rgba(255,255,255,0.05)'; e.currentTarget.style.color='#6B7280'; }}
-          >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-              <polyline points="16 17 21 12 16 7"/>
-              <line x1="21" y1="12" x2="9" y2="12"/>
-            </svg>
-            Cambio de turno
-          </button>
+        {/* Badge mozo activo + botón de cambio rápido */}
+        {activeStaff && (
+          <div style={{ marginTop: 10, background: 'rgba(29,158,117,0.08)', border: '1px solid rgba(29,158,117,0.18)', borderRadius: 8, padding: '7px 10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+              <div style={{ width: 22, height: 22, borderRadius: '50%', background: G.teal, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, color: '#FFF', flexShrink: 0 }}>
+                {activeStaff.nombre.charAt(0).toUpperCase()}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#E6EDF3', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{activeStaff.nombre}</div>
+                <div style={{ fontSize: 9.5, color: '#484F58' }}>{activeStaff.rol}</div>
+              </div>
+              <button
+                onClick={clearActiveStaff}
+                title="Cambiar mozo"
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#484F58', padding: 2, display: 'flex' }}
+                onMouseEnter={e => e.currentTarget.style.color = '#8B949E'}
+                onMouseLeave={e => e.currentTarget.style.color = '#484F58'}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
+          </div>
         )}
       </div>
     </div>
