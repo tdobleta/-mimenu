@@ -1,0 +1,23 @@
+{
+  "name": "mimenu-relay",
+  "version": "1.0.0",
+  "description": "Servidor relay LAN para mimenú — permite comunicación cocina/salón sin internet",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "build-exe": "pkg . --targets node18-win-x64 --output dist/mimenu-relay.exe"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "ws": "^8.16.0",
+    "bonjour-service": "^1.1.1"
+  },
+  "devDependencies": {
+    "pkg": "^5.8.1"
+  },
+  "pkg": {
+    "targets": ["node18-win-x64"],
+    "outputPath": "dist",
+    "assets": []
+  }
+}

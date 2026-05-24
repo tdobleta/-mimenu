@@ -14,6 +14,7 @@ import FacturaModal from '../facturacion/FacturaModal';
 import { getAfipConfig } from '@/lib/afip';
 import { MENU_CATEGORIES, DEFAULT_CATEGORY, getCategoryColor } from '@/lib/menuCategories';
 import { descontarStockPorMesa } from '@/lib/stockApi';
+import { localRelay } from '@/lib/localRelay';
 
 // Colores para categorías extra no definidas en MENU_CATEGORIES
 const EXTRA_COLORS = [G.teal, G.violet, G.blue, G.amber, '#F97316', '#EC4899', '#6366F1', '#14B8A6'];
@@ -93,6 +94,13 @@ export default function ComandaPanel({ table, branchId, onClose, addToast }) {
     try {
       await base44.entities.Turn.update(table.turnId, { enviado_cocina: true, enviado_cocina_at: new Date().toISOString() });
       setYaEnviado(true);
+      // Notificar por relay LAN si está disponible (< 200ms, sin internet)
+      localRelay.send('NEW_COMANDA', {
+        branchId,
+        turnId:  table.turnId,
+        mesaNum: table.num,
+        items:   (table.order || []).map(it => ({ nombre: it.nombre, qty: it.qty, notas: it.nota || '' })),
+      });
       addToast('Comanda enviada a cocina ✓', 'success');
       const cfg = getPrinterConfig();
       if (cfg.autoPrintComanda) {

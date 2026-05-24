@@ -4,6 +4,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { useStore } from '@/lib/store';
 import { fetchTurnItemsBatch } from '@/lib/pagination';
 import { subscribeToTurns, subscribeToTurnItems, registerActiveTurns } from '@/lib/realtimeManager';
+import { localRelay } from '@/lib/localRelay';
 import { useToast } from '@/lib/toast';
 
 // ── Helper: actualizar estado via Edge Function cocina-update (usa service_role, bypasea RLS)
@@ -59,6 +60,7 @@ export default function CocinaDisplay() {
   const [lastUpdate, setLastUpdate] = useState(null);
   const [, setTick] = useState(0);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [relayConnected, setRelayConnected] = useState(localRelay.isConnected);
   const removalTimers = useRef({});
   // Ref siempre actualizado para evitar stale closure en cambiarEstado (async)
   // Mismo patrón que storeRef en Salon.jsx
@@ -138,18 +140,32 @@ export default function CocinaDisplay() {
     const unsubTurns = subscribeToTurns(activeBranchId, () => loadCocina());
     const unsubItems = subscribeToTurnItems(activeBranchId, () => loadCocina());
 
+    // Relay LAN: recibir comandas instantáneamente sin internet (< 200ms)
+    const unsubRelay = localRelay.on('NEW_COMANDA', (msg) => {
+      if (msg.branchId !== activeBranchId) return;
+      // La comanda ya está en DB (ComandaPanel la persistió antes de enviar el relay msg).
+      // Solo necesitamos recargar para que aparezca en pantalla.
+      loadCocina();
+    });
+    // Iniciar conexión relay si está habilitado pero no conectado
+    localRelay.connect().catch(() => {});
+
     // Fallback: polling cada 30s por si Realtime se desconecta
     const fallback = setInterval(() => { if (navigator.onLine) loadCocina(); }, 30000);
 
     return () => {
       unsubTurns();
       unsubItems();
+      unsubRelay();
       clearInterval(fallback);
     };
   }, [activeBranchId, loadCocina]);
 
   useEffect(() => {
-    const t = setInterval(() => setTick(x => x+1), 1000);
+    const t = setInterval(() => {
+      setTick(x => x+1);
+      setRelayConnected(localRelay.isConnected);
+    }, 1000);
     return () => {
       clearInterval(t);
       // Limpiar todos los timers de remoción al desmontar
@@ -245,11 +261,18 @@ export default function CocinaDisplay() {
         </div>
       </div>
 
-      {/* Banner offline — prominente para que el cocinero lo vea desde lejos */}
-      {!isOnline && (
+      {/* Banner sin internet — prominente para que el cocinero lo vea desde lejos */}
+      {!isOnline && !relayConnected && (
         <div style={{ position:'sticky', top:63, zIndex:9, background:'#EF4444', color:'white', padding:'14px 20px', fontSize:16, fontWeight:700, textAlign:'center', display:'flex', alignItems:'center', justifyContent:'center', gap:12, letterSpacing:'0.01em' }}>
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
           ⚠ SIN INTERNET — Mostrando últimas comandas guardadas. Nuevos pedidos no llegarán hasta reconectar.
+        </div>
+      )}
+      {/* Banner relay LAN activo — el cocinero sabe que está operando sin internet pero con red local */}
+      {!isOnline && relayConnected && (
+        <div style={{ position:'sticky', top:63, zIndex:9, background:'#D97706', color:'white', padding:'10px 20px', fontSize:14, fontWeight:700, textAlign:'center', display:'flex', alignItems:'center', justifyContent:'center', gap:10 }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>
+          Sin internet · Relay local activo — comandas llegan vía red WiFi
         </div>
       )}
 
