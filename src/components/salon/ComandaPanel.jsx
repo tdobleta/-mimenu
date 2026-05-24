@@ -14,6 +14,7 @@ import FacturaModal from '../facturacion/FacturaModal';
 import { getAfipConfig } from '@/lib/afip';
 import { MENU_CATEGORIES, DEFAULT_CATEGORY, getCategoryColor } from '@/lib/menuCategories';
 import { descontarStockPorMesa } from '@/lib/stockApi';
+import { cerrarMesaOnline } from '@/lib/cajaService';
 import { localRelay } from '@/lib/localRelay';
 import { getActiveStaff, touchActiveStaff } from '@/lib/useActiveStaff';
 
@@ -502,49 +503,35 @@ export default function ComandaPanel({ table, branchId, onClose, addToast }) {
             const cajaShiftId = store.turnoActivo.id;
             try {
               if (table.turnId) {
-                // Cierre atómico: lock + update turn + update caja en una sola transacción
-                const { data: resultado, error: rpcError } = await supabase.rpc('cerrar_mesa_atomico', {
-                  p_turn_id: table.turnId,
-                  p_total: finalTotal,
-                  p_propina: propinaAmount || 0,
-                  p_metodo: method,
-                  p_mozo: table.mozo || '',
-                  p_caja_shift_id: cajaShiftId || null,
-                  p_pagos_detalle: pagos?.length > 0 ? pagos : null,
+                // Cierre atómico delegado a cajaService:
+                // cerrar_mesa_atomico + caja cache update + stock decrement (fire-and-forget)
+                const result = await cerrarMesaOnline({
+                  turnId:      table.turnId,
+                  branchId,
+                  cajaShiftId: cajaShiftId || null,
+                  total:       finalTotal,
+                  propina:     propinaAmount || 0,
+                  metodo:      method,
+                  mozo:        table.mozo || '',
+                  pagos,
+                  order:       table.order || [],
+                  store,
                 });
-                if (rpcError) {
-                  // cerrar_mesa_atomico lanza RAISE EXCEPTION si el turno no existe o ya está cerrado.
-                  // Supabase lo retorna como rpcError con code P0001.
-                  const msgLower = rpcError.message?.toLowerCase() || '';
-                  if (msgLower.includes('ya cerrado') || rpcError.code === 'P0001') {
+                if (!result.ok) {
+                  if (result.alreadyClosed) {
                     addToast('Esta mesa ya fue cerrada por otro dispositivo.', 'warning');
                     store.closeTable(branchId, table.id);
                     setShowClose(false); onClose(); setCerrando(false);
                     return;
                   }
-                  throw rpcError;
+                  throw result.error;
                 }
-                // Si llegamos aquí sin error, cerrar_mesa_atomico tuvo éxito.
-                // resultado es la fila de turns actualizada — no hay campo .ok que verificar.
               } else {
-                // Venta directa sin turn previo — crear turn cerrado
+                // Venta directa sin turn previo — crear turn cerrado (path legacy)
                 const turn = await base44.entities.Turn.create({ branch_id:branchId, mesa_num:table.num, status:'cerrada', opened_at:table.openedAt ? new Date(table.openedAt).toISOString() : new Date().toISOString(), closed_at:new Date().toISOString(), total_facturado:finalTotal, descuento:discAmount||0, propina:propinaAmount||0, metodo_pago:method, mozo:table.mozo||'', ...(cajaShiftId?{caja_shift_id:cajaShiftId}:{}) });
                 await Promise.all((table.order||[]).map(item => base44.entities.TurnItem.create({ turn_id:turn.id, branch_id:branchId, menu_item_name:item.nombre, menu_item_id:item.itemId, cantidad:item.qty, precio:item.precio, notas:item.nota||null })));
               }
               store.closeTable(branchId, table.id);
-              // Descontar stock automáticamente según recetas configuradas.
-              // Se pasa table.turnId para idempotencia en retries offline.
-              descontarStockPorMesa(table.order || [], branchId, store, table.turnId || null).catch((err) => {
-                console.error('[Stock] Fallo al descontar stock:', err);
-                addToast('Mesa cerrada. Nota: el descuento de stock falló — revisalo manualmente.', 'warning');
-              });
-              // El total de caja ya se actualizó dentro de cerrar_mesa_atomico
-              if (store.turnoActivo) {
-                try {
-                  const { data: cajaData } = await supabase.from('caja_shifts').select('total_facturado_turno').eq('id', cajaShiftId).single();
-                  if (cajaData) store.setTurnoActivo({ ...store.turnoActivo, totalCache: cajaData.total_facturado_turno });
-                } catch(e) { console.warn('Cache caja no actualizado:', e); }
-              }
               setShowClose(false);
 const afipCfg = getAfipConfig();
 if (afipCfg.habilitado) {

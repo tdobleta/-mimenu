@@ -12,6 +12,7 @@ import { subscribeToTurns } from '@/lib/realtimeManager';
 import { useAuth } from '@/lib/AuthContext';
 import useUserRole from '@/lib/useUserRole';
 import { getActiveStaff, touchActiveStaff } from '@/lib/useActiveStaff';
+import { cerrarMesaOnline } from '@/lib/cajaService';
 
 // ── Constantes ─────────────────────────────────────────────────────────────────
 const ESTADOS = [
@@ -83,24 +84,47 @@ export default function Delivery() {
 
   // ── Cambiar estado ────────────────────────────────────────────────────────
   async function cambiarEstado(pedidoId, nuevoEstado) {
-    const updates = { delivery_estado: nuevoEstado };
-    if (nuevoEstado === 'entregado') {
-      updates.status       = 'cerrada';
-      updates.closed_at    = new Date().toISOString();
-      updates.total_facturado = pedidos.find(p => p.id === pedidoId)
-        ?.turn_items?.reduce((s, i) => s + i.precio * i.cantidad, 0) || 0;
-    }
-    // Optimistic update
+    // Optimistic update para UI inmediata
     setPedidos(prev => prev.map(p =>
       p.id === pedidoId
         ? { ...p, delivery_estado: nuevoEstado, status: nuevoEstado === 'entregado' ? 'cerrada' : p.status }
         : p
     ));
-    const { error } = await supabase.from('turns').update(updates).eq('id', pedidoId);
-    if (error) { addToast('Error al actualizar estado', 'error'); loadPedidos(); }
-    else if (nuevoEstado === 'entregado') {
+
+    if (nuevoEstado === 'entregado') {
+      // Para "entregado" usamos cerrarMesaOnline que llama cerrar_mesa_atomico:
+      // garantiza que caja_shifts se actualiza correctamente (no UPDATE plano).
       const pedido = pedidos.find(p => p.id === pedidoId);
       const total = pedido?.turn_items?.reduce((s, i) => s + i.precio * i.cantidad, 0) || 0;
+      const cajaShiftId = store.turnoActivo?.id || null;
+      const metodoPago = pedido?.delivery_data?.metodo_pago || 'Efectivo';
+
+      const result = await cerrarMesaOnline({
+        turnId:      pedidoId,   // turn.id es el pedidoId en delivery
+        branchId,
+        cajaShiftId,
+        total,
+        propina:     0,
+        metodo:      metodoPago,
+        mozo:        pedido?.mozo || '',
+        order:       (pedido?.turn_items || []).map(i => ({
+          itemId: i.menu_item_id,
+          id:     i.menu_item_id,
+          qty:    i.cantidad,
+        })),
+        store,
+      });
+
+      if (!result.ok && !result.alreadyClosed) {
+        addToast('Error al registrar entrega', 'error');
+        loadPedidos();
+        return;
+      }
+
+      // También actualizar delivery_estado = 'entregado' en la misma fila
+      // (cerrar_mesa_atomico no actualiza este campo)
+      await supabase.from('turns').update({ delivery_estado: 'entregado' }).eq('id', pedidoId);
+
       store.logAccion({
         usuario: getActiveStaff()?.nombre || user?.email || 'Sistema',
         rol: userRole,
@@ -111,6 +135,13 @@ export default function Delivery() {
       });
       touchActiveStaff();
       addToast('Pedido entregado ✓', 'success');
+    } else {
+      // Para los demás estados (preparando, listo, en_camino) → UPDATE simple
+      const { error } = await supabase
+        .from('turns')
+        .update({ delivery_estado: nuevoEstado })
+        .eq('id', pedidoId);
+      if (error) { addToast('Error al actualizar estado', 'error'); loadPedidos(); }
     }
   }
 

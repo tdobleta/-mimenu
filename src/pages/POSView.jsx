@@ -12,6 +12,7 @@ import { enqueue } from '@/lib/offlineQueue';
 import { useBidirectionalSync } from '@/lib/useBidirectionalSync';
 import { subscribeToTurns, subscribeToTurnItems } from '@/lib/realtimeManager';
 import { descontarStockPorMesa } from '@/lib/stockApi';
+import { cerrarMesaOnline } from '@/lib/cajaService';
 
 function cc(cat) { return getCategoryColor(cat); }
 function fmt(n) { return '$'+Number(n||0).toLocaleString('es-AR',{maximumFractionDigits:0}); }
@@ -505,6 +506,8 @@ export default function POSView() {
     try{
       const cajaId=store.turnoActivo?.id||null;
       let tid=selectedTurn?.id;
+
+      // POS mode: no hay turn previo (venta directa) → crear turn abierto con sus ítems
       if(!tid){
         const{data,error}=await supabase.from('turns').insert({branch_id:branchId,mesa_num:0,mozo:'',status:'abierta',opened_at:new Date().toISOString(),total_facturado:0,caja_shift_id:cajaId||null}).select().single();
         if(error)throw error;
@@ -515,45 +518,31 @@ export default function POSView() {
           await supabase.from('turn_items').insert({turn_id:tid,branch_id:branchId,menu_item_id:item.id||null,menu_item_name:item.nombre,cantidad:item.qty,precio:item.precio+(item.extra||0),notas:notaF||null});
         }
       }
-      // Cierre atómico: lock + update turn + update caja en 1 transacción SQL
-      const { data: resultado, error: rpcError } = await supabase.rpc('cerrar_mesa_atomico', {
-        p_turn_id: tid,
-        p_total: tot,
-        p_propina: propina || 0,
-        p_metodo: metodo,
-        p_mozo: selectedTurn?.mozo || '',
-        p_caja_shift_id: cajaId || null,
-        p_pagos_detalle: pagos?.length > 0 ? pagos : null,
+
+      // Cierre de mesa: delega lógica de negocio a cajaService
+      // (cerrar_mesa_atomico + caja cache + stock decrement)
+      const result = await cerrarMesaOnline({
+        turnId: tid, branchId, cajaShiftId: cajaId,
+        total: tot, propina: propina||0, metodo,
+        mozo: selectedTurn?.mozo||'', pagos,
+        order, store,
       });
-      if (rpcError) {
-        // cerrar_mesa_atomico lanza RAISE EXCEPTION si el turno no existe o ya está cerrado.
-        const msgLower = rpcError.message?.toLowerCase() || '';
-        if (msgLower.includes('ya cerrado') || rpcError.code === 'P0001') {
+      if (!result.ok) {
+        if (result.alreadyClosed) {
           addToast('Esta mesa ya fue cerrada por otro dispositivo.', 'warning');
           setShowCobro(false);
           return;
         }
-        throw rpcError;
+        throw result.error;
       }
-      // Si llegamos aquí sin error, cerrar_mesa_atomico tuvo éxito (resultado = turns row).
-      // Actualizar cache de caja desde DB (ya actualizado por la transacción)
-      if (cajaId) {
-        try {
-          const { data: cajaData } = await supabase.from('caja_shifts').select('total_facturado_turno').eq('id', cajaId).single();
-          if (cajaData) store.setTurnoActivo({ ...store.turnoActivo, totalCache: cajaData.total_facturado_turno });
-        } catch(e) {}
-      }
+
+      // Limpiar estado local de la mesa
       if(selectedTurn?.id){const tables=store.getTables(branchId);const table=tables.find(t=>t.turnId===selectedTurn.id);if(table)store.closeTable(branchId,table.id);}
-      // Descontar stock automáticamente según recetas (no bloquea el cobro).
-      // Se pasa selectedTurn?.id para idempotencia: si descontarStockPorMesa
-      // se reintenta, los egresos con el mismo turn_id son ignorados (23505).
-      descontarStockPorMesa(order, branchId, store, selectedTurn?.id || null).catch((err) => {
-        console.error('[Stock] Fallo al descontar stock en POSView:', err);
-        addToast('Cobrado. Nota: el descuento de stock falló — revisalo manualmente.', 'warning');
-      });
       store.refreshCharts&&store.refreshCharts();
       addToast('Cobrado '+fmt(tot),'success');
       setShowCobro(false);
+
+      // Impresión y AFIP (UI pura)
       const pCfg=getPrinterConfig();
       if(pCfg.autoPrintRecibo){
         try{await printReceipt({mesa:selectedTurn?.mesa_num||'Directa',mozo:selectedTurn?.mozo||'',items:order.map(it=>({nombre:it.nombre,precio:it.precio+(it.extra||0),qty:it.qty,nota:it.nota||''})),subtotal:tot-propina,descuento:0,propina,total:tot,metodo},pCfg);}
