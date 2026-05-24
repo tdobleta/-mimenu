@@ -4,6 +4,8 @@ import { base44 } from '@/api/base44Client';
 import { Link } from 'react-router-dom';
 import { exportTurnsCSV } from '@/lib/export';
 import { fetchRecetas, fetchPrecios } from '@/lib/stockApi';
+import { fetchTurnItemsBatch } from '@/lib/pagination';
+import { useToast } from '@/lib/toast';
 import AnalyticsSummary from '../components/analytics/AnalyticsSummary';
 import SalesEvolution from '../components/analytics/SalesEvolution';
 import IncomeDistribution from '../components/analytics/IncomeDistribution';
@@ -30,7 +32,9 @@ function getPeriodStart(period) {
 
 export default function Analiticas() {
   const store = useStore();
+  const { addToast } = useToast();
   const [period, setPeriod] = useState('month');
+  const [turnsLimitReached, setTurnsLimitReached] = useState(false);
   const [loading, setLoading] = useState(true);
   const [allTurns, setAllTurns] = useState([]);
   const [allItems, setAllItems] = useState([]);
@@ -59,12 +63,11 @@ export default function Analiticas() {
           turns = arrays.flat();
         }
         turns = turns || [];
+        // Aviso si se llegó al tope de carga (500 por sucursal)
+        setTurnsLimitReached(turns.length >= 500);
 
-        const top200 = turns.slice(0, 200);
-        const itemsArrays = await Promise.all(
-          top200.map(t => base44.entities.TurnItem.filter({ turn_id: t.id }).catch(() => []))
-        );
-        const items = itemsArrays.flat();
+        // Carga todos los ítems en batches de 50 IDs — evita N+1 queries
+        const items = await fetchTurnItemsBatch(turns.map(t => t.id));
 
         let menus = [];
         let recipes = {};
@@ -92,8 +95,8 @@ export default function Analiticas() {
           setLoading(false);
         }
       } catch(err) {
-        console.error('Error cargando analíticas:', err);
         if (!cancelled) {
+          addToast('Error al cargar analíticas. Revisá tu conexión.', 'error');
           setAllTurns([]);
           setAllItems([]);
           setLoading(false);
@@ -147,6 +150,13 @@ export default function Analiticas() {
           )}
         </div>
       </div>
+
+      {turnsLimitReached && !loading && (
+        <div style={{ display:'flex', alignItems:'center', gap:8, padding:'9px 14px', background:'#FFFBEB', border:'1px solid #FDE68A', borderRadius:9, fontSize:12, color:'#92400E' }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#CA8A04" strokeWidth="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          Se cargaron los últimos 500 registros por sucursal. Si tu restaurante tiene más volumen, los datos más antiguos no están incluidos en este período.
+        </div>
+      )}
 
       {loading ? (
         <div style={{ display:'flex', alignItems:'center', justifyContent:'center', padding:'80px 0' }}>
