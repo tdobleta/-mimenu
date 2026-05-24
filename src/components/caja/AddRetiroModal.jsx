@@ -6,6 +6,7 @@ import { money } from '@/lib/fmt';
 import { useAuth } from '@/lib/AuthContext';
 import useUserRole from '@/lib/useUserRole';
 import { enqueue } from '@/lib/offlineQueue';
+import { getActiveStaff } from '@/lib/useActiveStaff';
 
 const CONCEPTOS = ['Retiro recaudación','Pago proveedor','Gastos operativos','Otro'];
 
@@ -37,7 +38,7 @@ export default function AddRetiroModal({ onClose }) {
       if (error) throw error;
       store.addRetiro(retiro);
       store.logAccion({
-        usuario: user?.email || 'Sistema',
+        usuario: getActiveStaff()?.nombre || user?.email || 'Sistema',
         rol: userRole,
         categoria: 'Caja',
         accion: 'Retiro de caja',

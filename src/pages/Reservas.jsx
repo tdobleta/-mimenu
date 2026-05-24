@@ -1,11 +1,13 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useStore } from '@/lib/store';
 import { base44 } from '@/api/base44Client';
 import { useToast } from '@/lib/toast';
 import { dateShort } from '@/lib/fmt';
 import { useAuth } from '@/lib/AuthContext';
 import useUserRole from '@/lib/useUserRole';
-import emailjs from 'https://cdn.jsdelivr.net/npm/@emailjs/browser@4/+esm';
+import { supabase } from '@/api/supabaseClient';
+import emailjs from '@emailjs/browser';
+import { getActiveStaff } from '@/lib/useActiveStaff';
 
 const BADGE = {
   confirmada: { bg:'#E8F7F2', c:'#1D9E75' },
@@ -33,13 +35,60 @@ export default function Reservas() {
   const reservas = store.getReservas();
   const showSucursalCol = store.branchId === 'todas';
 
+  const activeBranchId = store.branchId !== 'todas' ? store.branchId : store.sucursales[0]?.id;
+
+  // ── Realtime: nuevas reservas web llegan en tiempo real ───────────────────
+  useEffect(() => {
+    if (!activeBranchId) return;
+
+    const channel = supabase
+      .channel(`reservas-${activeBranchId}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'reservations',
+        filter: `branch_id=eq.${activeBranchId}`,
+      }, (payload) => {
+        const r = payload.new;
+        // Agregar al store solo si no existe ya (idempotente)
+        store.addReservation(activeBranchId, {
+          id:       r.id,
+          hora:     r.hora,
+          nombre:   r.nombre,
+          telefono: r.telefono,
+          personas: r.personas,
+          mesa:     r.mesa || '-',
+          canal:    r.canal || 'Web',
+          estado:   r.estado,
+          fecha:    r.fecha,
+          email:    r.email || '',
+          notas:    r.notas || '',
+        });
+        addToast(`Nueva reserva: ${r.nombre} (${r.fecha} ${r.hora})`, 'info');
+      })
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'reservations',
+        filter: `branch_id=eq.${activeBranchId}`,
+      }, (payload) => {
+        const r = payload.new;
+        store.updateReservation(activeBranchId, r.id, { estado: r.estado });
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [activeBranchId]);
+
   const filtered = reservas.filter(r => {
     if (tab==='hoy') return r.fecha === todayStr;
     if (tab==='proximos') return r.fecha > todayStr && r.fecha <= next7Str;
     return r.fecha < todayStr;
   });
 
+  const operador = () => getActiveStaff()?.nombre || user?.email || 'Sistema';
   const sucursalNombre = (r) => r.sucursalNombre || store.sucursales.find(s=>s.id===store.branchId)?.nombre || '';
+
   const confirm = async (r) => {
     const bid = r.sucursalNombre
       ? store.sucursales.find(s => s.nombre === r.sucursalNombre)?.id || store.branchId
@@ -47,26 +96,26 @@ export default function Reservas() {
     try {
       await base44.entities.Reservation.update(r.id, { estado: 'confirmada' });
       store.updateReservation(bid, r.id, { estado: 'confirmada' });
-      store.logAccion({ usuario: user?.email || 'Sistema', rol: userRole, categoria: 'Reservas', accion: 'Reserva confirmada', detalle: r.nombre + ' · ' + r.fecha + ' ' + r.hora, sucursal: sucursalNombre(r) });
+      store.logAccion({ usuario: operador(), rol: userRole, categoria: 'Reservas', accion: 'Reserva confirmada', detalle: r.nombre + ' · ' + r.fecha + ' ' + r.hora, sucursal: sucursalNombre(r) });
       addToast('Reserva confirmada', 'success');
 
       // Enviar mail de confirmación al cliente si tiene email
       if (r.email && r.email.trim()) {
         if (!store.restaurante?.emailjs_config) {
-          addToast('Reserva confirmada. Para enviar mails automáticos configurá EmailJS en Configuración → Restaurante.', 'info');
+          addToast('Para enviar mails automáticos, configurá EmailJS en Configuración → Restaurante.', 'info');
         } else {
-          const restaurantName = store.restaurante?.nombre || store.sucursales.find(s => s.id === bid)?.nombre || 'el restaurante';
+          const restaurantName = store.restaurante?.nombre || 'el restaurante';
           try {
             const emailCfg = JSON.parse(store.restaurante.emailjs_config);
             await emailjs.send(
               emailCfg.serviceId,
               emailCfg.templateId,
               {
-                cliente_nombre: r.nombre || 'Cliente',
-                cliente_email: r.email.trim(),
-                fecha: r.fecha || '',
-                hora: r.hora || '',
-                personas: r.personas || '',
+                cliente_nombre:  r.nombre || 'Cliente',
+                cliente_email:   r.email.trim(),
+                fecha:           r.fecha || '',
+                hora:            r.hora || '',
+                personas:        r.personas || '',
                 restaurant_name: restaurantName,
               },
               emailCfg.publicKey
@@ -74,7 +123,7 @@ export default function Reservas() {
             addToast('Mail de confirmación enviado al cliente', 'success');
           } catch(mailErr) {
             console.error('Error enviando mail:', mailErr);
-            addToast('Reserva confirmada, pero no se pudo enviar el mail al cliente', 'warning');
+            addToast('Reserva confirmada, pero no se pudo enviar el mail', 'warning');
           }
         }
       }
@@ -91,13 +140,16 @@ export default function Reservas() {
     try {
       await base44.entities.Reservation.update(r.id, { estado: 'cancelada' });
       store.updateReservation(bid, r.id, { estado: 'cancelada' });
-      store.logAccion({ usuario: user?.email || 'Sistema', rol: userRole, categoria: 'Reservas', accion: 'Reserva cancelada', detalle: r.nombre + ' · ' + r.fecha + ' ' + r.hora, sucursal: sucursalNombre(r) });
+      store.logAccion({ usuario: operador(), rol: userRole, categoria: 'Reservas', accion: 'Reserva cancelada', detalle: r.nombre + ' · ' + r.fecha + ' ' + r.hora, sucursal: sucursalNombre(r) });
       addToast('Reserva cancelada', 'info');
     } catch(err) {
       console.error(err);
       addToast('Error al cancelar reserva', 'error');
     }
   };
+
+  // Badge de nuevas reservas en pestaña "Hoy"
+  const nuevasHoy = reservas.filter(r => r.fecha === todayStr && r.estado === 'en espera').length;
 
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
@@ -118,8 +170,11 @@ export default function Reservas() {
       <div style={{ display:'flex', borderBottom:'0.5px solid rgba(0,0,0,0.08)' }}>
         {[['hoy','Hoy'],['proximos','Próximos 7 días'],['historial','Historial']].map(([k,l])=>(
           <button key={k} onClick={()=>setTab(k)}
-            style={{ padding:'8px 16px', fontSize:13, border:'none', background:'none', cursor:'pointer', marginBottom:-1, fontWeight: tab===k?500:400, color: tab===k?'#1D9E75':'#9CA3AF', borderBottom: tab===k?'2px solid #1D9E75':'2px solid transparent', transition:'all .15s' }}>
+            style={{ padding:'8px 16px', fontSize:13, border:'none', background:'none', cursor:'pointer', marginBottom:-1, fontWeight: tab===k?500:400, color: tab===k?'#1D9E75':'#9CA3AF', borderBottom: tab===k?'2px solid #1D9E75':'2px solid transparent', transition:'all .15s', display:'flex', alignItems:'center', gap:6 }}>
             {l}
+            {k === 'hoy' && nuevasHoy > 0 && (
+              <span style={{ background:'#CA8A04', color:'white', borderRadius:99, fontSize:10, fontWeight:700, padding:'1px 6px', lineHeight:'16px' }}>{nuevasHoy}</span>
+            )}
           </button>
         ))}
       </div>
@@ -147,7 +202,7 @@ export default function Reservas() {
             {filtered.length === 0 ? (
               <tr><td colSpan={10} style={{ padding:'32px', textAlign:'center', fontSize:13, color:'#9CA3AF' }}>No hay reservas para este período.</td></tr>
             ) : filtered.map(r => (
-              <tr key={r.id} style={{ borderBottom:'0.5px solid rgba(0,0,0,0.05)' }}>
+              <tr key={r.id} style={{ borderBottom:'0.5px solid rgba(0,0,0,0.05)', background: r.estado==='en espera' ? 'rgba(202,138,4,0.03)' : 'transparent' }}>
                 <td style={{ padding:'10px 14px', fontWeight:600, color:'#1D9E75' }}>{r.hora}</td>
                 <td style={{ padding:'10px 14px', overflow:'hidden' }}>
                   <div style={{ fontWeight:500, color:'#111827', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{r.nombre}</div>
@@ -166,11 +221,9 @@ export default function Reservas() {
                       <Btn onClick={()=>confirm(r)} style={{ backgroundColor:'#1D9E75', color:'white', border:'none' }}>Confirmar</Btn>
                       <Btn onClick={()=>cancel(r)}  style={{ border:'0.5px solid rgba(0,0,0,0.12)', color:'#374151' }}>Cancelar</Btn>
                     </>}
-                    {r.estado==='confirmada' && <>
-                      <Btn onClick={()=>cancel(r)}  style={{ border:'0.5px solid rgba(0,0,0,0.12)', color:'#374151' }}>Cancelar</Btn>
-                      <Btn style={{ color:'#6B7280', border:'none', background:'none' }}>Ver</Btn>
-                    </>}
-                    {r.estado==='cancelada' && <Btn style={{ color:'#6B7280', border:'none', background:'none' }}>Ver</Btn>}
+                    {r.estado==='confirmada' && (
+                      <Btn onClick={()=>cancel(r)} style={{ border:'0.5px solid rgba(0,0,0,0.12)', color:'#374151' }}>Cancelar</Btn>
+                    )}
                   </div>
                 </td>
               </tr>
@@ -200,35 +253,32 @@ function NewReservationModal({ store, addToast, onClose }) {
   const sucursal = store.sucursales.find(s=>s.id===activeBranch);
   const franjas = sucursal?.franjas || [];
 
-  const preview = `Hola ${form.nombre||'[Nombre]'}, tu reserva en ${store.restaurante.nombre} para el ${dateShort(form.fecha)} a las ${form.hora} está confirmada. Personas: ${form.personas}. ¡Te esperamos!`;
-
   async function save() {
     if (!form.nombre.trim()) return;
     try {
-      const activeBranch2 = store.branchId !== 'todas' ? store.branchId : store.sucursales[0]?.id;
       const created = await base44.entities.Reservation.create({
-        branch_id: activeBranch2,
-        hora: form.hora,
-        nombre: form.nombre,
-        telefono: form.telefono,
-        email: form.email || '',
-        personas: form.personas,
-        mesa: '-',
-        canal: 'Manual',
-        estado: 'confirmada',
-        fecha: form.fecha,
-        notas: form.notas || '',
+        branch_id: activeBranch,
+        hora:      form.hora,
+        nombre:    form.nombre,
+        telefono:  form.telefono,
+        email:     form.email || '',
+        personas:  form.personas,
+        mesa:      '-',
+        canal:     'Manual',
+        estado:    'confirmada',
+        fecha:     form.fecha,
+        notas:     form.notas || '',
       });
-      store.addReservation(activeBranch2, {
-        id: created.id,
-        hora: form.hora,
-        nombre: form.nombre,
+      store.addReservation(activeBranch, {
+        id:       created.id,
+        hora:     form.hora,
+        nombre:   form.nombre,
         telefono: form.telefono,
         personas: form.personas,
-        mesa: '-',
-        canal: 'Manual',
-        estado: 'confirmada',
-        fecha: form.fecha,
+        mesa:     '-',
+        canal:    'Manual',
+        estado:   'confirmada',
+        fecha:    form.fecha,
       });
       addToast('Reserva creada', 'success');
       onClose();
@@ -243,11 +293,6 @@ function NewReservationModal({ store, addToast, onClose }) {
       <div style={{ fontSize:12, color:'#6B7280', marginBottom:4 }}>{label}</div>
       <input type={type} value={form[k]} onChange={e=>setForm(f=>({...f,[k]:e.target.value}))} style={{ width:'100%', padding:'7px 10px', border:'0.5px solid rgba(0,0,0,0.12)', borderRadius:7, fontSize:13 }} />
     </div>
-  );
-  const Toggle = ({v,onChange}) => (
-    <button onClick={()=>onChange(!v)} style={{ position:'relative', width:40, height:22, borderRadius:99, border:'none', cursor:'pointer', backgroundColor:v?'#1D9E75':'#E5E7EB', padding:2, flexShrink:0 }}>
-      <span style={{ display:'inline-block', width:18, height:18, borderRadius:'50%', backgroundColor:'white', transition:'transform .2s', transform:v?'translateX(18px)':'translateX(0)' }} />
-    </button>
   );
 
   return (
@@ -273,7 +318,10 @@ function NewReservationModal({ store, addToast, onClose }) {
             <div>
               <div style={{ fontSize:12, color:'#6B7280', marginBottom:4 }}>Hora</div>
               <select value={form.hora} onChange={e=>setForm(f=>({...f,hora:e.target.value}))} style={{ width:'100%', padding:'7px 10px', border:'0.5px solid rgba(0,0,0,0.12)', borderRadius:7, fontSize:13, backgroundColor:'white' }}>
-                {franjas.map(fr=><option key={fr} value={fr}>{fr}</option>)}
+                {franjas.length > 0
+                  ? franjas.map(fr=><option key={fr} value={fr}>{fr}</option>)
+                  : ['12:00','13:00','14:00','20:00','21:00','22:00'].map(h=><option key={h} value={h}>{h}</option>)
+                }
               </select>
             </div>
             <div>
@@ -293,7 +341,6 @@ function NewReservationModal({ store, addToast, onClose }) {
             </div>
           </div>
           <F k="notas" label="Notas internas" />
-
         </div>
         <div style={{ display:'flex', gap:8, padding:'14px 20px', borderTop:'0.5px solid rgba(0,0,0,0.08)' }}>
           <button onClick={onClose} style={{ flex:1, padding:'9px 0', border:'0.5px solid rgba(0,0,0,0.12)', borderRadius:7, fontSize:13, color:'#374151', backgroundColor:'white', cursor:'pointer' }}>Cancelar</button>
@@ -314,7 +361,7 @@ function LinkModal({ onClose, sucursal }) {
     setSaving(true);
     try {
       await base44.entities.Branch.update(sucursal.id, { acepta_reservas_online: val });
-    } catch(e) {
+    } catch {
       setActive(!val);
     } finally {
       setSaving(false);
@@ -322,7 +369,7 @@ function LinkModal({ onClose, sucursal }) {
   }
   const url = `${window.location.origin}/public/reservas/${sucursal?.id || 'sin-id'}`;
   function copy() { navigator.clipboard.writeText(url).catch(()=>{}); setCopied(true); setTimeout(()=>setCopied(false),2000); }
-  const T = ({v, onChange, disabled})=>(
+  const T = ({v, onChange, disabled}) => (
     <button onClick={() => !disabled && onChange(!v)} style={{ position:'relative', width:40, height:22, borderRadius:99, border:'none', cursor: disabled ? 'not-allowed' : 'pointer', backgroundColor:v?'#1D9E75':'#E5E7EB', padding:2, opacity: disabled ? 0.6 : 1, flexShrink:0 }}>
       <span style={{ display:'inline-block', width:18, height:18, borderRadius:'50%', backgroundColor:'white', transition:'transform .2s', transform:v?'translateX(18px)':'translateX(0)' }} />
     </button>
@@ -344,10 +391,8 @@ function LinkModal({ onClose, sucursal }) {
           <span style={{ fontSize:13 }}>Recibir reservas online</span>
           <T v={active} onChange={toggleActive} disabled={saving} />
         </div>
-        <p style={{ fontSize:12, color:'#9CA3AF', lineHeight:'18px' }}>Compartí este link con tus clientes para que reserven solos. Las reservas llegan con estado "en espera" y podés confirmarlas manualmente.</p>
+        <p style={{ fontSize:12, color:'#9CA3AF', lineHeight:'18px' }}>Compartí este link con tus clientes para que reserven solos. Las reservas llegan con estado "en espera" y podés confirmarlas desde acá.</p>
       </div>
     </div>
   );
 }
-
-

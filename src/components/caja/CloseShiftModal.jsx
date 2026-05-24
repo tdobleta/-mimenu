@@ -5,6 +5,7 @@ import { useToast } from '@/lib/toast';
 import { money } from '@/lib/fmt';
 import { useAuth } from '@/lib/AuthContext';
 import useUserRole from '@/lib/useUserRole';
+import { getActiveStaff } from '@/lib/useActiveStaff';
 
 export default function CloseShiftModal({ ventasPorMetodo, totalVentas, retirosTotales, retirosEfectivo, efectivoEsperado, tipoTurno, mesasAbiertas = 0, onClose, onClosed }) {
   const store = useStore();
@@ -48,7 +49,7 @@ export default function CloseShiftModal({ ventasPorMetodo, totalVentas, retirosT
       });
       store.cerrarTurnoActivo();
       store.logAccion({
-        usuario: user?.email || 'Sistema',
+        usuario: getActiveStaff()?.nombre || user?.email || 'Sistema',
         rol: userRole,
         categoria: 'Caja',
         accion: 'Turno cerrado',

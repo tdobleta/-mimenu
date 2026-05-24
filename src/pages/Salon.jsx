@@ -13,6 +13,7 @@ import { supabase } from '@/api/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
 import useUserRole from '@/lib/useUserRole';
 import { G, glass, glassDeep, glassLight, fontDisplay } from '@/lib/glass';
+import { getActiveStaff } from '@/lib/useActiveStaff';
 
 export default function Salon() {
   const store = useStore();
@@ -205,7 +206,7 @@ export default function Salon() {
       const openedAt = Date.now();
       store.openTable(displayBranch, table.id, openedAt);
       addToast(`Mesa ${table.num} abierta`, 'success');
-      const mozoNombre = store.teamMembers?.find(m => m.email === user?.email)?.nombre || user?.email || '';
+      const mozoNombre = getActiveStaff()?.nombre || store.teamMembers?.find(m => m.email === user?.email)?.nombre || user?.email || '';
       base44.entities.Turn.create({ branch_id:displayBranch, mesa_num:table.num, status:'abierta', opened_at:new Date(openedAt).toISOString(), total_facturado:0, mozo:mozoNombre, caja_shift_id: store.turnoActivo?.id || null })
         .then(turn => store.setTableTurnId(displayBranch, table.id, turn.id))
         .catch((err) => {
