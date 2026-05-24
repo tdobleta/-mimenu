@@ -8,13 +8,16 @@ en la misma red WiFi, **aunque se corte el internet**.
 ### Opción A — Ejecutar manualmente
 
 1. Instalar **Node.js 18+** desde https://nodejs.org
-2. Abrir una terminal en esta carpeta:
+2. **Abrir el firewall de Windows** (obligatorio, una sola vez):
+   - Clic derecho en `abrir-puerto.bat` → "Ejecutar como administrador"
+   - Abre el puerto 3001 en Windows Defender para tráfico de red local
+3. Abrir una terminal en esta carpeta:
    ```
    cd C:\mimenu\local-server
    npm install
    node server.js
    ```
-3. Dejar la terminal abierta mientras el restaurante opera.
+4. Dejar la terminal abierta mientras el restaurante opera.
 
 ### Opción B — Auto-inicio con Windows (recomendado)
 
@@ -52,11 +55,30 @@ Debe responder:
 3. Probar conexión → debe mostrar "✓ Relay disponible"
 4. Guardar
 
-## Si mDNS no funciona en algunos Android
+## Si las tablets no pueden conectarse al relay
+
+### Caso 1 — Firewall de Windows
+
+El relay está corriendo pero las tablets no llegan al puerto 3001.
+**Solución:** ejecutar `abrir-puerto.bat` como Administrador (ver instalación).
+
+### Caso 2 — AP Isolation (aislamiento WiFi del router)
+
+Síntoma: las tablets no pueden ver la PC Caja **aunque estén en el mismo WiFi**.
+Ocurre con routers de Fibertel, Telecentro, Claro y otros ISPs que vienen con
+"Client Isolation" o "AP Isolation" activado por defecto.
+
+**Diagnóstico:** desde una tablet, abrir el navegador e ir a `http://[IP-DE-LA-PC]:3001/health`.
+- Si carga → el relay funciona, el problema es mDNS
+- Si no carga → hay AP Isolation activo
+
+**Solución:** entrar al panel web del router (generalmente en `192.168.0.1` o `192.168.1.1`)
+y desactivar "AP Isolation" / "Client Isolation" / "Wireless Isolation".
+
+### Caso 3 — mDNS no resuelve en Android
 
 Ingresar la IP del servidor manualmente (ej: `ws://192.168.1.100:3001`).
-La IP se puede ver en el relay: aparece en la consola al iniciar, o en la configuración
-de red del PC.
+La IP se puede ver en la configuración de red del PC (Win+R → `ncpa.cpl`).
 
 ## Puerto por defecto
 

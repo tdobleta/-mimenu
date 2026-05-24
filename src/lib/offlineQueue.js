@@ -7,6 +7,15 @@ const DB_NAME = 'mimenu_offline';
 const DB_VERSION = 1;
 const STORE = 'queue';
 
+// ── Persistencia de storage: evita que el OS borre IndexedDB por falta de espacio ──
+// Sin esto, iOS Safari y Android Chrome pueden purgar la DB si el dispositivo
+// tiene poco almacenamiento — lo que significa cobros offline perdidos para siempre.
+// navigator.storage.persist() pide al browser que marque este origen como persistente.
+// En Chrome Android requiere que la PWA esté instalada. En iOS Safari es best-effort.
+if (typeof navigator !== 'undefined' && navigator.storage?.persist) {
+  navigator.storage.persist().catch(() => {});
+}
+
 // ── Abrir DB ──────────────────────────────────────────────────
 function openDB() {
   return new Promise((resolve, reject) => {

@@ -109,6 +109,7 @@ export default function RelayTab() {
         </div>
         <ol style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: G.textMid, lineHeight: '22px' }}>
           <li>Instalar <strong>Node.js</strong> desde <code>nodejs.org</code></li>
+          <li>Ejecutar <code style={{ background: '#0D1117', color: '#58D68D', padding: '2px 6px', borderRadius: 4, fontSize: 11 }}>abrir-puerto.bat</code> como Administrador (abre el firewall de Windows)</li>
           <li>Abrir una terminal y ejecutar:<br />
             <code style={{ background: '#0D1117', color: '#58D68D', padding: '2px 8px', borderRadius: 4, fontSize: 11 }}>
               cd C:\mimenu\local-server &amp;&amp; npm install &amp;&amp; node server.js
@@ -120,6 +121,26 @@ export default function RelayTab() {
         <div style={{ marginTop: 10, fontSize: 11, color: G.textFaint }}>
           Para auto-inicio con Windows: usá NSSM (ver README en la carpeta local-server/).
         </div>
+      </div>
+
+      {/* Advertencia AP Isolation */}
+      <div style={{ background: 'rgba(59,130,246,0.05)', border: '1px solid rgba(59,130,246,0.2)', borderRadius: 10, padding: 14 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: '#1D4ED8', marginBottom: 6 }}>
+          ⚠ Si el relay no conecta — Aislamiento de red (AP Isolation)
+        </div>
+        <div style={{ fontSize: 12, color: '#1E40AF', lineHeight: '18px', marginBottom: 8 }}>
+          Muchos routers de Fibertel, Telecentro y Claro vienen con <strong>Client Isolation</strong> (aislamiento WiFi) activado.
+          Cuando está activo, los dispositivos en la misma red <em>no pueden verse entre sí</em> — ni siquiera por IP.
+          mDNS (<code>mimenu-caja.local</code>) tampoco funciona en este caso.
+        </div>
+        <div style={{ fontSize: 12, fontWeight: 600, color: '#1D4ED8', marginBottom: 4 }}>Cómo verificarlo:</div>
+        <ol style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: '#1E40AF', lineHeight: '20px' }}>
+          <li>Desde una tablet, abrí el navegador y entrá a la IP de la PC Caja en el puerto 3001<br />
+            <code style={{ background: '#1D4ED8', color: '#DBEAFE', padding: '1px 6px', borderRadius: 3, fontSize: 11 }}>http://192.168.X.X:3001/health</code>
+          </li>
+          <li>Si no carga, el router tiene Client Isolation activo</li>
+          <li>Solución: entrar al panel del router y desactivar "AP Isolation" / "Client Isolation" / "Wireless Isolation"</li>
+        </ol>
       </div>
 
       {/* Habilitar / deshabilitar */}
