@@ -199,23 +199,65 @@ function printEpson(text, { cut = true, bold = false } = {}) {
   });
 }
 
-// ── Imprimir con browser (window.print) ───────────────────────────────────────
+// ── Imprimir con browser (popup window, no bloquea el hilo principal) ────────
+// Usar popup en lugar de iframe: el diálogo de impresión queda asociado al
+// popup (contexto separado), por lo que el tab principal permanece responsive
+// durante toda la operación. Con iframe, Chrome/Safari freezan el hilo JS
+// del tab padre mientras el diálogo está abierto, congelando WebSocket,
+// Realtime y timers de cocina.
 function printBrowser(html) {
   return new Promise((resolve) => {
-    const iframe = document.createElement('iframe');
-    iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:0;height:0;border:none;';
-    document.body.appendChild(iframe);
-    iframe.contentDocument.open();
-    iframe.contentDocument.write(html);
-    iframe.contentDocument.close();
-    iframe.contentWindow.focus();
-    setTimeout(() => {
-      iframe.contentWindow.print();
+    // Intentar popup (contexto de impresión aislado)
+    const popup = window.open('', '_blank', 'width=1,height=1,top=-9999,left=-9999');
+
+    if (!popup) {
+      // Popup bloqueado por el navegador → fallback silencioso con iframe
+      // (misma lógica anterior, peor UX pero funcional)
+      const iframe = document.createElement('iframe');
+      iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:0;height:0;border:none;';
+      document.body.appendChild(iframe);
+      iframe.contentDocument.open();
+      iframe.contentDocument.write(html);
+      iframe.contentDocument.close();
+      iframe.contentWindow.focus();
       setTimeout(() => {
-        document.body.removeChild(iframe);
+        iframe.contentWindow.print();
+        setTimeout(() => {
+          try { document.body.removeChild(iframe); } catch {}
+          resolve();
+        }, 500);
+      }, 300);
+      return;
+    }
+
+    // Escribir contenido en el popup
+    popup.document.open();
+    popup.document.write(html);
+    popup.document.close();
+
+    // Esperar que el DOM del popup esté listo y entonces imprimir
+    let printed = false;
+    const doPrint = () => {
+      if (printed) return;
+      printed = true;
+      try {
+        popup.focus();
+        popup.print();
+        // Cerrar el popup después de que el usuario confirme / cancele la impresión
+        // No cerramos inmediatamente porque en algunos OS el diálogo es asíncrono
+        setTimeout(() => { try { popup.close(); } catch {} resolve(); }, 1000);
+      } catch {
         resolve();
-      }, 500);
-    }, 300);
+      }
+    };
+
+    if (popup.document.readyState === 'complete') {
+      doPrint();
+    } else {
+      popup.onload = doPrint;
+      // Fallback si onload no dispara (algunos browsers lo omiten para document.write)
+      setTimeout(doPrint, 400);
+    }
   });
 }
 

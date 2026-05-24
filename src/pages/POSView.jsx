@@ -510,6 +510,7 @@ export default function POSView() {
         enqueue({
           type: 'CLOSE_TABLE',
           turn_id: selectedTurn.id,
+          table_id: tableLocal.id,      // para mimenu-table-synced (amber → libre)
           branch_id: branchId,
           caja_shift_id: store.turnoActivo?.id || null,
           total: tot,

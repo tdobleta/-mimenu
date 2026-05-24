@@ -84,7 +84,8 @@ async function processOperation(op) {
 
     case 'INSERT_TURN': {
       const { error } = await supabase.from('turns').insert(op.data);
-      if (error) throw error;
+      // 23505 = unique_violation en turns.id → turno ya insertado en un retry previo → éxito silencioso
+      if (error && error.code !== '23505') throw error;
       break;
     }
 
@@ -157,14 +158,24 @@ async function processOperation(op) {
     case 'CLOSE_TABLE': {
       // Cobro diferido: el mozo cobró sin internet.
       // Ahora que hay conexión, ejecutamos el RPC atómico cerrar_mesa_atomico.
+      //
+      // COMPATIBILIDAD: aceptar tanto camelCase como snake_case en los campos del op
+      // porque POSView.jsx (Sprint 7.3) encoló con snake_case y las versiones futuras
+      // podrían usar camelCase.
+      const turnId       = op.turnId       || op.turn_id;
+      const cajaShiftId  = op.cajaShiftId  || op.caja_shift_id  || null;
+      const pagosDetalle = op.pagosDetalle || op.pagos           || null;
+      const branchId     = op.branchId     || op.branch_id       || null;
+      const tableId      = op.tableId      || op.table_id        || null;
+
       const { error: rpcError } = await supabase.rpc('cerrar_mesa_atomico', {
-        p_turn_id:       op.turnId,
+        p_turn_id:       turnId,
         p_total:         op.total,
         p_propina:       op.propina || 0,
         p_metodo:        op.metodo,
         p_mozo:          op.mozo || '',
-        p_caja_shift_id: op.cajaShiftId || null,
-        p_pagos_detalle: op.pagosDetalle || null,
+        p_caja_shift_id: cajaShiftId,
+        p_pagos_detalle: pagosDetalle,
       });
       if (rpcError) {
         const msgLower = rpcError.message?.toLowerCase() || '';
@@ -175,7 +186,7 @@ async function processOperation(op) {
       // Notificar a Salon.jsx para que limpie el estado pendiente_cobro → libre
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('mimenu-table-synced', {
-          detail: { branchId: op.branchId, tableId: op.tableId },
+          detail: { branchId, tableId },
         }));
       }
       break;
