@@ -7,7 +7,7 @@ import { useAuth } from '@/lib/AuthContext';
 import useUserRole from '@/lib/useUserRole';
 import { supabase } from '@/api/supabaseClient';
 import emailjs from '@emailjs/browser';
-import { getActiveStaff } from '@/lib/useActiveStaff';
+import { getActiveStaff, touchActiveStaff } from '@/lib/useActiveStaff';
 
 const BADGE = {
   confirmada: { bg:'#E8F7F2', c:'#1D9E75' },
@@ -97,6 +97,7 @@ export default function Reservas() {
       await base44.entities.Reservation.update(r.id, { estado: 'confirmada' });
       store.updateReservation(bid, r.id, { estado: 'confirmada' });
       store.logAccion({ usuario: operador(), rol: userRole, categoria: 'Reservas', accion: 'Reserva confirmada', detalle: r.nombre + ' · ' + r.fecha + ' ' + r.hora, sucursal: sucursalNombre(r) });
+      touchActiveStaff();
       addToast('Reserva confirmada', 'success');
 
       // Enviar mail de confirmación al cliente si tiene email
@@ -141,6 +142,7 @@ export default function Reservas() {
       await base44.entities.Reservation.update(r.id, { estado: 'cancelada' });
       store.updateReservation(bid, r.id, { estado: 'cancelada' });
       store.logAccion({ usuario: operador(), rol: userRole, categoria: 'Reservas', accion: 'Reserva cancelada', detalle: r.nombre + ' · ' + r.fecha + ' ' + r.hora, sucursal: sucursalNombre(r) });
+      touchActiveStaff();
       addToast('Reserva cancelada', 'info');
     } catch(err) {
       console.error(err);

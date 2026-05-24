@@ -194,6 +194,7 @@ export default function Reportes() {
               { label:'MercadoPago', val:totalVentas.mp,            color:G.amber },
               { label:'Transf.',     val:totalVentas.transferencia, color:G.blue },
               { label:'Propinas',    val:totalVentas.propinas,      color:G.textMuted },
+              { label:'Ticket prom.',val:totalVentas.mesas>0?totalVentas.total/totalVentas.mesas:0, color:G.text },
             ].map(m=>(
               <div key={m.label} style={{ padding:'4px 20px', borderRight:'1px solid rgba(0,0,0,0.06)' }}>
                 <div style={{ fontSize:10, fontWeight:700, color:G.textFaint, textTransform:'uppercase', letterSpacing:'0.07em', fontFamily:FONT_UI, marginBottom:3 }}>{m.label}</div>

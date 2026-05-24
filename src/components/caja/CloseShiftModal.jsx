@@ -5,7 +5,7 @@ import { useToast } from '@/lib/toast';
 import { money } from '@/lib/fmt';
 import { useAuth } from '@/lib/AuthContext';
 import useUserRole from '@/lib/useUserRole';
-import { getActiveStaff } from '@/lib/useActiveStaff';
+import { getActiveStaff, touchActiveStaff } from '@/lib/useActiveStaff';
 
 export default function CloseShiftModal({ ventasPorMetodo, totalVentas, retirosTotales, retirosEfectivo, efectivoEsperado, tipoTurno, mesasAbiertas = 0, onClose, onClosed }) {
   const store = useStore();
@@ -61,6 +61,7 @@ export default function CloseShiftModal({ ventasPorMetodo, totalVentas, retirosT
       let msg = 'Turno cerrado · La caja cuadra';
       if (diferencia > 0) msg = `Turno cerrado · Sobraron ${money(diferencia)}`;
       else if (diferencia < 0) msg = `Turno cerrado · Faltaron ${money(Math.abs(diferencia))}`;
+      touchActiveStaff();
       addToast(msg, diferencia === 0 ? 'success' : 'info');
       onClosed();
     } catch(err) {

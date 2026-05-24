@@ -6,7 +6,7 @@ import { money } from '@/lib/fmt';
 import { useAuth } from '@/lib/AuthContext';
 import useUserRole from '@/lib/useUserRole';
 import { enqueue } from '@/lib/offlineQueue';
-import { getActiveStaff } from '@/lib/useActiveStaff';
+import { getActiveStaff, touchActiveStaff } from '@/lib/useActiveStaff';
 
 const CONCEPTOS = ['Retiro recaudación','Pago proveedor','Gastos operativos','Otro'];
 
@@ -45,6 +45,7 @@ export default function AddRetiroModal({ onClose }) {
         detalle: conceptoFinal + ' · ' + money(montoNum),
         sucursal: store.sucursales.find(s => s.id === store.branchId)?.nombre || '',
       });
+      touchActiveStaff();
       addToast(`Retiro registrado: -${money(montoNum)}`, 'success');
       onClose();
     } catch(err) {

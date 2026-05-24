@@ -5,7 +5,7 @@ import { useToast } from '@/lib/toast';
 import { money } from '@/lib/fmt';
 import { useAuth } from '@/lib/AuthContext';
 import useUserRole from '@/lib/useUserRole';
-import { getActiveStaff } from '@/lib/useActiveStaff';
+import { getActiveStaff, touchActiveStaff } from '@/lib/useActiveStaff';
 
 const TIPOS = [
   { key:'manana', label:'Mañana', horario:'7:00 — 13:00' },
@@ -65,6 +65,7 @@ export default function OpenShiftModal({ onClose }) {
         detalle: 'Turno ' + tipoLabel + ' · Fondo $' + fondoNum,
         sucursal: store.sucursales.find(s => s.id === branchId)?.nombre || '',
       });
+      touchActiveStaff();
       addToast('Turno abierto correctamente', 'success');
       onClose();
     } catch(err) {

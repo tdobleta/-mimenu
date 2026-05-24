@@ -16,6 +16,22 @@ const TEAL_BG = 'rgba(29,158,117,0.08)';
 
 const TABS = ['Directorio', 'Top clientes', 'Cumpleaños', 'WhatsApp'];
 
+function downloadCSV(filename, headers, rows) {
+  const content = '﻿' + [headers.join(','), ...rows.map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(','))].join('\n');
+  const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
+const BtnCSV = ({ onClick, disabled }) => (
+  <button onClick={onClick} disabled={disabled}
+    style={{ display:'flex', alignItems:'center', gap:5, padding:'7px 13px', border:'1px solid #E2E8F0', borderRadius:9, fontSize:12, color:'#374151', background:'#F8FAFC', cursor:disabled?'default':'pointer', opacity:disabled?0.45:1, whiteSpace:'nowrap' }}>
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+    Exportar CSV
+  </button>
+);
+
 // ─── Customer Form Modal ─────────────────────────────────────────────────────
 function CustomerModal({ customer, restaurantId, onSave, onClose }) {
   const isNew = !customer?.id;
@@ -189,6 +205,12 @@ function TabDirectorio({ restaurantId }) {
             style={{ width: '100%', padding: '8px 10px 8px 32px', border: '1px solid #E2E8F0', borderRadius: 10, fontSize: 13, outline: 'none', boxSizing: 'border-box', fontFamily: FONT }}
           />
         </div>
+        <BtnCSV
+          disabled={customers.length === 0}
+          onClick={() => downloadCSV('clientes.csv',
+            ['Nombre', 'Teléfono', 'Email', 'Nacimiento', 'Notas', 'Puntos'],
+            customers.map(c => [c.nombre, c.telefono || '', c.email || '', c.nacimiento || '', c.notas || '', c.puntos || 0])
+          )} />
         <button
           onClick={() => setModal('new')}
           style={{ padding: '8px 16px', background: TEAL, color: '#FFF', border: 'none', borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}>
@@ -324,8 +346,12 @@ function TabTopClientes({ restaurantId }) {
 
   return (
     <div>
-      <div style={{ fontSize: 12, color: '#64748B', marginBottom: 14 }}>
-        Top {top.length} clientes por total gastado
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+        <div style={{ fontSize: 12, color: '#64748B' }}>Top {top.length} clientes por total gastado</div>
+        <BtnCSV onClick={() => downloadCSV('top-clientes.csv',
+          ['Rank', 'Nombre', 'Visitas', 'Ultima visita', 'Total gastado'],
+          top.map((c, i) => [i + 1, c.nombre, c.visitas, c.ultimaVisita || '', c.totalGastado])
+        )} />
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {top.map((c, idx) => {
@@ -387,8 +413,14 @@ function TabCumpleanos({ restaurantId }) {
 
   return (
     <div>
-      <div style={{ fontSize: 12, color: '#64748B', marginBottom: 14 }}>
-        Clientes con cumpleaños en los próximos 30 días
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+        <div style={{ fontSize: 12, color: '#64748B' }}>Clientes con cumpleaños en los próximos 30 días</div>
+        <BtnCSV
+          disabled={bdayers.length === 0}
+          onClick={() => downloadCSV('cumpleanos.csv',
+            ['Nombre', 'Teléfono', 'Nacimiento', 'Días'],
+            bdayers.map(c => [c.nombre, c.telefono || '', c.nacimiento || '', c._diasParaCumple ?? ''])
+          )} />
       </div>
 
       {bdayers.length === 0 ? (

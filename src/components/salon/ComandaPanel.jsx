@@ -15,6 +15,7 @@ import { getAfipConfig } from '@/lib/afip';
 import { MENU_CATEGORIES, DEFAULT_CATEGORY, getCategoryColor } from '@/lib/menuCategories';
 import { descontarStockPorMesa } from '@/lib/stockApi';
 import { localRelay } from '@/lib/localRelay';
+import { getActiveStaff, touchActiveStaff } from '@/lib/useActiveStaff';
 
 // Colores para categorías extra no definidas en MENU_CATEGORIES
 const EXTRA_COLORS = [G.teal, G.violet, G.blue, G.amber, '#F97316', '#EC4899', '#6366F1', '#14B8A6'];
@@ -552,7 +553,8 @@ if (afipCfg.habilitado) {
   onClose();
 }
               const detalle = [`Mesa ${table.num}`, money(finalTotal), method, discAmount>0?`desc. ${money(discAmount)}${discMotivo?` (${discMotivo})`:''}`:null, propinaAmount>0?`propina ${money(propinaAmount)}`:null].filter(Boolean).join(' · ');
-              store.logAccion({ usuario:user?.email||'Sistema', rol:userRole, categoria:'Salón', accion:'Mesa cerrada', detalle, sucursal:store.sucursales.find(s=>s.id===branchId)?.nombre||'' });
+              touchActiveStaff();
+              store.logAccion({ usuario:getActiveStaff()?.nombre||user?.email||'Sistema', rol:userRole, categoria:'Salón', accion:'Mesa cerrada', detalle, sucursal:store.sucursales.find(s=>s.id===branchId)?.nombre||'' });
               addToast(`Mesa ${table.num} cerrada · ${money(finalTotal)} · ${method}${propinaAmount>0?` + propina ${money(propinaAmount)}`:''}`, 'success');
               if (store.refreshCharts) store.refreshCharts();
             } catch(err) {
