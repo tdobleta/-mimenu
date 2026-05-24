@@ -30,6 +30,7 @@ import OnboardingFlow from './pages/OnboardingFlow';
 import Login from './pages/Login';
 import POSView from './pages/POSView';
 import Clientes from './pages/Clientes';
+import Delivery from './pages/Delivery';
 
 const RoleGuard = ({ roles, children }) => {
   const role = useUserRole();
@@ -147,6 +148,7 @@ const RoutedApp = () => {
         <Route path="/control-cocina" element={<RoleGuard roles={['Dueno','Encargado']}><ControlCocina /></RoleGuard>} />
         <Route path="/analiticas" element={<RoleGuard roles={['Dueno','Encargado']}><Analiticas /></RoleGuard>} />
         <Route path="/clientes" element={<RoleGuard roles={['Dueno','Encargado']}><Clientes /></RoleGuard>} />
+        <Route path="/delivery" element={<RoleGuard roles={['Dueno','Encargado','Mozo']}><Delivery /></RoleGuard>} />
         <Route path="/configuracion" element={<RoleGuard roles={['Dueno']}><Configuracion /></RoleGuard>} />
         <Route path="*" element={<PageNotFound />} />
       </Route>
