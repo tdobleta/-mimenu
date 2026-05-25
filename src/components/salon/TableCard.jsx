@@ -82,6 +82,7 @@ export default function TableCard({ table, isSelected, onClick, onComandaListaCl
             <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
               {total > 0 && <div style={{ fontSize:14, fontWeight:800, color:s.numColor, lineHeight:1 }}>{money(total)}</div>}
               {table.openedAt && <div style={{ fontSize:11, color:s.numColor, opacity:0.7, fontWeight:600 }}>{fmtTableTime(elapsed)}</div>}
+              {table.mozo && <div style={{ fontSize:10, color:G.textFaint, fontWeight:500, marginTop:1 }}>{table.mozo}</div>}
             </div>
             <div style={{ fontSize:10, color:G.textFaint, fontWeight:500 }}>{table.sillas} sillas</div>
           </>

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useOfflineSync } from '@/lib/offlineSync';
 import { useStore } from '@/lib/store';
+import FailedOpsModal from './FailedOpsModal';
 
 const S = {
   base: {
@@ -27,7 +28,8 @@ function Btn({ onClick, children, style = {} }) {
 export default function OfflineBanner() {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [showBack, setShowBack] = useState(false);
-  const { pending, failed, syncing, sync, dismissFailed, retryAllFailed } = useOfflineSync();
+  const [showFailedModal, setShowFailedModal] = useState(false);
+  const { pending, failed, syncing, sync, dismissFailed, retryAllFailed, refreshCount } = useOfflineSync();
   const { isOfflineMode } = useStore();
 
   useEffect(() => {
@@ -50,19 +52,30 @@ export default function OfflineBanner() {
 
   // ── Operaciones fallidas (dead letters) — visible siempre que haya ──────────
   if (failed > 0) return (
-    <div style={{ ...S.base, background: '#DC2626', color: 'white', flexWrap: 'wrap' }}>
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5">
-        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-      </svg>
-      <span>
-        {failed === 1
-          ? '1 operación falló permanentemente'
-          : `${failed} operaciones fallaron permanentemente`}
-        {' — revisalas antes de seguir operando.'}
-      </span>
-      <Btn onClick={retryAllFailed}>Reintentar</Btn>
-      <Btn onClick={dismissFailed}>Descartar</Btn>
-    </div>
+    <>
+      <div style={{ ...S.base, background: '#DC2626', color: 'white', flexWrap: 'wrap' }}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5">
+          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        <span>
+          {failed === 1
+            ? '1 operación falló permanentemente'
+            : `${failed} operaciones fallaron permanentemente`}
+          {' — revisalas antes de seguir operando.'}
+        </span>
+        <Btn onClick={() => setShowFailedModal(true)}>Ver detalles</Btn>
+        <Btn onClick={retryAllFailed}>Reintentar</Btn>
+        <Btn onClick={dismissFailed}>Descartar</Btn>
+      </div>
+      {showFailedModal && (
+        <FailedOpsModal
+          onClose={() => setShowFailedModal(false)}
+          onRetryAll={async () => { await retryAllFailed(); setShowFailedModal(false); }}
+          onDiscardAll={dismissFailed}
+          onChanged={refreshCount}
+        />
+      )}
+    </>
   );
 
   // ── Sincronizando o pendientes online ─────────────────────────────────────

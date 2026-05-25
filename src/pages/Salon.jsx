@@ -315,6 +315,24 @@ export default function Salon() {
           </div>
         )}
 
+        {/* Aviso: sin turno de caja abierto */}
+        {!store.turnoActivo && tables.length > 0 && (
+          <Link to="/caja" style={{
+            display:'flex', alignItems:'center', gap:10, padding:'10px 16px',
+            background:'rgba(217,119,6,0.08)', border:'1.5px solid rgba(217,119,6,0.25)',
+            borderRadius:12, textDecoration:'none', flexShrink:0,
+          }}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#D97706" strokeWidth="2.2" style={{ flexShrink:0 }}>
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+            <span style={{ fontSize:13, color:'#92400E', fontWeight:600, flex:1 }}>
+              Sin turno de caja abierto — los cobros no se registrarán correctamente.
+            </span>
+            <span style={{ fontSize:12, color:G.teal, fontWeight:700, flexShrink:0 }}>Abrir turno →</span>
+          </Link>
+        )}
+
         {/* Table grid */}
         <div style={{ ...glassDeep({ padding:20, position:'relative', flex:1 }) }}>
           {tables.length === 0 ? (
