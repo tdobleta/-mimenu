@@ -48,7 +48,7 @@ export default function OfflineBanner() {
   if (isOfflineMode) return (
     <div style={{ position:'fixed',top:0,left:0,right:0,zIndex:9999,padding:'10px 20px',display:'flex',alignItems:'center',justifyContent:'center',gap:10,fontSize:13,fontWeight:600,fontFamily:"'DM Sans',sans-serif",background:'#D97706',color:'white',boxShadow:'0 2px 12px rgba(0,0,0,0.15)' }}>
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-      Modo offline — menú cargado desde caché. No se puede cobrar hasta reconectar.
+      Modo offline - datos cargados desde cache. Los cobros manuales quedan pendientes de sincronizar.
     </div>
   );
 

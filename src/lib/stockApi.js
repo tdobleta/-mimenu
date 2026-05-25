@@ -1,5 +1,13 @@
 import { supabase } from '@/api/supabaseClient';
 
+function isMissingStockDecrementRpc(err) {
+  const msg = `${err?.code || ''} ${err?.message || ''}`.toLowerCase();
+  return (
+    msg.includes('decrement_stock_with_egreso') &&
+    (msg.includes('not found') || msg.includes('does not exist') || msg.includes('schema cache') || err?.code === 'PGRST202')
+  );
+}
+
 // ============================================================
 // stockApi.js
 // API de Supabase para recetas, precios, egresos e ingresos de stock.
@@ -187,6 +195,24 @@ export async function descontarStockPorMesa(order, branchId, store, turnId = nul
         // El store local usa el acumulador (refleja todos los decrementos anteriores del mismo ingrediente)
         const nuevoActual = Math.max(0, Number(ing.actual) - decrementosLocales[ing.id]);
         try {
+          const stockClientUid = turnId ? `stock_${turnId}_${menuItemId}_${ing.id}` : null;
+          if (stockClientUid) {
+            const { data, error } = await supabase.rpc('decrement_stock_with_egreso', {
+              p_branch_id:          branchId,
+              p_stock_item_id:      ing.id,
+              p_qty:                cantidad,
+              p_ingrediente_nombre: ing.nombre,
+              p_unidad:             ing.unidad,
+              p_motivo:             'Mesa (automatico)',
+              p_origen:             'automatico',
+              p_client_uid:         stockClientUid,
+            });
+            if (error && !isMissingStockDecrementRpc(error)) throw error;
+            if (!error) {
+              if (!data?.already_applied) store.updateStockItem(branchId, ing.id, { actual: nuevoActual });
+              continue;
+            }
+          }
           // DB: RPC atómico — siempre correcto independientemente del orden de ejecución
           const { error } = await supabase.rpc('decrement_stock', {
             p_id:  ing.id,

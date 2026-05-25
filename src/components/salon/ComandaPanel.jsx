@@ -4,18 +4,18 @@ import { money, elapsedMin, fmtTableTime, tableTotal } from '@/lib/fmt';
 import CloseTableModal from './CloseTableModal';
 import { dbAddTurnItem, dbUpdateTurnItem, dbSaveNota, dbLoadTurnItems } from '@/lib/posApi';
 import { enqueue } from '@/lib/offlineQueue';
-import { supabase } from '@/api/supabaseClient';
 import { base44 } from '@/api/base44Client';
 import { getPrinterConfig, printComanda } from '@/lib/printer';
 import { useAuth } from '@/lib/AuthContext';
 import useUserRole from '@/lib/useUserRole';
-import { G, glass, glassLight, fontDisplay } from '@/lib/glass';
+import { G, glassLight, fontDisplay } from '@/lib/glass';
 import FacturaModal from '../facturacion/FacturaModal';
 import { getAfipConfig } from '@/lib/afip';
 import { MENU_CATEGORIES, DEFAULT_CATEGORY, getCategoryColor } from '@/lib/menuCategories';
 import { cerrarMesaOnline } from '@/lib/cajaService';
 import { localRelay } from '@/lib/localRelay';
 import { getActiveStaff, touchActiveStaff } from '@/lib/useActiveStaff';
+import { buildCloseTableOperation } from '@/lib/operations/closeTableOperation';
 
 // Colores para categorías extra no definidas en MENU_CATEGORIES
 const EXTRA_COLORS = [G.teal, G.violet, G.blue, G.amber, '#F97316', '#EC4899', '#6366F1', '#14B8A6'];
@@ -471,6 +471,21 @@ export default function ComandaPanel({ table, branchId, onClose, addToast }) {
             if (cerrando) return;
             setCerrando(true);
             if (!store.turnoActivo) { addToast('No hay turno de caja abierto. Abrí la caja antes de cerrar mesas.', 'error'); setCerrando(false); return; }
+            const closeOperation = buildCloseTableOperation({
+              restaurantId:    store.restaurantId,
+              branchId,
+              table,
+              cajaShiftId:     store.turnoActivo?.id || null,
+              method,
+              finalTotal,
+              discountAmount:  discAmount || 0,
+              discountReason:  discMotivo || null,
+              tipAmount:       propinaAmount || 0,
+              pagos:           pagos?.length > 0 ? pagos : null,
+              user,
+              userRole,
+              activeStaff:     getActiveStaff(),
+            });
             // Guard offline: si no hay internet, guardar en queue y marcar mesa como "pendiente"
             if (!navigator.onLine) {
               try {
@@ -485,6 +500,7 @@ export default function ComandaPanel({ table, branchId, onClose, addToast }) {
                   mozo:         table.mozo || '',
                   cajaShiftId:  store.turnoActivo?.id || null,
                   pagosDetalle: pagos?.length > 0 ? pagos : null,
+                  operation:    closeOperation,
                 });
                 store.closeTableOffline(branchId, table.id, { method, finalTotal, pagos });
                 addToast(`Mesa ${table.num} cobrada offline · ${money(finalTotal)} · Se sincronizará al reconectar.`, 'warning');
@@ -515,6 +531,7 @@ export default function ComandaPanel({ table, branchId, onClose, addToast }) {
                   pagos,
                   order:       table.order || [],
                   store,
+                  operation:   closeOperation,
                 });
                 if (!result.ok) {
                   if (result.alreadyClosed) {

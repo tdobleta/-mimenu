@@ -11,8 +11,8 @@ import { getCategoryColor } from '@/lib/menuCategories';
 import { enqueue } from '@/lib/offlineQueue';
 import { useBidirectionalSync } from '@/lib/useBidirectionalSync';
 import { subscribeToTurns, subscribeToTurnItems } from '@/lib/realtimeManager';
-import { descontarStockPorMesa } from '@/lib/stockApi';
 import { cerrarMesaOnline } from '@/lib/cajaService';
+import { buildCloseTableOperation } from '@/lib/operations/closeTableOperation';
 
 function cc(cat) { return getCategoryColor(cat); }
 function fmt(n) { return '$'+Number(n||0).toLocaleString('es-AR',{maximumFractionDigits:0}); }
@@ -506,6 +506,23 @@ export default function POSView() {
       const tableLocal = store.getTables(branchId).find(t => t.turnId === selectedTurn?.id);
       if (selectedTurn?.id && tableLocal) {
         const cobroData = { total: tot, propina: propina||0, metodo, pagos, mozo: selectedTurn.mozo||'' };
+        const closeOperation = buildCloseTableOperation({
+          restaurantId:    store.restaurantId,
+          branchId,
+          table: {
+            ...tableLocal,
+            turnId:   selectedTurn.id,
+            num:      selectedTurn.mesa_num || tableLocal.num,
+            openedAt: selectedTurn.opened_at || tableLocal.openedAt,
+            mozo:     selectedTurn.mozo || tableLocal.mozo || '',
+            order,
+          },
+          cajaShiftId:     store.turnoActivo?.id || null,
+          method:          metodo,
+          finalTotal:      tot,
+          tipAmount:       propina || 0,
+          pagos:           pagos?.length > 0 ? pagos : null,
+        });
         store.closeTableOffline(branchId, tableLocal.id, cobroData);
         enqueue({
           type: 'CLOSE_TABLE',
@@ -518,6 +535,7 @@ export default function POSView() {
           metodo,
           mozo: selectedTurn.mozo || '',
           pagos: pagos?.length > 0 ? pagos : null,
+          operation: closeOperation,
         }).catch(() => {});
         addToast('Mesa cobrada localmente (offline). Se sincroniza al reconectar.', 'warning');
         setShowCobro(false);
@@ -544,11 +562,32 @@ export default function POSView() {
 
       // Cierre de mesa: delega lógica de negocio a cajaService
       // (cerrar_mesa_atomico + caja cache + stock decrement)
+      const tableForOperation = selectedTurn?.id
+        ? store.getTables(branchId).find(t => t.turnId === selectedTurn.id)
+        : null;
+      const closeOperation = tableForOperation ? buildCloseTableOperation({
+        restaurantId:    store.restaurantId,
+        branchId,
+        table: {
+          ...tableForOperation,
+          turnId:   selectedTurn.id,
+          num:      selectedTurn.mesa_num || tableForOperation.num,
+          openedAt: selectedTurn.opened_at || tableForOperation.openedAt,
+          mozo:     selectedTurn.mozo || tableForOperation.mozo || '',
+          order,
+        },
+        cajaShiftId:     cajaId || null,
+        method:          metodo,
+        finalTotal:      tot,
+        tipAmount:       propina || 0,
+        pagos:           pagos?.length > 0 ? pagos : null,
+      }) : null;
       const result = await cerrarMesaOnline({
         turnId: tid, branchId, cajaShiftId: cajaId,
         total: tot, propina: propina||0, metodo,
         mozo: selectedTurn?.mozo||'', pagos,
         order, store,
+        operation: closeOperation,
       });
       if (!result.ok) {
         if (result.alreadyClosed) {

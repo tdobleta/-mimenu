@@ -19,6 +19,14 @@
 import { supabase } from '@/api/supabaseClient';
 import { descontarStockPorMesa } from '@/lib/stockApi';
 
+function isMissingCloseOperationRpc(err) {
+  const msg = `${err?.code || ''} ${err?.message || ''}`.toLowerCase();
+  return (
+    msg.includes('sync_close_table_operation') &&
+    (msg.includes('not found') || msg.includes('does not exist') || msg.includes('schema cache') || err?.code === 'PGRST202')
+  );
+}
+
 /**
  * Cierra una mesa de forma atómica (solo cuando hay internet).
  *
@@ -47,13 +55,39 @@ export async function cerrarMesaOnline({
   pagos = null,
   order = [],
   store = null,
+  operation = null,
 }) {
   if (!turnId) {
     return { ok: false, error: new Error('cerrarMesaOnline: turnId requerido') };
   }
 
   // ── 1. Cierre atómico: FOR UPDATE + UPDATE turns + UPDATE caja_shifts ────────
-  const { error: rpcError } = await supabase.rpc('cerrar_mesa_atomico', {
+  let alreadyApplied = false;
+  let useLegacyClose = !operation?.operation_type;
+
+  if (operation?.operation_type === 'CLOSE_TABLE') {
+    const { data, error } = await supabase.rpc('sync_close_table_operation', {
+      p_operation: operation,
+    });
+
+    if (!error && data?.ok !== false) {
+      alreadyApplied = Boolean(data?.already_applied);
+    } else if (error) {
+      const msgLower = error.message?.toLowerCase() || '';
+      if (msgLower.includes('ya cerrado') || error.code === 'P0001') {
+        return { ok: false, alreadyClosed: true };
+      }
+      if (!isMissingCloseOperationRpc(error)) {
+        return { ok: false, error };
+      }
+      console.warn('[cajaService] sync_close_table_operation no disponible; usando cerrar_mesa_atomico legacy.');
+      useLegacyClose = true;
+    } else {
+      return { ok: false, error: new Error(data?.error || 'sync_close_table_operation fallo') };
+    }
+  }
+
+  const { error: rpcError } = useLegacyClose ? await supabase.rpc('cerrar_mesa_atomico', {
     p_turn_id:       turnId,
     p_total:         total,
     p_propina:       propina,
@@ -61,7 +95,7 @@ export async function cerrarMesaOnline({
     p_mozo:          mozo,
     p_caja_shift_id: cajaShiftId || null,
     p_pagos_detalle: pagos?.length > 0 ? pagos : null,
-  });
+  }) : { error: null };
 
   if (rpcError) {
     // P0001 = turn ya cerrado (cerrar_mesa_atomico lanza RAISE EXCEPTION USING ERRCODE='P0001')
@@ -100,7 +134,7 @@ export async function cerrarMesaOnline({
   // No bloquea el flujo de cobro. Si falla, el caller puede mostrar un warning.
   // Se pasa turnId para idempotencia: si se reintenta, los egresos con el mismo
   // turnId+menuItemId+ingredienteId se ignorarán silenciosamente (código 23505).
-  if (order?.length > 0 && store) {
+  if (!alreadyApplied && order?.length > 0 && store) {
     descontarStockPorMesa(order, branchId, store, turnId).catch((err) => {
       console.error('[cajaService] Fallo al descontar stock (no bloquea):', err?.message);
     });

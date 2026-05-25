@@ -22,6 +22,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/api/supabaseClient';
 import { getActive, dequeue, updateOp, countActive } from '@/lib/offlineQueue';
+import { buildCloseTableSyncPayload } from '@/lib/operations/closeTableOperation';
 
 const MAX_RETRIES = 3;
 const BACKOFF_BASE_MS = 1500;   // 1.5s → 3s → 6s
@@ -36,6 +37,14 @@ function isJWTError(err) {
     err?.message?.includes('JWT') ||
     err?.message?.includes('token is expired') ||
     err?.message?.includes('not authenticated')
+  );
+}
+
+function isMissingCloseOperationRpc(err) {
+  const msg = `${err?.code || ''} ${err?.message || ''}`.toLowerCase();
+  return (
+    msg.includes('sync_close_table_operation') &&
+    (msg.includes('not found') || msg.includes('does not exist') || msg.includes('schema cache') || err?.code === 'PGRST202')
   );
 }
 
@@ -168,18 +177,53 @@ async function processOperation(op) {
       // COMPATIBILIDAD: aceptar tanto camelCase como snake_case en los campos del op
       // porque POSView.jsx (Sprint 7.3) encoló con snake_case y las versiones futuras
       // podrían usar camelCase.
-      const turnId       = op.turnId       || op.turn_id;
-      const cajaShiftId  = op.cajaShiftId  || op.caja_shift_id  || null;
-      const pagosDetalle = op.pagosDetalle || op.pagos           || null;
-      const branchId     = op.branchId     || op.branch_id       || null;
-      const tableId      = op.tableId      || op.table_id        || null;
+      const closePayload = buildCloseTableSyncPayload(op);
+      const {
+        turnId,
+        cajaShiftId,
+        pagosDetalle,
+        branchId,
+        tableId,
+        total,
+        propina,
+        metodo,
+        mozo,
+      } = closePayload;
+
+      if (!turnId || total === undefined || !metodo) {
+        throw new Error(`CLOSE_TABLE incompleta: ${closePayload.operationId || op.id || 'sin_id'}`);
+      }
+
+      if (op.operation?.operation_type === 'CLOSE_TABLE') {
+        const { data, error } = await supabase.rpc('sync_close_table_operation', {
+          p_operation: op.operation,
+        });
+
+        if (!error && data?.ok !== false) {
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('mimenu-table-synced', {
+              detail: { branchId, tableId },
+            }));
+          }
+          break;
+        }
+
+        if (error) {
+          const msgLower = error.message?.toLowerCase() || '';
+          if (msgLower.includes('ya cerrado') || error.code === 'P0001') break;
+          if (!isMissingCloseOperationRpc(error)) throw error;
+          console.warn('[offlineSync] sync_close_table_operation no disponible; usando cerrar_mesa_atomico legacy.');
+        } else {
+          throw new Error(data?.error || 'sync_close_table_operation fallo');
+        }
+      }
 
       const { error: rpcError } = await supabase.rpc('cerrar_mesa_atomico', {
         p_turn_id:       turnId,
-        p_total:         op.total,
-        p_propina:       op.propina || 0,
-        p_metodo:        op.metodo,
-        p_mozo:          op.mozo || '',
+        p_total:         total,
+        p_propina:       propina || 0,
+        p_metodo:        metodo,
+        p_mozo:          mozo || '',
         p_caja_shift_id: cajaShiftId,
         p_pagos_detalle: pagosDetalle,
       });
