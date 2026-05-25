@@ -59,13 +59,10 @@ export default function CloseTableModal({ table, total, branchId, onClose, onCon
   useEffect(() => {
     const rid = store.restaurantId;
     if (!rid) return;
-    supabase
-      .from('restaurant_settings')
-      .select('mp_access_token, mp_device_id')
-      .eq('restaurant_id', rid)
-      .maybeSingle()
+    supabase.functions
+      .invoke('mp-settings', { body: { action: 'load', restaurantId: rid } })
       .then(({ data }) => {
-        setHasMpConfig(!!(data?.mp_access_token && data?.mp_device_id));
+        setHasMpConfig(Boolean(data?.credentials?.mp_access_token && data?.config?.mp_device_id));
       })
       .catch(() => {});
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -694,4 +691,3 @@ export default function CloseTableModal({ table, total, branchId, onClose, onCon
     </div>
   );
 }
-
