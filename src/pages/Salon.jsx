@@ -317,25 +317,42 @@ export default function Salon() {
 
         {/* Table grid */}
         <div style={{ ...glassDeep({ padding:20, position:'relative', flex:1 }) }}>
-          <div style={{ display:'grid', gridTemplateColumns:`repeat(${grid.cols}, 1fr)`, gridTemplateRows:`repeat(${grid.rows}, auto)`, gap:14 }}>
-            {tables.map(t => (
-              <div key={t.id} style={{ gridColumn:t.gridCol, gridRow:t.gridRow }}>
-                <TableCard
-                  table={t}
-                  isSelected={selTable?.id === t.id}
-                  loading={abriendo === t.id}
-                  onClick={() => handleClick(t)}
-                  onComandaListaClick={() => {
-                    if (t.turnId) {
-                      base44.entities.Turn.update(t.turnId, { comanda_lista:false }).catch(() => {});
-                      store.setTableComandaLista(displayBranch, t.id, false);
-                    }
-                  }}
-                />
+          {tables.length === 0 ? (
+            <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', minHeight:220, gap:12, textAlign:'center' }}>
+              <div style={{ width:48, height:48, borderRadius:'50%', background:'rgba(29,158,117,0.10)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={G.teal} strokeWidth="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
               </div>
-            ))}
-          </div>
-          <div style={{ textAlign:'center', marginTop:18, fontSize:10, color:'rgba(155,163,184,0.5)', letterSpacing:'2px', fontWeight:700 }}>ENTRADA</div>
+              <div style={{ fontSize:15, fontWeight:700, color:G.text }}>Sin mesas configuradas</div>
+              <div style={{ fontSize:13, color:G.textFaint, maxWidth:260 }}>
+                Usá el editor de layout para agregar las mesas de tu salón.
+              </div>
+              <button onClick={() => setShowEditor(true)} style={{ marginTop:4, padding:'8px 20px', background:G.teal, color:'white', border:'none', borderRadius:10, fontSize:13, fontWeight:700, cursor:'pointer' }}>
+                Editar layout
+              </button>
+            </div>
+          ) : (
+            <>
+              <div style={{ display:'grid', gridTemplateColumns:`repeat(${grid.cols}, 1fr)`, gridTemplateRows:`repeat(${grid.rows}, auto)`, gap:14 }}>
+                {tables.map(t => (
+                  <div key={t.id} style={{ gridColumn:t.gridCol, gridRow:t.gridRow }}>
+                    <TableCard
+                      table={t}
+                      isSelected={selTable?.id === t.id}
+                      loading={abriendo === t.id}
+                      onClick={() => handleClick(t)}
+                      onComandaListaClick={() => {
+                        if (t.turnId) {
+                          base44.entities.Turn.update(t.turnId, { comanda_lista:false }).catch(() => {});
+                          store.setTableComandaLista(displayBranch, t.id, false);
+                        }
+                      }}
+                    />
+                  </div>
+                ))}
+              </div>
+              <div style={{ textAlign:'center', marginTop:18, fontSize:10, color:'rgba(155,163,184,0.5)', letterSpacing:'2px', fontWeight:700 }}>ENTRADA</div>
+            </>
+          )}
         </div>
       </div>
 
