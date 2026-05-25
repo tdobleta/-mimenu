@@ -195,7 +195,8 @@ export async function descontarStockPorMesa(order, branchId, store, turnId = nul
         // El store local usa el acumulador (refleja todos los decrementos anteriores del mismo ingrediente)
         const nuevoActual = Math.max(0, Number(ing.actual) - decrementosLocales[ing.id]);
         try {
-          const stockClientUid = turnId ? `stock_${turnId}_${menuItemId}_${ing.id}` : null;
+          const lineId = item.turnItemId || item.uid || item.id || menuItemId;
+          const stockClientUid = turnId ? `stock_${turnId}_${lineId}_${ing.id}` : null;
           if (stockClientUid) {
             const { data, error } = await supabase.rpc('decrement_stock_with_egreso', {
               p_branch_id:          branchId,
@@ -223,7 +224,7 @@ export async function descontarStockPorMesa(order, branchId, store, turnId = nul
           // IDEMPOTENCIA: Si tenemos turnId, generamos un client_uid determinístico.
           // Si este egreso ya fue registrado (retry), addEgreso lo ignorará silenciosamente.
           const egresoClientUid = turnId
-            ? `stock_${turnId}_${menuItemId}_${ing.id}`
+            ? `stock_${turnId}_${lineId}_${ing.id}`
             : null;
           await addEgreso(branchId, {
             ingredienteId:      ing.id,

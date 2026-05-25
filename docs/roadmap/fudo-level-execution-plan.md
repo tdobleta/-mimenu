@@ -24,7 +24,7 @@ La meta practica es: facilidad operativa tipo Fudo, con una base local/offline m
 | Cold start offline | 55% | 85% | Existe `snapshotDB.js`. Hay que verificar que `store.jsx` guarda/carga mesas, turno activo y estado operativo suficiente. |
 | Cocina | 65% | 90% | Hay pantalla, realtime, public/device-token path y relay local. Falta contrato claro: relay notifica, servidor confirma, offline muestra stale con certeza. |
 | Caja | 70% | 90% | Turnos, retiros y cierres existen. Falta que caja sea consecuencia idempotente de operaciones, no suma fragil de updates. |
-| Stock | 70% | 90% | Ingredientes, recetas, ingresos/egresos existen. Falta stock como efecto transaccional/reconciliable del cierre. |
+| Stock | 78% | 90% | Ingredientes, recetas, ingresos/egresos existen. El cierre por operacion ahora tiene migracion para aplicar stock server-side; falta snapshot de recetas y auditoria de cierres antiguos. |
 | AFIP/fiscal | 40% | 85% | Hay UI, migraciones y funciones, pero `src/lib/afip.js` todavia contiene logica/credenciales del lado cliente. Debe pasar a servidor. |
 | MercadoPago Point | 55% | 85% | Hay Edge Functions y settings. Falta persistencia de intentos, ownership fuerte, idempotencia estable y estados de timeout/reintento. |
 | Equipo/permisos | 70% | 90% | `invite-member` existe. Falta auditar RLS real aplicada, grants, roles y flujo de dispositivos. |
@@ -133,7 +133,7 @@ Trabajo:
 
 - Definir orden de aplicacion: cerrar turn -> caja -> stock movements -> fiscal pending -> audit/event.
 - Crear idempotencia por `operation_id`.
-- Stock: generar movimientos con referencia a operacion, no solo decrementos sueltos.
+- Stock: generar movimientos con referencia estable de cierre/linea, no solo decrementos sueltos.
 - Caja: totals deben poder reconstruirse desde turns/operaciones, no depender solo de acumulados.
 - Fiscal: si offline, crear `facturas_contingencia` o estado pendiente, nunca simular CAE.
 

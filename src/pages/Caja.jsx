@@ -539,14 +539,16 @@ function ContingenciaAfip() {
 
       let res;
       if (item.tipo === 'B') {
-        res = await emitirFacturaB({ items: item.items, total: item.total, descuento: item.descuento, mesa: item.mesa });
+        res = await emitirFacturaB({ items: item.items, total: item.total, descuento: item.descuento, mesa: item.mesa, restaurantId: item.restaurant_id, branchId: item.branch_id, turnId: item.turn_id });
       } else {
         if (!item.cliente_data?.cuit) throw new Error('Faltan datos del cliente (CUIT) para Factura A');
-        res = await emitirFacturaA({ items: item.items, total: item.total, descuento: item.descuento, mesa: item.mesa, cliente: item.cliente_data });
+        res = await emitirFacturaA({ items: item.items, total: item.total, descuento: item.descuento, mesa: item.mesa, cliente: item.cliente_data, restaurantId: item.restaurant_id, branchId: item.branch_id, turnId: item.turn_id });
       }
 
       // Guardar en historial oficial
-      const { data: facturaRow } = await supabase.from('facturas').insert({
+      let facturaRow = res.factura_id ? { id: res.factura_id } : null;
+      if (!facturaRow) {
+        const { data: insertedFactura } = await supabase.from('facturas').insert({
         restaurant_id: item.restaurant_id,
         branch_id:     item.branch_id,
         turn_id:       item.turn_id || null,
@@ -558,7 +560,9 @@ function ContingenciaAfip() {
         total:         res.total || item.total,
         condicion_iva_receptor: item.tipo === 'B' ? 'Consumidor Final' : (item.cliente_data?.razon_social || 'Empresa'),
         pdf_url:       res.pdf_link || null,
-      }).select('id').single();
+        }).select('id').single();
+        facturaRow = insertedFactura || null;
+      }
 
       // Marcar como procesada
       await supabase.from('facturas_contingencia').update({
@@ -673,4 +677,3 @@ function Kpi({ label, value, valueColor }) {
     </div>
   );
 }
-

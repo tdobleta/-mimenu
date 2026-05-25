@@ -155,11 +155,9 @@ async function processOperation(op) {
       // decrement_stock RPC usa GREATEST(0, actual - qty) — atómico, sin race conditions,
       // y nunca produce stock negativo aunque haya dos tablets simultáneas.
       //
-      // TODO: actualmente este caso nunca se encola desde el frontend.
-      // El stock se descuenta en cajaService.cerrarMesa() → descontarStockPorMesa() solo en
-      // el path online. Los cierres offline (CLOSE_TABLE) NO descuentan stock hasta que
-      // se sincronicen. Pendiente: encolar STOCK_DECREMENT junto con CLOSE_TABLE en
-      // POSView.jsx cuando el cobro se hace offline.
+      // Operacion legacy/manual. El cierre de mesa moderno descuenta stock en el
+      // servidor dentro de sync_close_table_operation para que online/offline tengan
+      // el mismo efecto idempotente.
       for (const item of (op.items || [])) {
         const { error } = await supabase.rpc('decrement_stock', {
           p_id:  item.stockItemId,

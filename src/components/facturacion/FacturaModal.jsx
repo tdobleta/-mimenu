@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { emitirFacturaB, emitirFacturaA, abrirPdfFactura, getAfipConfig } from '@/lib/afip';
 import { money } from '@/lib/fmt';
-import { G, glass, glassLight, fontDisplay } from '@/lib/glass';
+import { G, glassLight, fontDisplay } from '@/lib/glass';
 import { supabase } from '@/api/supabaseClient';
 
 // ── FacturaModal ──────────────────────────────────────────────────────────────
@@ -33,7 +33,7 @@ export default function FacturaModal({ mesa, items, total, descuento = 0, restau
     try {
       let res;
       if (tipo === 'B') {
-        res = await emitirFacturaB({ items, total, descuento, mesa });
+        res = await emitirFacturaB({ items, total, descuento, mesa, restaurantId, branchId, turnId });
       } else {
         if (!cuitCliente || !razonCliente) {
           setError('Para Factura A necesitás ingresar CUIT y razón social del cliente.');
@@ -42,12 +42,15 @@ export default function FacturaModal({ mesa, items, total, descuento = 0, restau
         res = await emitirFacturaA({
           items, total, descuento, mesa,
           cliente: { cuit: cuitCliente, razon_social: razonCliente, email: emailCliente, domicilio: domicilioCliente },
+          restaurantId,
+          branchId,
+          turnId,
         });
       }
       setResultado(res);
 
       // Persistir en tabla facturas (fire-and-forget — no bloquea el flujo)
-      if (restaurantId) {
+      if (restaurantId && res?.persist_in_browser) {
         supabase.from('facturas').insert({
           restaurant_id: restaurantId,
           branch_id:     branchId   || null,

@@ -63,6 +63,7 @@ export async function cerrarMesaOnline({
 
   // ── 1. Cierre atómico: FOR UPDATE + UPDATE turns + UPDATE caja_shifts ────────
   let alreadyApplied = false;
+  let serverAppliedStock = false;
   let useLegacyClose = !operation?.operation_type;
 
   if (operation?.operation_type === 'CLOSE_TABLE') {
@@ -72,6 +73,7 @@ export async function cerrarMesaOnline({
 
     if (!error && data?.ok !== false) {
       alreadyApplied = Boolean(data?.already_applied);
+      serverAppliedStock = Boolean(data?.stock_applied);
     } else if (error) {
       const msgLower = error.message?.toLowerCase() || '';
       if (msgLower.includes('ya cerrado') || error.code === 'P0001') {
@@ -133,8 +135,8 @@ export async function cerrarMesaOnline({
   // ── 3. Descontar stock según recetas configuradas (fire-and-forget) ──────────
   // No bloquea el flujo de cobro. Si falla, el caller puede mostrar un warning.
   // Se pasa turnId para idempotencia: si se reintenta, los egresos con el mismo
-  // turnId+menuItemId+ingredienteId se ignorarán silenciosamente (código 23505).
-  if (!alreadyApplied && order?.length > 0 && store) {
+  // turnId+lineId+ingredienteId se ignorarán silenciosamente (código 23505).
+  if (!alreadyApplied && !serverAppliedStock && order?.length > 0 && store) {
     descontarStockPorMesa(order, branchId, store, turnId).catch((err) => {
       console.error('[cajaService] Fallo al descontar stock (no bloquea):', err?.message);
     });

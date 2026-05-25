@@ -34,13 +34,18 @@ Current relevant files:
 Current behavior:
 
 - Online close calls `cerrarMesaOnline`.
-- `cerrarMesaOnline` calls the `cerrar_mesa_atomico` RPC.
-- Stock decrement happens after the close as a fire-and-forget side effect.
+- Modern operation close calls `sync_close_table_operation`, which records the
+  business operation and applies stock movements server-side when the stock
+  effects migration is installed.
+- Legacy close still falls back to `cerrar_mesa_atomico` and client-side stock
+  decrement.
 - Offline close enqueues a small `CLOSE_TABLE` operation.
 - Offline UI marks the table as `pendiente_cobro`.
-- Sync later calls `cerrar_mesa_atomico`.
+- Sync later calls `sync_close_table_operation` when available, with fallback to
+  `cerrar_mesa_atomico`.
 
-This is a good base, but the offline operation is not complete enough for the final architecture.
+This is a good base. The next gap is adding fiscal/payment recovery effects to
+the same operation model instead of handling them as separate UI flows.
 
 ## Design Principle
 
@@ -321,4 +326,3 @@ Minimum verification for first implementation:
 - Whether sync identity is user-session based, device-token based, or both.
 - Whether fiscal pending records are created locally, server-side, or both.
 - Whether stock recipe snapshots should be required for every close.
-
