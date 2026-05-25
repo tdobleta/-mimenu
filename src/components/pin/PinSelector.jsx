@@ -53,15 +53,17 @@ export default function PinSelector({ branchId, onSelect }) {
 
   useEffect(() => {
     if (!branchId) return;
-    supabase
-      .from('staff_pins')
-      .select('id, nombre, rol, pin')
-      .eq('branch_id', branchId)
-      .eq('activo', true)
-      .order('nombre')
-      .then(({ data }) => {
-        setStaff(data || []);
+    supabase.functions
+      .invoke('staff-pin-auth', { body: { action: 'list', branchId } })
+      .then(({ data, error }) => {
+        if (error || data?.error) throw new Error(error?.message || data?.error);
+        setStaff((data?.staff || []).filter(m => m.activo));
         setLoading(false);
+      })
+      .catch(() => {
+        setStaff([]);
+        setLoading(false);
+        setError('No se pudo cargar el personal');
       });
   }, [branchId]);
 
@@ -81,11 +83,15 @@ export default function PinSelector({ branchId, onSelect }) {
     }
   }
 
-  function verifyPin(enteredPin) {
+  async function verifyPin(enteredPin) {
     if (!selected) return;
-    if (enteredPin === selected.pin) {
-      onSelect({ id: selected.id, nombre: selected.nombre, rol: selected.rol, branchId });
-    } else {
+    try {
+      const { data, error: authError } = await supabase.functions.invoke('staff-pin-auth', {
+        body: { action: 'verify', branchId, staffId: selected.id, pin: enteredPin },
+      });
+      if (authError || data?.error || !data?.staff) throw new Error(authError?.message || data?.error || 'PIN incorrecto');
+      onSelect({ id: data.staff.id, nombre: data.staff.nombre, rol: data.staff.rol, branchId });
+    } catch {
       setShaking(true);
       setTimeout(() => {
         setShaking(false);
