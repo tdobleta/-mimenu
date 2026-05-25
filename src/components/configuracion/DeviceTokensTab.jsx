@@ -64,7 +64,7 @@ export default function DeviceTokensTab() {
     if (err) {
       setError('Error al crear dispositivo: ' + err.message);
     } else if (data) {
-      const deviceUrl = `${BASE_URL}/cocina?branch=${selectedBranch}&token=${data.token}`;
+      const deviceUrl = `${BASE_URL}/public/cocina?branch=${selectedBranch}&token=${data.token}`;
       setNewlyCreated({ ...data, url: deviceUrl });
       setTokens(prev => [data, ...prev]);
       setNewName('');
@@ -83,7 +83,7 @@ export default function DeviceTokensTab() {
   }
 
   function buildUrl(token) {
-    return `${BASE_URL}/cocina?branch=${selectedBranch}&token=${token}`;
+    return `${BASE_URL}/public/cocina?branch=${selectedBranch}&token=${token}`;
   }
 
   async function copyToClipboard(text, id) {
