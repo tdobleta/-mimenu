@@ -21,7 +21,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/api/supabaseClient';
-import { getActive, dequeue, updateOp, countActive } from '@/lib/offlineQueue';
+import { getActive, dequeue, updateOp, countActive, countFailed, clearFailed, retryFailed } from '@/lib/offlineQueue';
 import { buildCloseTableSyncPayload } from '@/lib/operations/closeTableOperation';
 
 const MAX_RETRIES = 3;
@@ -321,26 +321,35 @@ export async function drainQueue(onProgress) {
 // ── Hook React para usar el sync en componentes ───────────────
 export function useOfflineSync() {
   const [pending, setPending] = useState(0);
+  const [failed, setFailed] = useState(0);
   const [syncing, setSyncing] = useState(false);
   const [lastSync, setLastSync] = useState(null);
   const syncingRef = useRef(false);
 
   const refreshCount = useCallback(async () => {
-    try { setPending(await countActive()); } catch {}
+    try {
+      const [active, failedCount] = await Promise.all([countActive(), countFailed()]);
+      setPending(active);
+      setFailed(failedCount);
+    } catch {}
   }, []);
+
+  const dismissFailed = useCallback(async () => {
+    try { await clearFailed(); await refreshCount(); } catch {}
+  }, [refreshCount]);
 
   const sync = useCallback(async () => {
     if (syncingRef.current || !navigator.onLine) return;
     syncingRef.current = true;
     setSyncing(true);
     try {
-      const { synced, failed } = await drainQueue(() => refreshCount());
+      const { synced, failed: failedCount } = await drainQueue(() => refreshCount());
       if (synced > 0) {
         console.log(`[offlineSync] Sincronizados ${synced}`);
         setLastSync(Date.now());
       }
-      if (failed > 0) {
-        console.error(`[offlineSync] ${failed} operaciones fallaron permanentemente`);
+      if (failedCount > 0) {
+        console.error(`[offlineSync] ${failedCount} operaciones fallaron permanentemente`);
       }
     } catch (err) {
       console.error('[offlineSync]', err);
@@ -350,6 +359,14 @@ export function useOfflineSync() {
       refreshCount();
     }
   }, [refreshCount]);
+
+  const retryAllFailed = useCallback(async () => {
+    try {
+      const n = await retryFailed();
+      await refreshCount();
+      if (n > 0) sync();
+    } catch {}
+  }, [refreshCount, sync]);
 
   useEffect(() => {
     refreshCount();
@@ -362,7 +379,7 @@ export function useOfflineSync() {
     };
   }, [sync, refreshCount]);
 
-  return { pending, syncing, lastSync, sync, refreshCount };
+  return { pending, failed, syncing, lastSync, sync, refreshCount, dismissFailed, retryAllFailed };
 }
 
 // ── Background Sync via Service Worker ───────────────────────

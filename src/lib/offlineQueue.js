@@ -121,3 +121,43 @@ export async function countActive() {
   const active = await getActive();
   return active.length;
 }
+
+// ── Obtener solo operaciones fallidas (dead letters) ──────────
+export async function getFailed() {
+  const all = await getPending();
+  return all.filter(op => op.status === 'failed');
+}
+
+// ── Contar operaciones fallidas ───────────────────────────────
+export async function countFailed() {
+  const failed = await getFailed();
+  return failed.length;
+}
+
+// ── Limpiar operaciones fallidas (descartarlas) ───────────────
+export async function clearFailed() {
+  const failed = await getFailed();
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, 'readwrite');
+    const store = tx.objectStore(STORE);
+    failed.forEach(op => store.delete(op.id));
+    tx.oncomplete = resolve;
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+// ── Reintentar operaciones fallidas (volver a estado pendiente) ─
+export async function retryFailed() {
+  const failed = await getFailed();
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, 'readwrite');
+    const store = tx.objectStore(STORE);
+    failed.forEach(op => {
+      store.put({ ...op, status: 'pending', lastError: null, failedAt: null });
+    });
+    tx.oncomplete = () => resolve(failed.length);
+    tx.onerror = () => reject(tx.error);
+  });
+}
