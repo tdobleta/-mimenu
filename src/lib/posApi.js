@@ -30,20 +30,32 @@ export async function dbLoadClosedTurns({ branchId, since } = {}) {
 
 // ── TurnItem (ítems de la comanda) ────────────────────────────────────────────
 
-export async function dbAddTurnItem({ turnId, branchId, menuItemId, nombre, precio, qty, notas }) {
+export async function dbAddTurnItem({ turnId, branchId, menuItemId, nombre, precio, qty, notas, clientUid }) {
+  const row = {
+    turn_id: turnId,
+    branch_id: branchId,
+    menu_item_id: menuItemId || null,
+    menu_item_name: nombre,
+    cantidad: qty,
+    precio: precio || 0,
+    notas: notas || '',
+  };
+  // Idempotencia: si el cliente generó un uid estable, pasarlo como client_uid.
+  // En un retry donde la respuesta se perdió, la DB devolverá el registro ya insertado
+  // en lugar de crear un duplicado (ON CONFLICT client_uid DO NOTHING requiere la migración
+  // 20260524000004_turn_items_idempotency.sql aplicada en Supabase).
+  if (clientUid) row.client_uid = clientUid;
+
   const { data, error } = await supabase
     .from('turn_items')
-    .insert({
-      turn_id: turnId,
-      branch_id: branchId,
-      menu_item_id: menuItemId || null,
-      menu_item_name: nombre,
-      cantidad: qty,
-      precio: precio || 0,
-      notas: notas || '',
-    })
+    .insert(row)
     .select()
     .single();
+
+  // 23505 = unique_violation en client_uid → ítem ya existe (retry después de drop de red)
+  // En este caso no tenemos el ID de la fila para retornar, pero el caller puede ignorar
+  // el turnItemId si ya tiene el ítem en el store local.
+  if (error && error.code === '23505') return null;
   if (error) throw error;
   return data;
 }

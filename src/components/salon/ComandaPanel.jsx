@@ -147,11 +147,13 @@ export default function ComandaPanel({ table, branchId, onClose, addToast }) {
     const next = [...order, newItem];
     store.updateTableOrder(branchId, table.id, next);
     if (table.turnId) {
-        const tryAdd = (retries) => dbAddTurnItem({ turnId:table.turnId, branchId, menuItemId:item.id, nombre:item.nombre, precio:item.precio, qty:1 })
+        const tryAdd = (retries) => dbAddTurnItem({ turnId:table.turnId, branchId, menuItemId:item.id, nombre:item.nombre, precio:item.precio, qty:1, clientUid:uid })
           .then(ti => {
             // setOrderItemTurnItemIdByUid usa setS(p => ...) — siempre lee el estado actual,
             // no el snapshot 'next' capturado al inicio de addItem(). Esto evita la race
             // condition donde el .then() sobreescribía notas o ítems agregados después.
+            // ti puede ser null si el ítem ya existía (retry idempotente por client_uid).
+            if (!ti) return; // ya está en DB — no necesitamos el turnItemId
             store.setOrderItemTurnItemIdByUid(branchId, table.id, uid, ti.id);
             // Si el usuario escribió una nota antes de que DB respondiera, guardarla ahora
             const pendingNota = pendingNotesRef.current[uid];
