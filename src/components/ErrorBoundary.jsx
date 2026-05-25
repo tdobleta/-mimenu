@@ -3,7 +3,7 @@ import { Component } from 'react';
 export default class ErrorBoundary extends Component {
   constructor(props) {
     super(props);
-    this.state = { hasError: false, error: null };
+    this.state = { hasError: false, error: null, swUpdateAvailable: false };
   }
 
   static getDerivedStateFromError(error) {
@@ -12,10 +12,39 @@ export default class ErrorBoundary extends Component {
 
   componentDidCatch(error, info) {
     console.error('[mimenú] Error no manejado:', error, info);
+    // Detectar si hay una actualización del SW pendiente
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistration().then(reg => {
+        if (reg?.waiting) {
+          this.setState({ swUpdateAvailable: true });
+        }
+      }).catch(() => {});
+    }
   }
 
+  handleUpdate = () => {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistration().then(reg => {
+        if (reg?.waiting) {
+          reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+          navigator.serviceWorker.addEventListener('controllerchange', () => {
+            window.location.reload();
+          });
+        } else {
+          window.location.reload();
+        }
+      }).catch(() => window.location.reload());
+    } else {
+      window.location.reload();
+    }
+  };
+
   render() {
-    if (!this.state.hasError) return this.props.children;
+    // Cuando se usa como fallback de Sentry.ErrorBoundary (sin children ni error propio),
+    // mostrar children si existen, o null si no hay nada que renderizar.
+    if (!this.state.hasError) return this.props.children || null;
+
+    const { error, swUpdateAvailable } = this.state;
 
     return (
       <div style={{
@@ -31,7 +60,7 @@ export default class ErrorBoundary extends Component {
           background: 'white',
           borderRadius: 16,
           padding: 40,
-          maxWidth: 420,
+          maxWidth: 440,
           width: '100%',
           textAlign: 'center',
           boxShadow: '0 4px 24px rgba(0,0,0,0.08)',
@@ -52,11 +81,12 @@ export default class ErrorBoundary extends Component {
           <div style={{ fontSize: 18, fontWeight: 700, color: '#111827', marginBottom: 8 }}>
             Algo salió mal
           </div>
-          <div style={{ fontSize: 13, color: '#6B7280', lineHeight: '20px', marginBottom: 24 }}>
-            Ocurrió un error inesperado. Podés intentar recargar la página.
-            Si el problema persiste, contactá soporte.
+          <div style={{ fontSize: 13, color: '#6B7280', lineHeight: '20px', marginBottom: 16 }}>
+            {swUpdateAvailable
+              ? 'Hay una nueva versión disponible. Actualizá la app para resolver el problema.'
+              : 'Ocurrió un error inesperado. Podés intentar recargar la página.'}
           </div>
-          {this.state.error && (
+          {error && (
             <div style={{
               background: '#F9FAFB',
               borderRadius: 8,
@@ -68,23 +98,41 @@ export default class ErrorBoundary extends Component {
               fontFamily: 'monospace',
               wordBreak: 'break-all',
             }}>
-              {this.state.error.message}
+              {error.message || String(error)}
             </div>
           )}
-          <button
-            onClick={() => window.location.reload()}
-            style={{
-              padding: '10px 24px',
-              backgroundColor: '#1D9E75',
-              color: 'white',
-              border: 'none',
-              borderRadius: 8,
-              fontSize: 14,
-              cursor: 'pointer',
-              fontWeight: 500,
-            }}>
-            Recargar página
-          </button>
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
+            {swUpdateAvailable && (
+              <button
+                onClick={this.handleUpdate}
+                style={{
+                  padding: '10px 24px',
+                  backgroundColor: '#1D9E75',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: 8,
+                  fontSize: 14,
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                }}>
+                Actualizar y recargar
+              </button>
+            )}
+            <button
+              onClick={() => window.location.reload()}
+              style={{
+                padding: '10px 24px',
+                backgroundColor: swUpdateAvailable ? 'white' : '#1D9E75',
+                color: swUpdateAvailable ? '#6B7280' : 'white',
+                border: swUpdateAvailable ? '1px solid #E5E7EB' : 'none',
+                borderRadius: 8,
+                fontSize: 14,
+                cursor: 'pointer',
+                fontWeight: 500,
+              }}>
+              Recargar página
+            </button>
+          </div>
         </div>
       </div>
     );
