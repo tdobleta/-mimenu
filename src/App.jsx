@@ -1,4 +1,5 @@
 import { lazy, Suspense } from 'react';
+import ErrorBoundary from '@/components/ErrorBoundary';
 import { Toaster } from 'sonner'
 import { supabase } from '@/api/supabaseClient'
 import { QueryClientProvider } from '@tanstack/react-query'
@@ -125,7 +126,9 @@ const AuthenticatedApp = () => {
 
   return (
     <Suspense fallback={<PageLoader />}>
-      <RoutedApp />
+      <ErrorBoundary>
+        <RoutedApp />
+      </ErrorBoundary>
     </Suspense>
   );
 };
@@ -181,28 +184,30 @@ const RoutedApp = () => {
 
 function App() {
   return (
-    <AuthProvider>
-      <AppProvider>
-        <ToastProvider>
-          <QueryClientProvider client={queryClientInstance}>
-            <Router>
-              <OfflineBanner />
-              <Suspense fallback={<PageLoader />}>
-                <Routes>
-                  <Route path="/login" element={<Login />} />
-                  <Route path="/public/reservas/:branchSlug" element={<PublicReservation />} />
-                  <Route path="/public/cocina" element={<Cocina />} />
-                  <Route path="/terminos" element={<TerminosServicio />} />
-                  <Route path="/privacidad" element={<PoliticaPrivacidad />} />
-                  <Route path="*" element={<AuthenticatedApp />} />
-                </Routes>
-              </Suspense>
-            </Router>
-            <Toaster position="top-right" richColors closeButton />
-          </QueryClientProvider>
-        </ToastProvider>
-      </AppProvider>
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <AppProvider>
+          <ToastProvider>
+            <QueryClientProvider client={queryClientInstance}>
+              <Router>
+                <OfflineBanner />
+                <Suspense fallback={<PageLoader />}>
+                  <Routes>
+                    <Route path="/login" element={<Login />} />
+                    <Route path="/public/reservas/:branchSlug" element={<PublicReservation />} />
+                    <Route path="/public/cocina" element={<Cocina />} />
+                    <Route path="/terminos" element={<TerminosServicio />} />
+                    <Route path="/privacidad" element={<PoliticaPrivacidad />} />
+                    <Route path="*" element={<AuthenticatedApp />} />
+                  </Routes>
+                </Suspense>
+              </Router>
+              <Toaster position="top-right" richColors closeButton />
+            </QueryClientProvider>
+          </ToastProvider>
+        </AppProvider>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }
 
