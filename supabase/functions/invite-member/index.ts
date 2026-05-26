@@ -76,22 +76,23 @@ Deno.serve(async (req) => {
     // ── 4. Verificar que el caller pertenece al restaurante ───────────────────
     const { data: restaurant } = await supabaseAdmin
       .from('restaurants')
-      .select('id, nombre, owner_id, owner_email')
+      .select('id, nombre, owner_id')
       .eq('id', restaurantId)
       .single();
 
     if (!restaurant) return json({ error: 'Restaurante no encontrado' }, 404);
 
-    // Verificar que es dueño (por owner_id o owner_email)
-    const esOwner = restaurant.owner_id === caller.id || restaurant.owner_email === caller.email;
-    // O encargado (tiene registro en team_members con rol Encargado)
+    // Verificar permisos solo por user_id. No usar email como criterio:
+    // una cuenta nueva con el mismo email de un miembro legacy no debe ganar acceso.
+    const esOwner = restaurant.owner_id === caller.id;
+    // O encargado confirmado por user_id.
     let esEncargado = false;
     if (!esOwner) {
       const { data: callerMember } = await supabaseAdmin
         .from('team_members')
         .select('rol')
         .eq('restaurant_id', restaurantId)
-        .eq('email', caller.email)
+        .eq('user_id', caller.id)
         .single();
       esEncargado = callerMember?.rol === 'Encargado';
     }
