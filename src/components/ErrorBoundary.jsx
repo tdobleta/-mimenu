@@ -1,4 +1,5 @@
 import { Component } from 'react';
+import { captureOperationalError } from '@/lib/observability';
 
 export default class ErrorBoundary extends Component {
   constructor(props) {
@@ -11,6 +12,10 @@ export default class ErrorBoundary extends Component {
   }
 
   componentDidCatch(error, info) {
+    captureOperationalError(error, {
+      tags: { source: 'react_error_boundary' },
+      context: { componentStack: info?.componentStack || '' },
+    });
     console.error('[mimenú] Error no manejado:', error, info);
     // Detectar si hay una actualización del SW pendiente
     if ('serviceWorker' in navigator) {

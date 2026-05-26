@@ -14,6 +14,7 @@ import { ToastProvider } from '@/lib/toast';
 import OfflineBanner from '@/components/OfflineBanner';
 import Layout from './components/Layout';
 import PinGuard from './components/pin/PinGuard';
+import ObservabilityBridge from '@/components/ObservabilityBridge';
 
 // ── Lazy-loaded pages (code splitting por ruta) ────────────────────────────────
 // Vite genera un chunk separado por cada import() dinámico.
@@ -190,6 +191,7 @@ function App() {
           <ToastProvider>
             <QueryClientProvider client={queryClientInstance}>
               <Router>
+                <ObservabilityBridge />
                 <OfflineBanner />
                 <Suspense fallback={<PageLoader />}>
                   <Routes>

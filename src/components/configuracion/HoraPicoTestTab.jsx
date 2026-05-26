@@ -5,6 +5,7 @@ import {
   groupStepsByPhase,
   summarizeHoraPicoRunbook,
 } from '@/lib/horaPicoRunbook';
+import { captureOperationalEvent } from '@/lib/observability';
 import { G } from '@/lib/glass';
 
 const STORAGE_KEY = 'mimenu_hora_pico_runbook';
@@ -52,9 +53,11 @@ export default function HoraPicoTestTab() {
   }
 
   function toggleStep(id) {
+    const willComplete = !completed.has(id);
     const nextCompleted = completed.has(id)
       ? (state.completed || []).filter(x => x !== id)
       : [...(state.completed || []), id];
+    captureOperationalEvent(willComplete ? 'hora_pico_step_completed' : 'hora_pico_step_unchecked', { step_id: id });
     update({ completed: nextCompleted });
   }
 
@@ -67,6 +70,11 @@ export default function HoraPicoTestTab() {
       completedIds: state.completed,
       notes: state.notes,
       operator: state.operator,
+    });
+    captureOperationalEvent('hora_pico_evidence_exported', {
+      completed: report.summary.completed,
+      required_completed: report.summary.required_completed,
+      status: report.summary.status,
     });
     const date = new Date().toISOString().slice(0, 10);
     downloadJSON(`prueba-hora-pico-${date}.json`, report);
