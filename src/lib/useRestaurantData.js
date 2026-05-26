@@ -17,10 +17,11 @@ export function useRestaurantData() {
       const me = { id: sbUser.id, email: sbUser.email, role: sbUser.app_metadata?.role ?? 'user' };
       setUser(me);
 
-      // Intentar por owner_id primero
+      // Owner por owner_id; empleados por visibilidad RLS via get_user_restaurant_id().
+      // No usar owner_email: el modelo seguro es user_id.
       let { data: rests } = await supabase.from('restaurants').select('*').eq('owner_id', sbUser.id).limit(1);
       if (!rests || rests.length === 0) {
-        const res2 = await supabase.from('restaurants').select('*').eq('owner_email', sbUser.email).limit(1);
+        const res2 = await supabase.from('restaurants').select('*').limit(1);
         rests = res2.data;
       }
 

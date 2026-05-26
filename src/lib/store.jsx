@@ -68,16 +68,13 @@ export function AppProvider({ children }) {
           // No hay sesiÃ³n â€” AuthContext se encarga de redirigir al login
           return;
         }
-        // Intentar por owner_id primero (mÃ¡s preciso), luego por email
+        // Resolver tenant por owner_id o membresia confirmada por user_id.
+        // No usar email como criterio de permisos: la RLS ya elimino ese fallback.
         let restaurants = await base44.entities.Restaurant.filter({ owner_id: user.id });
-        if (!restaurants || restaurants.length === 0) {
-          restaurants = await base44.entities.Restaurant.filter({ owner_email: user.email });
-        }
 
         let memberships = [];
         try {
-          const byEmail = await base44.entities.TeamMember.filter({ email: user.email }).catch(() => []);
-          memberships = (byEmail || []).filter(m => m.email === user.email);
+          memberships = await base44.entities.TeamMember.filter({ user_id: user.id }).catch(() => []);
         } catch(e) {}
 
         // Solo reintentar si hay un restaurante incompleto â€” posible usuario invitado
@@ -85,8 +82,7 @@ export function AppProvider({ children }) {
         if (memberships.length === 0 && restaurants && restaurants.length > 0 && !restaurants[0]?.onboarding_completado) {
           await new Promise(res => setTimeout(res, 1200));
           try {
-            const byEmail2 = await base44.entities.TeamMember.filter({ email: user.email }).catch(() => []);
-            memberships = (byEmail2 || []).filter(m => m.email === user.email);
+            memberships = await base44.entities.TeamMember.filter({ user_id: user.id }).catch(() => []);
           } catch(e) {}
         }
 
@@ -923,6 +919,5 @@ export function AppProvider({ children }) {
 }
 
 export const useStore = () => useContext(AppContext);
-
 
 

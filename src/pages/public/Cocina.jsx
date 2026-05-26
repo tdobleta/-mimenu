@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 const COLORS = {
   nueva:      { bg:'#FFFFFF', border:'#1D9E75', borderWidth:2,   headerBg:'#F0FBF7', headerText:'#111827', timerColor:'#1D9E75', pulse:true  },
@@ -13,6 +14,10 @@ const ORDER = { nueva:0, preparando:1, lista:2 };
 
 function tokenKey(branchId) {
   return `mimenu_cocina_device_token_${branchId || 'default'}`;
+}
+
+function isValidDeviceToken(token) {
+  return typeof token === 'string' && token.length === 64 && /^[0-9a-f]+$/.test(token);
 }
 
 function fmtElapsed(openedAt) {
@@ -33,6 +38,7 @@ async function callKitchenFunction(functionName, deviceToken, body) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      'apikey': SUPABASE_ANON_KEY,
       'Authorization': `Bearer ${deviceToken}`,
     },
     body: JSON.stringify(body),
@@ -57,12 +63,16 @@ export default function Cocina() {
 
   useEffect(() => {
     if (!branchId) return;
-    if (urlToken) {
+    if (isValidDeviceToken(urlToken)) {
       localStorage.setItem(tokenKey(branchId), urlToken);
       setDeviceToken(urlToken);
+      const clean = new URL(window.location.href);
+      clean.searchParams.delete('token');
+      window.history.replaceState(null, '', clean.toString());
       return;
     }
-    setDeviceToken(localStorage.getItem(tokenKey(branchId)) || '');
+    const stored = localStorage.getItem(tokenKey(branchId)) || '';
+    setDeviceToken(isValidDeviceToken(stored) ? stored : '');
   }, [branchId, urlToken]);
 
   const loadCocina = useCallback(async () => {
