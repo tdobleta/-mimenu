@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { buildObservabilityContext, sanitizeBreadcrumbData } from '@/lib/observability';
 
 describe('observability', () => {
@@ -50,5 +51,12 @@ describe('observability', () => {
     });
 
     expect(clean).toEqual({ operation_id: 'op-1', nested: '[object]' });
+  });
+
+  it('keeps Sentry DSN environment-driven instead of hardcoded', () => {
+    const source = readFileSync('src/main.jsx', 'utf8');
+
+    expect(source).toContain('VITE_SENTRY_DSN');
+    expect(source).not.toMatch(/https:\/\/[^'"]+\.ingest\.us\.sentry\.io\/\d+/);
   });
 });
