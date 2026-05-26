@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 function read(relPath) {
@@ -22,5 +22,14 @@ describe('tenant resolution security', () => {
     expect(publicKitchen).toContain("'apikey': SUPABASE_ANON_KEY");
     expect(publicKitchen).toContain("clean.searchParams.delete('token')");
     expect(publicKitchen).toContain('isValidDeviceToken');
+  });
+
+  it('does not keep the legacy Settings/TeamTab flow that inserted team members without Auth', () => {
+    expect(existsSync(resolve(process.cwd(), 'src/pages/Settings.jsx'))).toBe(false);
+    expect(existsSync(resolve(process.cwd(), 'src/components/configuracion/TeamTab.jsx'))).toBe(false);
+
+    const equipoTab = read('src/components/configuracion/EquipoTab.jsx');
+    expect(equipoTab).toContain("functions/v1/invite-member");
+    expect(equipoTab).not.toMatch(/from\(['"]team_members['"]\)\.insert/);
   });
 });
