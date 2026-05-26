@@ -10,12 +10,14 @@ import RelayTab from '../components/configuracion/RelayTab';
 import StaffPinsTab from '../components/configuracion/StaffPinsTab';
 import DeviceTokensTab from '../components/configuracion/DeviceTokensTab';
 import JornadaAuditTab from '../components/configuracion/JornadaAuditTab';
+import ProductionAuditTab from '../components/configuracion/ProductionAuditTab';
 import SupportOpsTab from '../components/configuracion/SupportOpsTab';
 import HoraPicoTestTab from '../components/configuracion/HoraPicoTestTab';
 import { G, fontDisplay } from '@/lib/glass';
 
 const TABS = [
   ['restaurante', 'Mi restaurante'],
+  ['produccion',  'Produccion'],
   ['jornada',     'Auditoria jornada'],
   ['hora_pico',   'Prueba hora pico'],
   ['sucursales',  'Sucursales'],
@@ -53,6 +55,7 @@ export default function Configuracion() {
       </div>
       <div style={{ paddingTop:4 }}>
         {tab === 'restaurante' && <RestauranteTab />}
+        {tab === 'produccion'  && <ProductionAuditTab />}
         {tab === 'jornada'     && <JornadaAuditTab />}
         {tab === 'hora_pico'   && <HoraPicoTestTab />}
         {tab === 'sucursales'  && <SucursalesTab />}
