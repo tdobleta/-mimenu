@@ -174,3 +174,48 @@ export function buildJornadaAuditReport({
 
   return { status, score, critical, warning, ok, total: checks.length, checks, branch, lowStock };
 }
+
+export function buildJornadaAuditSupportReport(report, {
+  restaurantId = null,
+  restaurantName = '',
+  branchId = null,
+  generatedAt = new Date().toISOString(),
+  appVersion = '',
+} = {}) {
+  const checks = (report?.checks || []).map(check => ({
+    id: check.id,
+    label: check.label,
+    status: check.status,
+    detail: check.detail,
+    action: check.action || '',
+  }));
+
+  return {
+    generated_at: generatedAt,
+    app_version: appVersion,
+    restaurant: {
+      id: restaurantId,
+      name: restaurantName || '',
+    },
+    branch: {
+      id: branchId || report?.branch?.id || null,
+      name: report?.branch?.nombre || report?.branch?.name || '',
+    },
+    summary: {
+      status: report?.status || 'unknown',
+      score: Number(report?.score || 0),
+      critical: Number(report?.critical || 0),
+      warning: Number(report?.warning || 0),
+      ok: Number(report?.ok || 0),
+      total: Number(report?.total || checks.length),
+    },
+    checks,
+    low_stock: (report?.lowStock || []).map(item => ({
+      id: item.id || null,
+      name: item.nombre || item.name || '',
+      actual: Number(item.actual || 0),
+      minimo: Number(item.minimo || 0),
+      unidad: item.unidad || '',
+    })),
+  };
+}

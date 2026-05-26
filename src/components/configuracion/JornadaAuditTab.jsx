@@ -3,7 +3,7 @@ import { supabase } from '@/api/supabaseClient';
 import { useStore } from '@/lib/store';
 import { countActive, countFailed } from '@/lib/offlineQueue';
 import { loadAfipSettings } from '@/lib/afip';
-import { buildJornadaAuditReport } from '@/lib/jornadaAudit';
+import { buildJornadaAuditReport, buildJornadaAuditSupportReport } from '@/lib/jornadaAudit';
 import { getPrinterConfig } from '@/lib/printer';
 import { getRelayConfig, localRelay } from '@/lib/localRelay';
 import { G } from '@/lib/glass';
@@ -89,6 +89,16 @@ function Pill({ status }) {
       {s.label}
     </span>
   );
+}
+
+function downloadJSON(filename, data) {
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 export default function JornadaAuditTab() {
@@ -179,6 +189,19 @@ export default function JornadaAuditTab() {
   }), [activeBranchId, remote, store]);
 
   const summary = SUMMARY[report.status] || SUMMARY.blocked;
+  const branchName = report.branch?.nombre || report.branch?.name || activeBranchId || 'sucursal';
+
+  function handleExport() {
+    const supportReport = buildJornadaAuditSupportReport(report, {
+      restaurantId: store.restaurantId,
+      restaurantName: store.restaurante?.nombre || store.restaurante?.name || '',
+      branchId: activeBranchId,
+      appVersion: 'mimenu-pos',
+    });
+    const safeBranch = String(branchName).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'sucursal';
+    const date = new Date().toISOString().slice(0, 10);
+    downloadJSON(`auditoria-jornada-${safeBranch}-${date}.json`, supportReport);
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 920 }}>
@@ -226,6 +249,21 @@ export default function JornadaAuditTab() {
             cursor: loading ? 'not-allowed' : 'pointer',
           }}>
           {loading ? 'Auditando...' : 'Actualizar auditoria'}
+        </button>
+        <button
+          onClick={handleExport}
+          disabled={loading}
+          style={{
+            padding: '8px 14px',
+            border: '1px solid #CBD5E1',
+            borderRadius: 8,
+            background: '#FFFFFF',
+            color: G.text,
+            fontSize: 13,
+            fontWeight: 700,
+            cursor: loading ? 'not-allowed' : 'pointer',
+          }}>
+          Exportar reporte
         </button>
         <span style={{ fontSize: 12, color: G.textMuted }}>
           {report.critical} bloqueante(s) - {report.warning} advertencia(s) - {report.ok} listo(s)

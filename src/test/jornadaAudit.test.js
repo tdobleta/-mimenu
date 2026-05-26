@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildJornadaAuditReport } from '@/lib/jornadaAudit';
+import { buildJornadaAuditReport, buildJornadaAuditSupportReport } from '@/lib/jornadaAudit';
 
 const base = {
   sucursales: [{ id: 'branch-1', nombre: 'Principal', mesas: 12 }],
@@ -85,5 +85,24 @@ describe('buildJornadaAuditReport', () => {
 
     expect(ready.checks.find(c => c.id === 'printer').status).toBe('ok');
     expect(missingIp.checks.find(c => c.id === 'printer').status).toBe('warning');
+  });
+
+  it('builds a support-safe export without raw runtime objects', () => {
+    const report = buildJornadaAuditReport({
+      ...base,
+      stockItems: [{ id: 's2', nombre: 'Tomate', actual: 1, minimo: 3, unidad: 'kg' }],
+    });
+    const exported = buildJornadaAuditSupportReport(report, {
+      restaurantId: 'rest-1',
+      restaurantName: 'Demo Rest',
+      branchId: 'branch-1',
+      generatedAt: '2026-05-26T00:00:00.000Z',
+      appVersion: 'test',
+    });
+
+    expect(exported.restaurant).toEqual({ id: 'rest-1', name: 'Demo Rest' });
+    expect(exported.summary.status).toBe('ready_with_warnings');
+    expect(exported.checks.every(c => ['id', 'label', 'status', 'detail', 'action'].every(k => k in c))).toBe(true);
+    expect(exported.low_stock).toEqual([{ id: 's2', name: 'Tomate', actual: 1, minimo: 3, unidad: 'kg' }]);
   });
 });
