@@ -11,11 +11,13 @@ import StaffPinsTab from '../components/configuracion/StaffPinsTab';
 import DeviceTokensTab from '../components/configuracion/DeviceTokensTab';
 import JornadaAuditTab from '../components/configuracion/JornadaAuditTab';
 import SupportOpsTab from '../components/configuracion/SupportOpsTab';
+import HoraPicoTestTab from '../components/configuracion/HoraPicoTestTab';
 import { G, fontDisplay } from '@/lib/glass';
 
 const TABS = [
   ['restaurante', 'Mi restaurante'],
   ['jornada',     'Auditoria jornada'],
+  ['hora_pico',   'Prueba hora pico'],
   ['sucursales',  'Sucursales'],
   ['equipo',      'Equipo'],
   ['mozos',       'Mozos y PINs'],
@@ -52,6 +54,7 @@ export default function Configuracion() {
       <div style={{ paddingTop:4 }}>
         {tab === 'restaurante' && <RestauranteTab />}
         {tab === 'jornada'     && <JornadaAuditTab />}
+        {tab === 'hora_pico'   && <HoraPicoTestTab />}
         {tab === 'sucursales'  && <SucursalesTab />}
         {tab === 'equipo'      && <EquipoTab />}
         {tab === 'impresora'   && <PrinterSetup />}
