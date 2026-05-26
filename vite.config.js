@@ -35,5 +35,33 @@ export default defineConfig({
     }),
   ],
   resolve: { alias: { '@': path.resolve(__dirname, './src') } },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          const normalized = id.replace(/\\/g, '/');
+          if (!normalized.includes('/node_modules/')) return undefined;
+          if (normalized.includes('/node_modules/@sentry/')) return 'vendor-sentry';
+          if (
+            normalized.includes('/node_modules/react/') ||
+            normalized.includes('/node_modules/react-dom/') ||
+            normalized.includes('/node_modules/react-router-dom/')
+          ) return 'vendor-react';
+          if (normalized.includes('/node_modules/@supabase/')) return 'vendor-supabase';
+          if (normalized.includes('/node_modules/@tanstack/')) return 'vendor-query';
+          if (normalized.includes('/node_modules/recharts/') || normalized.includes('/node_modules/d3-')) return 'vendor-charts';
+          if (
+            normalized.includes('/node_modules/@radix-ui/') ||
+            normalized.includes('/node_modules/lucide-react/') ||
+            normalized.includes('/node_modules/framer-motion/') ||
+            normalized.includes('/node_modules/sonner/') ||
+            normalized.includes('/node_modules/cmdk/') ||
+            normalized.includes('/node_modules/vaul/')
+          ) return 'vendor-ui';
+          return undefined;
+        },
+      },
+    },
+  },
   server: { port: 5173 },
 });
