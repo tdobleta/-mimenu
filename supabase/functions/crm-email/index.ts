@@ -25,11 +25,7 @@
 
 import { Resend } from 'https://esm.sh/resend@3';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { corsResponse, getCorsHeaders } from '../_shared/http.ts';
 
 // Cliente para validar JWT del usuario autenticado.
 const supabaseAuth = createClient(
@@ -188,20 +184,20 @@ function templateWelcome(customerName: string, restaurantName: string): string {
 // ── Handler principal ──────────────────────────────────────────────────────────
 
 Deno.serve(async (req: Request) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  if (req.method === 'OPTIONS') return corsResponse(req);
 
   // ── Verificación JWT ───────────────────────────────────────────────────────
   const authHeader = req.headers.get('Authorization');
   if (!authHeader?.startsWith('Bearer ')) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-      status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 401, headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' },
     });
   }
   const token = authHeader.replace('Bearer ', '');
   const { data: { user }, error: authError } = await supabaseAuth.auth.getUser(token);
   if (authError || !user) {
     return new Response(JSON.stringify({ error: 'Token inválido' }), {
-      status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 401, headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' },
     });
   }
   // ── Fin verificación JWT ───────────────────────────────────────────────────
@@ -213,17 +209,17 @@ Deno.serve(async (req: Request) => {
     // Validación básica
     if (!to || !to.includes('@')) {
       return new Response(JSON.stringify({ error: 'Email inválido o no proporcionado' }), {
-        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400, headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' },
       });
     }
     if (!type || !['birthday', 'points_summary', 'welcome'].includes(type)) {
       return new Response(JSON.stringify({ error: 'Tipo inválido. Usar: birthday | points_summary | welcome' }), {
-        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400, headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' },
       });
     }
     if (!customerName || !restaurantName) {
       return new Response(JSON.stringify({ error: 'customerName y restaurantName son requeridos' }), {
-        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400, headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' },
       });
     }
 
@@ -253,14 +249,14 @@ Deno.serve(async (req: Request) => {
     if (error) throw new Error(JSON.stringify(error));
 
     return new Response(JSON.stringify({ ok: true, type, to }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' },
     });
 
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Error desconocido';
     console.error('[crm-email]', msg);
     return new Response(JSON.stringify({ ok: false, error: msg }), {
-      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 500, headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' },
     });
   }
 });

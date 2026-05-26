@@ -1,16 +1,10 @@
 // Deprecated: usar mp-settings con action=detect.
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { corsResponse, jsonResponse } from '../_shared/http.ts';
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
-  return new Response(JSON.stringify({
+  if (req.method === 'OPTIONS') return corsResponse(req);
+  return jsonResponse(req, {
     error: 'Funcion deprecada. Usar mp-settings con action=detect.',
-  }), {
-    status: 410,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  });
+  }, 410);
 });

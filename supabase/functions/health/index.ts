@@ -16,14 +16,10 @@
 //   curl https://<project-ref>.supabase.co/functions/v1/health
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { corsResponse, getCorsHeaders } from '../_shared/http.ts';
 
 Deno.serve(async (req: Request) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  if (req.method === 'OPTIONS') return corsResponse(req);
 
   const checks: Record<string, { ok: boolean; msg?: string }> = {};
   let allOk = true;
@@ -66,6 +62,6 @@ Deno.serve(async (req: Request) => {
 
   return new Response(JSON.stringify(body, null, 2), {
     status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' },
   });
 });

@@ -16,11 +16,7 @@
 
 import { Resend } from 'https://esm.sh/resend@3';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { corsResponse, getCorsHeaders } from '../_shared/http.ts';
 
 // Cliente para validar JWT del usuario autenticado.
 // SUPABASE_URL y SUPABASE_ANON_KEY están disponibles automáticamente en Edge Functions.
@@ -45,7 +41,7 @@ function fmtFecha(isoStr: string): string {
 }
 
 Deno.serve(async (req: Request) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  if (req.method === 'OPTIONS') return corsResponse(req);
 
   // ── Verificación JWT ───────────────────────────────────────────────────────
   // La función solo puede ser llamada por usuarios autenticados (mozos/dueños).
@@ -54,14 +50,14 @@ Deno.serve(async (req: Request) => {
   const authHeader = req.headers.get('Authorization');
   if (!authHeader?.startsWith('Bearer ')) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-      status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 401, headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' },
     });
   }
   const token = authHeader.replace('Bearer ', '');
   const { data: { user }, error: authError } = await supabaseAuth.auth.getUser(token);
   if (authError || !user) {
     return new Response(JSON.stringify({ error: 'Token inválido' }), {
-      status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 401, headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' },
     });
   }
   // ── Fin verificación JWT ───────────────────────────────────────────────────
@@ -77,7 +73,7 @@ Deno.serve(async (req: Request) => {
 
     if (!email || !email.includes('@')) {
       return new Response(JSON.stringify({ error: 'Email inválido' }), {
-        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400, headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' },
       });
     }
 
@@ -190,14 +186,14 @@ Deno.serve(async (req: Request) => {
     if (error) throw new Error(JSON.stringify(error));
 
     return new Response(JSON.stringify({ ok: true }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' },
     });
 
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Error desconocido';
     console.error('[send-receipt]', msg);
     return new Response(JSON.stringify({ ok: false, error: msg }), {
-      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 500, headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' },
     });
   }
 });
