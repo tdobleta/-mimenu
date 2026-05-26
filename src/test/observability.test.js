@@ -59,4 +59,13 @@ describe('observability', () => {
     expect(source).toContain('VITE_SENTRY_DSN');
     expect(source).not.toMatch(/https:\/\/[^'"]+\.ingest\.us\.sentry\.io\/\d+/);
   });
+
+  it('does not expose Anthropic credentials through frontend Vite variables', () => {
+    const source = readFileSync('src/components/MimenuChatbot.jsx', 'utf8');
+
+    expect(source).not.toContain('VITE_ANTHROPIC_API_KEY');
+    expect(source).not.toContain('api.anthropic.com');
+    expect(source).not.toContain('anthropic-dangerous-direct-browser-access');
+    expect(source).toContain("supabase.functions.invoke('chat'");
+  });
 });

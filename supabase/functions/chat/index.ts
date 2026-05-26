@@ -5,10 +5,21 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-const CORS = {
-  'Access-Control-Allow-Origin': 'https://mimenuar.netlify.app',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+const ALLOWED_ORIGINS = new Set([
+  'https://mimenuar.netlify.app',
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+]);
+
+function corsHeaders(req: Request) {
+  const origin = req.headers.get('origin') || '';
+  const allowedOrigin = ALLOWED_ORIGINS.has(origin) ? origin : 'https://mimenuar.netlify.app';
+  return {
+    'Access-Control-Allow-Origin': allowedOrigin,
+    'Vary': 'Origin',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  };
+}
 
 const UPSTASH_URL   = Deno.env.get('UPSTASH_REDIS_REST_URL')!;
 const UPSTASH_TOKEN = Deno.env.get('UPSTASH_REDIS_REST_TOKEN')!;
@@ -32,12 +43,13 @@ async function checkRateLimit(userId: string) {
 }
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
+  const cors = corsHeaders(req);
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
 
   try {
     // 1. Autenticar usuario
     const authHeader = req.headers.get('Authorization');
-    if (!authHeader) return new Response(JSON.stringify({ error: 'No autorizado' }), { status: 401, headers: { ...CORS, 'Content-Type': 'application/json' } });
+    if (!authHeader) return new Response(JSON.stringify({ error: 'No autorizado' }), { status: 401, headers: { ...cors, 'Content-Type': 'application/json' } });
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
@@ -46,15 +58,15 @@ Deno.serve(async (req) => {
     );
 
     const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) return new Response(JSON.stringify({ error: 'Sesión inválida' }), { status: 401, headers: { ...CORS, 'Content-Type': 'application/json' } });
+    if (authError || !user) return new Response(JSON.stringify({ error: 'Sesión inválida' }), { status: 401, headers: { ...cors, 'Content-Type': 'application/json' } });
 
     // 2. Rate limiting
     const { allowed, remaining } = await checkRateLimit(user.id);
-    if (!allowed) return new Response(JSON.stringify({ error: 'Límite de mensajes alcanzado. Reintentá en 1 hora.' }), { status: 429, headers: { ...CORS, 'Content-Type': 'application/json', 'Retry-After': '3600' } });
+    if (!allowed) return new Response(JSON.stringify({ error: 'Límite de mensajes alcanzado. Reintentá en 1 hora.' }), { status: 429, headers: { ...cors, 'Content-Type': 'application/json', 'Retry-After': '3600' } });
 
     // 3. Parsear mensajes
     const { messages, system } = await req.json();
-    if (!messages?.length) return new Response(JSON.stringify({ error: 'Sin mensajes' }), { status: 400, headers: { ...CORS, 'Content-Type': 'application/json' } });
+    if (!messages?.length) return new Response(JSON.stringify({ error: 'Sin mensajes' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } });
 
     // 4. Llamar a Anthropic
     const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
@@ -79,11 +91,11 @@ Deno.serve(async (req) => {
       remaining_messages: remaining,
     }), {
       status: 200,
-      headers: { ...CORS, 'Content-Type': 'application/json' },
+      headers: { ...cors, 'Content-Type': 'application/json' },
     });
 
   } catch (err) {
     console.error('[chat]', err);
-    return new Response(JSON.stringify({ error: 'Error interno' }), { status: 500, headers: { ...CORS, 'Content-Type': 'application/json' } });
+    return new Response(JSON.stringify({ error: 'Error interno' }), { status: 500, headers: { ...cors, 'Content-Type': 'application/json' } });
   }
 });

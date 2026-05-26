@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useStore } from '@/lib/store';
 import useUserRole from '@/lib/useUserRole';
 import { useAuth } from '@/lib/AuthContext';
+import { supabase } from '@/api/supabaseClient';
 
 // ── Avatar SVG del Bot (alta calidad) ────────────────────────────────────────
 const BotAvatar = () => (
@@ -167,22 +168,13 @@ export default function MimenuChatbot() {
 
     try {
       const ctx = role ? `\nContexto del usuario: rol "${role}", restaurante "${store.restaurante?.nombre || 'sin nombre'}".` : '';
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': import.meta.env.VITE_ANTHROPIC_API_KEY || '',
-          'anthropic-version': '2023-06-01',
-          'anthropic-dangerous-direct-browser-access': 'true',
-        },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 1000,
+      const { data, error } = await supabase.functions.invoke('chat', {
+        body: {
           system: SYSTEM_PROMPT + ctx,
           messages: newMsgs.map(m => ({ role: m.role, content: m.content })),
-        }),
+        },
       });
-      const data = await res.json();
+      if (error || data?.error) throw new Error(data?.error || error?.message || 'chat_failed');
       const reply = data.content?.[0]?.text || 'No pude procesar tu consulta. Intentá de nuevo.';
       setMessages(prev => [...prev, { role: 'assistant', content: reply }]);
       if (!open) setUnread(u => u + 1);
