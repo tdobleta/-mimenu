@@ -10,6 +10,7 @@ import RelayTab from '../components/configuracion/RelayTab';
 import StaffPinsTab from '../components/configuracion/StaffPinsTab';
 import DeviceTokensTab from '../components/configuracion/DeviceTokensTab';
 import JornadaAuditTab from '../components/configuracion/JornadaAuditTab';
+import SupportOpsTab from '../components/configuracion/SupportOpsTab';
 import { G, fontDisplay } from '@/lib/glass';
 
 const TABS = [
@@ -23,6 +24,7 @@ const TABS = [
   ['terminal',    'Terminal de pago'],
   ['cocina',      'Cocina'],
   ['relay',       'Red local'],
+  ['soporte',     'Soporte operativo'],
   ['auditoria',   'Auditoría'],
 ];
 
@@ -58,6 +60,7 @@ export default function Configuracion() {
         {tab === 'mozos'       && <StaffPinsTab />}
         {tab === 'cocina'      && <DeviceTokensTab />}
         {tab === 'relay'       && <RelayTab />}
+        {tab === 'soporte'     && <SupportOpsTab />}
         {tab === 'auditoria'   && <AuditoriaTab />}
       </div>
     </div>
