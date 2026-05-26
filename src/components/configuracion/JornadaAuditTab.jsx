@@ -4,6 +4,8 @@ import { useStore } from '@/lib/store';
 import { countActive, countFailed } from '@/lib/offlineQueue';
 import { loadAfipSettings } from '@/lib/afip';
 import { buildJornadaAuditReport } from '@/lib/jornadaAudit';
+import { getPrinterConfig } from '@/lib/printer';
+import { getRelayConfig, localRelay } from '@/lib/localRelay';
 import { G } from '@/lib/glass';
 
 const STATUS = {
@@ -64,6 +66,14 @@ async function loadAfipStatus(restaurantId) {
   };
 }
 
+async function loadStorageStatus() {
+  if (typeof navigator === 'undefined' || !navigator.storage?.persisted) {
+    return { supported: false, persisted: false };
+  }
+  const persisted = await navigator.storage.persisted();
+  return { supported: true, persisted };
+}
+
 function Pill({ status }) {
   const s = STATUS[status] || STATUS.warning;
   return (
@@ -87,6 +97,9 @@ export default function JornadaAuditTab() {
   const [remote, setRemote] = useState({
     staffPinsCount: 0,
     kitchenDevicesCount: 0,
+    printer: {},
+    relay: {},
+    storage: {},
     mp: {},
     afip: {},
     offline: {},
@@ -97,7 +110,7 @@ export default function JornadaAuditTab() {
 
   const refresh = useCallback(async () => {
     if (!store.restaurantId || !activeBranchId) {
-      setRemote({ staffPinsCount: 0, kitchenDevicesCount: 0, mp: {}, afip: {}, offline: {} });
+      setRemote({ staffPinsCount: 0, kitchenDevicesCount: 0, printer: {}, relay: {}, storage: {}, mp: {}, afip: {}, offline: {} });
       setLoading(false);
       setLastRun(Date.now());
       return;
@@ -113,6 +126,7 @@ export default function JornadaAuditTab() {
         failed,
         mp,
         afip,
+        storage,
       ] = await Promise.all([
         countRows('staff_pins', activeBranchId).catch(() => 0),
         countRows('device_tokens', activeBranchId).catch(() => 0),
@@ -120,9 +134,21 @@ export default function JornadaAuditTab() {
         countFailed().catch(() => 0),
         loadMpStatus(store.restaurantId).catch(() => ({})),
         loadAfipStatus(store.restaurantId).catch(() => ({})),
+        loadStorageStatus().catch(() => ({ supported: false, persisted: false })),
       ]);
 
-      setRemote({ staffPinsCount, kitchenDevicesCount, mp, afip, offline: { active, failed } });
+      const printer = getPrinterConfig();
+      const relayConfig = getRelayConfig();
+      setRemote({
+        staffPinsCount,
+        kitchenDevicesCount,
+        printer,
+        relay: { ...relayConfig, connected: Boolean(localRelay.isConnected) },
+        storage,
+        mp,
+        afip,
+        offline: { active, failed },
+      });
       setLastRun(Date.now());
     } catch (err) {
       setError(err.message || 'No se pudo completar la auditoria.');
@@ -143,6 +169,9 @@ export default function JornadaAuditTab() {
     stockItems: activeBranchId ? (store.stock?.[activeBranchId] || []) : [],
     staffPinsCount: remote.staffPinsCount,
     kitchenDevicesCount: remote.kitchenDevicesCount,
+    printer: remote.printer,
+    relay: remote.relay,
+    storage: remote.storage,
     mp: remote.mp,
     afip: remote.afip,
     offline: remote.offline,
@@ -199,7 +228,7 @@ export default function JornadaAuditTab() {
           {loading ? 'Auditando...' : 'Actualizar auditoria'}
         </button>
         <span style={{ fontSize: 12, color: G.textMuted }}>
-          {report.critical} bloqueante(s) · {report.warning} advertencia(s) · {report.ok} listo(s)
+          {report.critical} bloqueante(s) - {report.warning} advertencia(s) - {report.ok} listo(s)
         </span>
       </div>
 

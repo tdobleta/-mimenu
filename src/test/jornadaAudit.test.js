@@ -6,11 +6,14 @@ const base = {
   activeBranchId: 'branch-1',
   tables: Array.from({ length: 12 }, (_, i) => ({ id: i + 1 })),
   menuItems: [{ id: 'm1' }, { id: 'm2' }],
-  turnoActivo: { id: 'shift-1' },
+  turnoActivo: { id: 'shift-1', branch_id: 'branch-1' },
   teamMembers: [{ id: 'u1' }],
   stockItems: [{ id: 's1', nombre: 'Carne', actual: 10, minimo: 2 }],
   staffPinsCount: 8,
   kitchenDevicesCount: 1,
+  printer: { method: 'browser' },
+  relay: { enabled: true, connected: true, url: 'ws://mimenu-caja.local:3001' },
+  storage: { supported: true, persisted: true },
   mp: { accessToken: true, deviceId: true },
   afip: { enabled: true, credentialsReady: true },
   offline: { active: 0, failed: 0 },
@@ -41,10 +44,23 @@ describe('buildJornadaAuditReport', () => {
     expect(report.checks.find(c => c.id === 'offline_failed').status).toBe('critical');
   });
 
+  it('blocks when the open cash shift belongs to another branch', () => {
+    const report = buildJornadaAuditReport({
+      ...base,
+      turnoActivo: { id: 'shift-2', branch_id: 'branch-2' },
+    });
+
+    expect(report.status).toBe('blocked');
+    expect(report.checks.find(c => c.id === 'cash_shift').status).toBe('critical');
+  });
+
   it('allows opening with warnings for optional integrations', () => {
     const report = buildJornadaAuditReport({
       ...base,
       kitchenDevicesCount: 0,
+      printer: { method: 'epson', epsonIp: '' },
+      relay: { enabled: true, connected: false },
+      storage: { supported: true, persisted: false },
       mp: {},
       afip: {},
       stockItems: [{ id: 's1', nombre: 'Queso', actual: 1, minimo: 4 }],
@@ -55,5 +71,19 @@ describe('buildJornadaAuditReport', () => {
     expect(report.critical).toBe(0);
     expect(report.warning).toBeGreaterThanOrEqual(4);
     expect(report.lowStock).toHaveLength(1);
+  });
+
+  it('marks Epson printers as ready only when an IP is configured', () => {
+    const ready = buildJornadaAuditReport({
+      ...base,
+      printer: { method: 'epson', epsonIp: '192.168.1.90' },
+    });
+    const missingIp = buildJornadaAuditReport({
+      ...base,
+      printer: { method: 'epson', epsonIp: '' },
+    });
+
+    expect(ready.checks.find(c => c.id === 'printer').status).toBe('ok');
+    expect(missingIp.checks.find(c => c.id === 'printer').status).toBe('warning');
   });
 });

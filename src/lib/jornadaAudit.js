@@ -16,6 +16,9 @@ export function buildJornadaAuditReport({
   stockItems = [],
   staffPinsCount = 0,
   kitchenDevicesCount = 0,
+  printer = {},
+  relay = {},
+  storage = {},
   mp = {},
   afip = {},
   offline = {},
@@ -26,6 +29,11 @@ export function buildJornadaAuditReport({
   const lowStock = stockItems.filter(item => Number(item.actual || 0) < Number(item.minimo || 0));
   const activeQueue = Number(offline.active || 0);
   const failedQueue = Number(offline.failed || 0);
+  const shiftOpen = Boolean(turnoActivo?.id);
+  const shiftMatchesBranch = shiftOpen && (!turnoActivo.branch_id || turnoActivo.branch_id === activeBranchId);
+  const printerReady = printer.method === 'browser' || (printer.method === 'epson' && Boolean(printer.epsonIp));
+  const relayReady = relay.enabled && relay.connected;
+  const storageSupported = storage.supported !== false;
 
   const checks = [
     makeCheck(
@@ -45,9 +53,13 @@ export function buildJornadaAuditReport({
     makeCheck(
       'cash_shift',
       'Turno de caja',
-      turnoActivo?.id ? 'ok' : 'critical',
-      turnoActivo?.id ? 'Hay un turno de caja abierto.' : 'No hay turno de caja abierto.',
-      'Abre caja antes de tomar pedidos.'
+      shiftMatchesBranch ? 'ok' : 'critical',
+      shiftMatchesBranch
+        ? 'Hay un turno de caja abierto para la sucursal.'
+        : shiftOpen
+          ? 'Hay un turno abierto, pero no corresponde a la sucursal activa.'
+          : 'No hay turno de caja abierto.',
+      shiftOpen ? 'Cambia a la sucursal correcta o abre caja en esta sucursal.' : 'Abre caja antes de tomar pedidos.'
     ),
     makeCheck(
       'menu',
@@ -76,6 +88,39 @@ export function buildJornadaAuditReport({
       kitchenDevicesCount > 0 ? 'ok' : 'warning',
       kitchenDevicesCount > 0 ? `${kitchenDevicesCount} dispositivo(s) de cocina activos.` : 'No hay token de cocina activo.',
       'Genera un token para el monitor de cocina.'
+    ),
+    makeCheck(
+      'printer',
+      'Impresora',
+      printerReady ? 'ok' : 'warning',
+      printerReady
+        ? printer.method === 'epson'
+          ? `Epson configurada en ${printer.epsonIp}.`
+          : 'Impresion por navegador configurada.'
+        : 'La impresora no esta lista para tickets/comandas.',
+      'Configura browser print o una Epson de red antes del servicio.'
+    ),
+    makeCheck(
+      'relay',
+      'Red local cocina',
+      relayReady ? 'ok' : 'warning',
+      relayReady
+        ? `Relay LAN conectado (${relay.url || 'default'}).`
+        : relay.enabled
+          ? 'Relay habilitado pero sin conexion en esta sesion.'
+          : 'Relay LAN desactivado; cocina depende de internet/Supabase.',
+      relay.enabled ? 'Revisa que el relay local este corriendo en la PC caja.' : 'Activa el relay para comunicacion cocina sin internet.'
+    ),
+    makeCheck(
+      'storage',
+      'Persistencia offline',
+      storageSupported && storage.persisted ? 'ok' : 'warning',
+      storageSupported
+        ? storage.persisted
+          ? 'El navegador protege IndexedDB/cache contra limpieza automatica.'
+          : 'El navegador no confirmo persistencia de datos offline.'
+        : 'Este navegador no informa persistencia de almacenamiento.',
+      'Instala la PWA y permite almacenamiento persistente en la tablet/PC.'
     ),
     makeCheck(
       'mp',
