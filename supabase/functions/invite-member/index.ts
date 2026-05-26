@@ -131,10 +131,15 @@ Deno.serve(async (req) => {
     const authUserId: string = linkData.user?.id || '';
 
     // ── 7. Crear registro en team_members ─────────────────────────────────────
-    await supabaseAdmin.from('team_members').upsert(
-      { restaurant_id: restaurantId, email: emailClean, nombre: nombre.trim(), rol, user_id: authUserId || null },
-      { onConflict: 'restaurant_id,email' }
-    );
+    const { data: teamMember, error: memberError } = await supabaseAdmin
+      .from('team_members')
+      .upsert(
+        { restaurant_id: restaurantId, email: emailClean, nombre: nombre.trim(), rol, user_id: authUserId || null },
+        { onConflict: 'restaurant_id,email' }
+      )
+      .select('id, restaurant_id, email, nombre, rol, user_id')
+      .single();
+    if (memberError) throw memberError;
 
     // ── 8. Enviar email con magic link (Resend) ───────────────────────────────
     // IMPORTANTE: Solo se envía el link — nunca credenciales en texto plano.
@@ -187,6 +192,7 @@ Deno.serve(async (req) => {
     return json({
       ok: true,
       mensaje: `Invitación enviada a ${emailClean}${resendKey ? '. Revisá el email para activar la cuenta.' : ' (sin email, Resend no configurado)'}`,
+      member: teamMember,
       // En desarrollo, devolver el link para testear sin email
       ...(Deno.env.get('SUPABASE_ENV') === 'local' ? { inviteLink } : {}),
     });

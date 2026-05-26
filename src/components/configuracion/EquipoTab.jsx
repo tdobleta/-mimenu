@@ -37,9 +37,9 @@ export default function EquipoTab() {
       if (yaExiste) { addToast('Este email ya está en el equipo', 'error'); setSaving(false); return; }
 
       // Llamar Edge Function invite-member:
-      //   - Crea cuenta Supabase Auth con contraseña aleatoria
+      //   - Crea cuenta Supabase Auth con link de invitación
       //   - Crea team_members record
-      //   - Envía email con credenciales vía Resend
+      //   - Envía email con magic link vía Resend
       const { data: { session } } = await supabase.auth.getSession();
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const res = await fetch(`${supabaseUrl}/functions/v1/invite-member`, {
@@ -53,8 +53,15 @@ export default function EquipoTab() {
       const result = await res.json();
       if (!res.ok) throw new Error(result.error || 'Error al invitar');
 
-      // Refrescar lista local con el nuevo miembro
-      addTeamMember({ id: Date.now(), email: emailClean, nombre: form.nombre.trim(), rol: form.rol, restaurant_id: restaurantId });
+      // Refrescar lista local con el id real de DB. Si usamos un id temporal,
+      // eliminar inmediatamente al miembro falla hasta recargar la app.
+      addTeamMember(result.member || {
+        id: crypto.randomUUID(),
+        email: emailClean,
+        nombre: form.nombre.trim(),
+        rol: form.rol,
+        restaurant_id: restaurantId,
+      });
 
       setShareInfo({ nombre: form.nombre || emailClean, email: emailClean });
       setShowModal(false);
@@ -156,13 +163,13 @@ export default function EquipoTab() {
               </div>
               <div>
                 <div style={{ fontSize:14, fontWeight:600, color:'#111827' }}>Invitación enviada a {shareInfo.nombre}</div>
-                <div style={{ fontSize:12, color:'#6B7280', marginTop:2 }}>Cuenta creada y email enviado con las credenciales.</div>
+                <div style={{ fontSize:12, color:'#6B7280', marginTop:2 }}>Cuenta creada y email enviado con el link de activación.</div>
               </div>
             </div>
 
             <div style={{ backgroundColor:'#F0FBF7', borderRadius:8, padding:14, marginBottom:20, fontSize:13, color:'#374151', lineHeight:'20px' }}>
-              <strong>{shareInfo.nombre}</strong> recibirá un email en <strong>{shareInfo.email}</strong> con su contraseña para ingresar.<br/>
-              <span style={{ fontSize:12, color:'#6B7280', marginTop:4, display:'block' }}>Si no llega el email, revisá la carpeta de spam. La cuenta ya está activa.</span>
+              <strong>{shareInfo.nombre}</strong> recibirá un email en <strong>{shareInfo.email}</strong> para activar su cuenta y elegir contraseña.<br/>
+              <span style={{ fontSize:12, color:'#6B7280', marginTop:4, display:'block' }}>Si no llega el email, revisá la carpeta de spam. La cuenta ya quedó invitada.</span>
             </div>
 
             <button
@@ -176,5 +183,4 @@ export default function EquipoTab() {
     </div>
   );
 }
-
 
