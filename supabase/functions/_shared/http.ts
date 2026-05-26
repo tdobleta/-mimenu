@@ -48,3 +48,14 @@ export function jsonResponse(req: Request, body: unknown, status = 200, headers:
     headers: { ...getCorsHeaders(req), ...headers, 'Content-Type': 'application/json' },
   });
 }
+
+export function serverErrorResponse(
+  req: Request,
+  scope: string,
+  err: unknown,
+  publicMessage = 'Error interno. Contacta soporte si el problema continua.',
+) {
+  const requestId = crypto.randomUUID();
+  console.error(`[${scope}] request_id=${requestId}`, err);
+  return jsonResponse(req, { error: publicMessage, requestId }, 500);
+}

@@ -2,6 +2,7 @@
 // Devuelve comandas activas para una pantalla de cocina autenticada con device token.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { serverErrorResponse } from '../_shared/http.ts';
 
 function getCorsHeaders(req: Request): Record<string, string> {
   const origin = req.headers.get('origin') || '';
@@ -93,7 +94,6 @@ Deno.serve(async (req: Request) => {
       ts: Date.now(),
     });
   } catch (err) {
-    console.error('[cocina-feed]', err);
-    return json(req, { error: (err as Error)?.message || 'Error interno' }, 500);
+    return serverErrorResponse(req, 'cocina-feed', err, 'No se pudo cargar la pantalla de cocina. Reintenta o contacta soporte.');
   }
 });

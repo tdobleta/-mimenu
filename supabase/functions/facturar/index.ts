@@ -2,7 +2,7 @@
 // Emite comprobantes AFIP/ARCA via TusFacturasAPP sin exponer credenciales al browser.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { corsResponse, jsonResponse } from '../_shared/http.ts';
+import { corsResponse, jsonResponse, serverErrorResponse } from '../_shared/http.ts';
 
 const TUSFACTURAS_API = 'https://www.tusfacturas.app/app/api/v2';
 
@@ -282,7 +282,6 @@ Deno.serve(async (req) => {
 
     return json({ ok: true, ...result, factura_id: facturaRow?.id || null });
   } catch (err: any) {
-    console.error('[facturar]', err);
-    return json({ error: err?.message || 'Error interno' }, 500);
+    return serverErrorResponse(req, 'facturar', err, 'No se pudo emitir la factura. Revisa la configuracion o contacta soporte.');
   }
 });

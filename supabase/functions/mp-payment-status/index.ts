@@ -2,7 +2,7 @@
 // Consulta el estado de un payment intent para polling del frontend.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { corsResponse, jsonResponse } from '../_shared/http.ts';
+import { corsResponse, jsonResponse, serverErrorResponse } from '../_shared/http.ts';
 
 async function canAccessRestaurant(supabase: any, user: any, restaurantId: string) {
   const { data: owned } = await supabase
@@ -78,6 +78,6 @@ Deno.serve(async (req) => {
       payment: mpData.payment || null,
     });
   } catch (err: any) {
-    return json({ error: err?.message || 'Error interno' }, 500);
+    return serverErrorResponse(req, 'mp-payment-status', err, 'No se pudo consultar el estado del pago. Reintenta o verifica la terminal.');
   }
 });

@@ -14,6 +14,7 @@
 //   - El anon key (que era público) ya NO funciona — solo device tokens válidos.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { serverErrorResponse } from '../_shared/http.ts';
 
 const VALID_ESTADOS = ['nueva', 'preparando', 'lista'];
 
@@ -147,10 +148,11 @@ Deno.serve(async (req: Request) => {
       .eq('branch_id', branch_id);
 
     if (updateError) {
-      console.error('[cocina-update] Update error:', updateError);
-      return new Response(
-        JSON.stringify({ error: 'Error al actualizar', debug: updateError.message }),
-        { status: 500, headers: { ...cors, 'Content-Type': 'application/json' } },
+      return serverErrorResponse(
+        req,
+        'cocina-update:update',
+        updateError,
+        'No se pudo actualizar la comanda. Reintenta o contacta soporte.',
       );
     }
 
@@ -161,10 +163,6 @@ Deno.serve(async (req: Request) => {
     });
 
   } catch (err) {
-    console.error('[cocina-update] Unhandled:', err);
-    return new Response(
-      JSON.stringify({ error: 'Error interno', debug: (err as Error).message }),
-      { status: 500, headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' } },
-    );
+    return serverErrorResponse(req, 'cocina-update', err);
   }
 });

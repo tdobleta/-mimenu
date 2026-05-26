@@ -2,7 +2,7 @@
 // Configura Mercado Pago Point sin devolver el access token al navegador.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { corsResponse, jsonResponse } from '../_shared/http.ts';
+import { corsResponse, jsonResponse, serverErrorResponse } from '../_shared/http.ts';
 
 const MP_API = 'https://api.mercadopago.com/point/integration-api';
 
@@ -181,7 +181,6 @@ Deno.serve(async (req) => {
 
     return json({ error: 'Accion invalida' }, 400);
   } catch (err: any) {
-    console.error('[mp-settings]', err);
-    return json({ error: err?.message || 'Error interno' }, 500);
+    return serverErrorResponse(req, 'mp-settings', err, 'No se pudo procesar la configuracion de Mercado Pago. Reintenta o contacta soporte.');
   }
 });

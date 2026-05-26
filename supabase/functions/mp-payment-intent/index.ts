@@ -4,7 +4,7 @@
 // credenciales de Mercado Pago.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { corsResponse, jsonResponse } from '../_shared/http.ts';
+import { corsResponse, jsonResponse, serverErrorResponse } from '../_shared/http.ts';
 
 async function getUserRestaurant(supabase: any, user: any, restaurantId: string) {
   const { data: owned } = await supabase
@@ -103,6 +103,6 @@ Deno.serve(async (req) => {
       state: mpData.state,
     });
   } catch (err: any) {
-    return json({ error: err?.message || 'Error interno' }, 500);
+    return serverErrorResponse(req, 'mp-payment-intent', err, 'No se pudo iniciar el pago en la terminal. Reintenta o contacta soporte.');
   }
 });

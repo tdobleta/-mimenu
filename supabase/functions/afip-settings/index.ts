@@ -3,7 +3,7 @@
 // secretos al navegador.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { corsResponse, jsonResponse } from '../_shared/http.ts';
+import { corsResponse, jsonResponse, serverErrorResponse } from '../_shared/http.ts';
 
 const TUSFACTURAS_API = 'https://www.tusfacturas.app/app/api/v2';
 
@@ -204,7 +204,6 @@ Deno.serve(async (req) => {
 
     return json({ error: 'Accion invalida' }, 400);
   } catch (err: any) {
-    console.error('[afip-settings]', err);
-    return json({ error: err?.message || 'Error interno' }, 500);
+    return serverErrorResponse(req, 'afip-settings', err, 'No se pudo procesar la configuracion fiscal. Reintenta o contacta soporte.');
   }
 });

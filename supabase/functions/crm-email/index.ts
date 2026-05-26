@@ -25,7 +25,7 @@
 
 import { Resend } from 'https://esm.sh/resend@3';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { corsResponse, getCorsHeaders } from '../_shared/http.ts';
+import { corsResponse, getCorsHeaders, serverErrorResponse } from '../_shared/http.ts';
 
 // Cliente para validar JWT del usuario autenticado.
 const supabaseAuth = createClient(
@@ -253,10 +253,6 @@ Deno.serve(async (req: Request) => {
     });
 
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : 'Error desconocido';
-    console.error('[crm-email]', msg);
-    return new Response(JSON.stringify({ ok: false, error: msg }), {
-      status: 500, headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' },
-    });
+    return serverErrorResponse(req, 'crm-email', err, 'No se pudo enviar el email de CRM. Reintenta o contacta soporte.');
   }
 });

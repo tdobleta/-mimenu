@@ -30,7 +30,7 @@
 //   - El usuario elige su propia contraseña al activar la cuenta
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { corsResponse, jsonResponse } from '../_shared/http.ts';
+import { corsResponse, jsonResponse, serverErrorResponse } from '../_shared/http.ts';
 
 Deno.serve(async (req) => {
   const json = (body: unknown, status = 200) => jsonResponse(req, body, status);
@@ -188,8 +188,6 @@ Deno.serve(async (req) => {
     });
 
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.error('[invite-member] Error:', msg);
-    return json({ error: msg || 'Error interno' }, 500);
+    return serverErrorResponse(req, 'invite-member', err, 'No se pudo enviar la invitacion. Reintenta o contacta soporte.');
   }
 });

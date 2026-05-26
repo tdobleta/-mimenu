@@ -2,7 +2,7 @@
 // Lista staff operativos y valida/gestiona PINs sin exponerlos al navegador.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { corsResponse, jsonResponse } from '../_shared/http.ts';
+import { corsResponse, jsonResponse, serverErrorResponse } from '../_shared/http.ts';
 
 const VALID_ROLES = ['Mozo', 'Encargado', 'Cocinero'];
 
@@ -226,7 +226,6 @@ Deno.serve(async (req) => {
 
     return json({ error: 'Accion invalida' }, 400);
   } catch (err: any) {
-    console.error('[staff-pin-auth]', err);
-    return json({ error: err?.message || 'Error interno' }, 500);
+    return serverErrorResponse(req, 'staff-pin-auth', err, 'No se pudo procesar la operacion de staff. Reintenta o contacta soporte.');
   }
 });
