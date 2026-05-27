@@ -31,5 +31,17 @@ describe('tenant resolution security', () => {
     const equipoTab = read('src/components/configuracion/EquipoTab.jsx');
     expect(equipoTab).toContain("functions/v1/invite-member");
     expect(equipoTab).not.toMatch(/from\(['"]team_members['"]\)\.insert/);
+    expect(equipoTab).not.toMatch(/from\(['"]team_members['"]\)\.delete/);
+    expect(equipoTab).toContain("action: 'delete'");
+  });
+
+  it('routes team member deletion through the authorized invite-member Edge Function', () => {
+    const inviteMember = read('supabase/functions/invite-member/index.ts');
+
+    expect(inviteMember).toContain("if (action === 'delete')");
+    expect(inviteMember).toContain("memberId requerido");
+    expect(inviteMember).toContain(".eq('restaurant_id', restaurantId)");
+    expect(inviteMember).toContain("accion: 'Miembro eliminado'");
+    expect(inviteMember).toContain(".eq('user_id', caller.id)");
   });
 });

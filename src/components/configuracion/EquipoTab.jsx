@@ -76,12 +76,24 @@ export default function EquipoTab() {
 
   async function handleDelete(member) {
     try {
-      const { error } = await supabase.from('team_members').delete().eq('id', member.id);
-      if (error) throw error;
+      const restaurantId = store.restaurantId;
+      if (!restaurantId) throw new Error('No se encontrÃ³ el restaurante');
+      const { data: { session } } = await supabase.auth.getSession();
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const res = await fetch(`${supabaseUrl}/functions/v1/invite-member`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`,
+        },
+        body: JSON.stringify({ action: 'delete', restaurantId, memberId: member.id }),
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || 'Error al eliminar');
       removeTeamMember(member.id);
       addToast('Miembro eliminado', 'info');
     } catch(err) {
-      addToast('Error al eliminar', 'error');
+      addToast(err?.message || 'Error al eliminar', 'error');
     }
   }
 
@@ -183,4 +195,3 @@ export default function EquipoTab() {
     </div>
   );
 }
-

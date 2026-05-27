@@ -53,13 +53,18 @@ Deno.serve(async (req) => {
     if (authErr || !caller) return json({ error: 'No autorizado' }, 401);
 
     // ── 3. Leer payload ───────────────────────────────────────────────────────
-    const { email, nombre, rol, restaurantId } = await req.json();
-    if (!email || !nombre || !rol || !restaurantId) {
-      return json({ error: 'Faltan campos: email, nombre, rol, restaurantId' }, 400);
+    const body = await req.json();
+    const action = String(body.action || 'invite');
+    const { email, nombre, rol, restaurantId } = body;
+    if (!restaurantId) {
+      return json({ error: 'restaurantId requerido' }, 400);
     }
-    const emailClean = email.trim().toLowerCase();
+    const emailClean = email ? email.trim().toLowerCase() : '';
     const rolesValidos = ['Encargado', 'Mozo', 'Cocinero'];
-    if (!rolesValidos.includes(rol)) {
+    if (action === 'invite' && (!emailClean || !nombre || !rol)) {
+      return json({ error: 'Faltan campos: email, nombre, rol' }, 400);
+    }
+    if (action === 'invite' && !rolesValidos.includes(rol)) {
       return json({ error: `Rol inválido. Debe ser uno de: ${rolesValidos.join(', ')}` }, 400);
     }
 
@@ -87,6 +92,44 @@ Deno.serve(async (req) => {
       esEncargado = callerMember?.rol === 'Encargado';
     }
     if (!esOwner && !esEncargado) return json({ error: 'Sin permiso' }, 403);
+
+    if (action === 'delete') {
+      const memberId = body.memberId || body.member_id;
+      if (!memberId) return json({ error: 'memberId requerido' }, 400);
+
+      const { data: member, error: memberFindErr } = await supabaseAdmin
+        .from('team_members')
+        .select('id, restaurant_id, email, nombre, rol')
+        .eq('id', memberId)
+        .eq('restaurant_id', restaurantId)
+        .maybeSingle();
+      if (memberFindErr) throw memberFindErr;
+      if (!member) return json({ error: 'Miembro no encontrado' }, 404);
+
+      const { error: deleteErr } = await supabaseAdmin
+        .from('team_members')
+        .delete()
+        .eq('id', member.id)
+        .eq('restaurant_id', restaurantId);
+      if (deleteErr) throw deleteErr;
+
+      const { error: auditErr } = await supabaseAdmin
+        .from('audit_logs')
+        .insert({
+          restaurant_id: restaurantId,
+          usuario: caller.email || caller.id,
+          rol: esOwner ? 'Dueno' : 'Encargado',
+          categoria: 'Equipo',
+          accion: 'Miembro eliminado',
+          detalle: `${member.nombre || member.email} · ${member.rol}`,
+          sucursal: '',
+        });
+      if (auditErr) console.warn('[invite-member] No se pudo auditar eliminacion de miembro', auditErr);
+
+      return json({ ok: true, member });
+    }
+
+    if (action !== 'invite') return json({ error: 'Accion invalida' }, 400);
 
     // ── 5. Verificar que el email no está ya en el equipo ─────────────────────
     const { data: existingMember } = await supabaseAdmin
