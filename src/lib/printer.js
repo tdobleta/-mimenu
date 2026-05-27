@@ -275,7 +275,14 @@ function buildReceiptHtml({ config, mesa, mozo, items, subtotal, descuento, prop
   <style>
     @page { margin: 4mm; size: ${config.paperWidth}mm auto; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Courier New', monospace; font-size: 11px; width: ${config.paperWidth - 8}mm; color: #000; }
+    body { font-family: 'Courier New', monospace; font-size: 11px; width: ${config.paperWidth - 8}mm; margin: 0 auto; color: #000; }
+    @media print and (min-width: 100mm) {
+      body { font-size: 13px; padding-top: 10mm; }
+      .nombre-local { font-size: 18px; }
+      .total-row td { font-size: 16px; }
+      .pie { font-size: 11px; }
+      .metodo { font-size: 13px; }
+    }
     .center { text-align: center; }
     .bold { font-weight: bold; }
     .nombre-local { font-size: 14px; font-weight: bold; text-align: center; margin-bottom: 2px; }
@@ -336,7 +343,7 @@ function buildComandaHtml({ config, mesa, mozo, items, fecha, copia = 1, total =
   <style>
     @page { margin: 4mm; size: ${config.paperWidth}mm auto; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Courier New', monospace; font-size: 13px; width: ${config.paperWidth - 8}mm; color: #000; }
+    body { font-family: 'Courier New', monospace; font-size: 13px; width: ${config.paperWidth - 8}mm; margin: 0 auto; color: #000; }
     .center { text-align: center; }
     .bold { font-weight: bold; }
     .titulo { font-size: 18px; font-weight: bold; text-align: center; }
