@@ -9,8 +9,6 @@ import { useToast } from '@/lib/toast';
 import { money } from '@/lib/fmt';
 import { G } from '@/lib/glass';
 import { subscribeToTurns } from '@/lib/realtimeManager';
-import { useAuth } from '@/lib/AuthContext';
-import useUserRole from '@/lib/useUserRole';
 import { getActiveStaff, touchActiveStaff } from '@/lib/useActiveStaff';
 import { cerrarMesaOnline } from '@/lib/cajaService';
 
@@ -51,8 +49,6 @@ function BadgeEstado({ estado }) {
 export default function Delivery() {
   const store      = useStore();
   const { addToast } = useToast();
-  const { user } = useAuth();
-  const userRole = useUserRole();
   const branchId   = store.branchId !== 'todas' ? store.branchId : (store.sucursales?.[0]?.id || '');
 
   const [pedidos,     setPedidos]     = useState([]);
@@ -85,6 +81,32 @@ export default function Delivery() {
     rtRef.current = subscribeToTurns(branchId, () => loadPedidos());
     return () => { if (rtRef.current) rtRef.current(); };
   }, [branchId]);
+
+  async function updateDeliveryOperation(pedidoId, { estado, repartidor }) {
+    const { data, error } = await supabase.rpc('update_delivery_order_operation', {
+      p_operation: {
+        operation_id: `delivery_update_${pedidoId}_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+        operation_type: 'UPDATE_DELIVERY_ORDER',
+        operation_version: 1,
+        tenant: {
+          restaurant_id: store.restaurantId || null,
+          branch_id: branchId,
+        },
+        actor: {
+          staff_name: getActiveStaff()?.nombre || '',
+        },
+        delivery: {
+          turn_id: pedidoId,
+          ...(estado ? { estado } : {}),
+        },
+        ...(repartidor !== undefined ? { assignment: { repartidor } } : {}),
+        created_at: new Date().toISOString(),
+      },
+    });
+    if (error) throw error;
+    if (data && data.ok === false) throw new Error(data.error || 'No se pudo actualizar el pedido');
+    return data;
+  }
 
   // ── Cambiar estado ────────────────────────────────────────────────────────
   async function cambiarEstado(pedidoId, nuevoEstado) {
@@ -125,27 +147,22 @@ export default function Delivery() {
         return;
       }
 
-      // También actualizar delivery_estado = 'entregado' en la misma fila
-      // (cerrar_mesa_atomico no actualiza este campo)
-      await supabase.from('turns').update({ delivery_estado: 'entregado' }).eq('id', pedidoId);
-
-      store.logAccion({
-        usuario: getActiveStaff()?.nombre || user?.email || 'Sistema',
-        rol: userRole,
-        categoria: 'Delivery',
-        accion: 'Pedido entregado',
-        detalle: deliveryCode(pedido) + ' · ' + money(total),
-        sucursal: store.sucursales.find(s => s.id === branchId)?.nombre || '',
-      });
+      try {
+        await updateDeliveryOperation(pedidoId, { estado: 'entregado' });
+      } catch {
+        addToast('Entrega registrada, pero no se pudo actualizar el estado de delivery', 'warning');
+        loadPedidos();
+        return;
+      }
       touchActiveStaff();
       addToast('Pedido entregado ✓', 'success');
     } else {
-      // Para los demás estados (preparando, listo, en_camino) → UPDATE simple
-      const { error } = await supabase
-        .from('turns')
-        .update({ delivery_estado: nuevoEstado })
-        .eq('id', pedidoId);
-      if (error) { addToast('Error al actualizar estado', 'error'); loadPedidos(); }
+      try {
+        await updateDeliveryOperation(pedidoId, { estado: nuevoEstado });
+      } catch {
+        addToast('Error al actualizar estado', 'error');
+        loadPedidos();
+      }
     }
   }
 
@@ -157,7 +174,12 @@ export default function Delivery() {
     setPedidos(prev => prev.map(p =>
       p.id === pedidoId ? { ...p, delivery_data: newData } : p
     ));
-    await supabase.from('turns').update({ delivery_data: newData }).eq('id', pedidoId);
+    try {
+      await updateDeliveryOperation(pedidoId, { repartidor });
+    } catch {
+      addToast('Error al asignar repartidor', 'error');
+      loadPedidos();
+    }
   }
 
   // ── Filtrar pedidos ───────────────────────────────────────────────────────
