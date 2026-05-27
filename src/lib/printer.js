@@ -207,8 +207,7 @@ function printEpson(text, { cut = true, bold = false } = {}) {
 // Realtime y timers de cocina.
 function printBrowser(html) {
   return new Promise((resolve) => {
-    // Intentar popup (contexto de impresión aislado)
-    const popup = window.open('', '_blank', 'width=1,height=1,top=-9999,left=-9999');
+    const popup = window.open('', '_blank', 'width=420,height=650');
 
     if (!popup) {
       // Popup bloqueado por el navegador → fallback silencioso con iframe
