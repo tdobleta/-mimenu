@@ -106,6 +106,41 @@ async function getUserRestaurant(supabase: any, user: any, restaurantId?: string
   return null;
 }
 
+async function assertBranchAndTurnScope(supabase: any, restaurantId: string, branchId?: string | null, turnId?: string | null) {
+  if (branchId) {
+    const { data: branch, error } = await supabase
+      .from('branches')
+      .select('id')
+      .eq('id', branchId)
+      .eq('restaurant_id', restaurantId)
+      .maybeSingle();
+    if (error) throw error;
+    if (!branch) return false;
+  }
+
+  if (turnId) {
+    const { data: turn, error } = await supabase
+      .from('turns')
+      .select('id, branch_id')
+      .eq('id', turnId)
+      .maybeSingle();
+    if (error) throw error;
+    if (!turn) return false;
+    if (branchId && turn.branch_id !== branchId) return false;
+
+    const { data: turnBranch, error: branchErr } = await supabase
+      .from('branches')
+      .select('id')
+      .eq('id', turn.branch_id)
+      .eq('restaurant_id', restaurantId)
+      .maybeSingle();
+    if (branchErr) throw branchErr;
+    if (!turnBranch) return false;
+  }
+
+  return true;
+}
+
 function settingsToConfig(settings: any): AfipConfig {
   const jsonCfg = settings?.afip_config || {};
   return {
@@ -156,15 +191,8 @@ Deno.serve(async (req) => {
     const restaurant = await getUserRestaurant(supabase, user, restaurantId);
     if (!restaurant?.id) return json({ error: 'Sin acceso a este restaurante' }, 403);
 
-    if (branchId) {
-      const { data: branch } = await supabase
-        .from('branches')
-        .select('id')
-        .eq('id', branchId)
-        .eq('restaurant_id', restaurant.id)
-        .maybeSingle();
-      if (!branch) return json({ error: 'Sucursal invalida' }, 403);
-    }
+    const scoped = await assertBranchAndTurnScope(supabase, restaurant.id, branchId, turnId);
+    if (!scoped) return json({ error: 'Sucursal o venta invalida para este restaurante' }, 403);
 
     const { data: settings } = await supabase
       .from('restaurant_settings')
