@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getPrinterConfig, savePrinterConfig, DEFAULT_CONFIG, connectEpson, disconnectEpson, getEpsonStatus, onEpsonStatusChange, printReceipt, printComanda } from '@/lib/printer';
+import { getPrinterConfig, savePrinterConfig, connectEpson, disconnectEpson, getEpsonStatus, onEpsonStatusChange, printReceipt, printComanda } from '@/lib/printer';
 import { useStore } from '@/lib/store';
 import { G, glass, glassDeep, glassLight, labelStyle, fontDisplay } from '@/lib/glass';
 

@@ -2,8 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useStore } from '@/lib/store';
 import { supabase } from '@/api/supabaseClient';
 import { subscribeToTurns, subscribeToTurnItems, registerActiveTurns } from '@/lib/realtimeManager';
-import { G, glass, glassDeep, fontDisplay, fontUI } from '@/lib/glass';
-import { money } from '@/lib/fmt';
+import { G, glassDeep, fontDisplay, fontUI } from '@/lib/glass';
 import { useToast } from '@/lib/toast';
 
 // ── Helpers ────────────────────────────────────────────────────────────

@@ -6,7 +6,7 @@ import { useToast } from '@/lib/toast';
 import { money } from '@/lib/fmt';
 import { useAuth } from '@/lib/AuthContext';
 import useUserRole from '@/lib/useUserRole';
-import { CATEGORY_NAMES as CATS, DEFAULT_CATEGORY, getCategoryColor, getCategoryBg } from '@/lib/menuCategories';
+import { CATEGORY_NAMES as CATS, DEFAULT_CATEGORY } from '@/lib/menuCategories';
 
 export default function MenuTab() {
   const store = useStore();

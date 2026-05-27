@@ -1,9 +1,9 @@
 import GuidedTour from '@/components/GuidedTour';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useStore } from '@/lib/store';
-import { MENU_CATEGORIES, CATEGORY_NAMES as CATEGORIAS, DEFAULT_CATEGORY, getCategoryColor, getCategoryBg } from '@/lib/menuCategories';
+import { CATEGORY_NAMES as CATEGORIAS, DEFAULT_CATEGORY, getCategoryColor, getCategoryBg } from '@/lib/menuCategories';
 
 const STEPS = ['Tu restaurante', 'Las mesas', 'El menú', '¡Listo!'];
 const MESAS_OPCIONES = [4, 6, 8, 10, 12, 15, 20, 25, 30];

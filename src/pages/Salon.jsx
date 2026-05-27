@@ -12,7 +12,7 @@ import { subscribeToTurns } from '@/lib/realtimeManager';
 import { supabase } from '@/api/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
 import useUserRole from '@/lib/useUserRole';
-import { G, glass, glassDeep, glassLight, fontDisplay } from '@/lib/glass';
+import { G, glassDeep, glassLight, fontDisplay } from '@/lib/glass';
 import { getActiveStaff } from '@/lib/useActiveStaff';
 import { enqueue } from '@/lib/offlineQueue';
 

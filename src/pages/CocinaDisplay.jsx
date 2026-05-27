@@ -95,13 +95,14 @@ const COCINA_CACHE_MAX_AGE = 2 * 3600 * 1000; // 2 horas
 
 export default function CocinaDisplay() {
   const { user } = useAuth();
-  const { restaurante, branchId, sucursales } = useStore();
+  const { restaurante, branchId, sucursales, loading: storeLoading } = useStore();
   const { addToast } = useToast();
   const activeBranchId = branchId !== 'todas' ? branchId : sucursales[0]?.id;
   const [comandas, setComandas] = useState([]);
   const [itemsListos, setItemsListos] = useState({});
   const [loading, setLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState(null);
+  const [loadError, setLoadError] = useState('');
   const [, setTick] = useState(0);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [relayConnected, setRelayConnected] = useState(localRelay.isConnected);
@@ -129,8 +130,16 @@ export default function CocinaDisplay() {
   }, []);
 
   const loadCocina = useCallback(async () => {
-    if (!activeBranchId) return;
+    if (storeLoading) return;
+    if (!activeBranchId) {
+      setComandas([]);
+      setLastUpdate(Date.now());
+      setLoadError('No hay una sucursal activa para mostrar cocina. Selecciona una sucursal en el sistema o configura una sucursal principal.');
+      setLoading(false);
+      return;
+    }
     try {
+      setLoadError('');
       const turns = await base44.entities.Turn.filter(
         { status:'abierta', enviado_cocina:true, branch_id:activeBranchId }, '-opened_at', 50
       );
@@ -167,12 +176,21 @@ export default function CocinaDisplay() {
           comandas: withItems.slice(0, 30),
         }));
       } catch(e) { /* localStorage lleno o bloqueado — ignorar */ }
-    } catch(err) { console.error('Error cargando cocina:', err); }
+    } catch(err) {
+      console.error('Error cargando cocina:', err);
+      setLoadError('No se pudo cargar la pantalla de cocina. Revisa conexion, permisos o vuelve a intentar.');
+    }
     setLoading(false);
-  }, [activeBranchId]);
+  }, [activeBranchId, storeLoading]);
 
   useEffect(() => {
-    if (!activeBranchId) return;
+    if (storeLoading) return undefined;
+    if (!activeBranchId) {
+      setComandas([]);
+      setLoadError('No hay una sucursal activa para mostrar cocina. Selecciona una sucursal en el sistema o configura una sucursal principal.');
+      setLoading(false);
+      return undefined;
+    }
 
     // Cargar cache inmediatamente mientras Supabase responde
     // (muestra algo útil incluso si la carga inicial tarda o falla)
@@ -340,6 +358,12 @@ export default function CocinaDisplay() {
           <div style={{ fontSize:12, color:'rgba(255,255,255,0.35)', fontFamily:'monospace' }}>
             Los botones "Tomar pedido" y "Marcar listo" no funcionarán hasta configurar el dispositivo.
           </div>
+        </div>
+      )}
+
+      {loadError && (
+        <div style={{ margin:'20px', borderRadius:14, border:'1px solid rgba(239,68,68,0.45)', backgroundColor:'rgba(127,29,29,0.36)', color:'#FEE2E2', padding:'14px 16px', fontSize:14, fontWeight:700, lineHeight:1.45 }}>
+          {loadError}
         </div>
       )}
 

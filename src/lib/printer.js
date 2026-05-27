@@ -207,7 +207,21 @@ function printEpson(text, { cut = true, bold = false } = {}) {
 // Realtime y timers de cocina.
 function printBrowser(html) {
   return new Promise((resolve) => {
-    const popup = window.open('', '_blank', 'width=420,height=650');
+    const availW = window.screen?.availWidth || 1280;
+    const availH = window.screen?.availHeight || 800;
+    const popupW = Math.max(860, Math.min(1200, availW - 80));
+    const popupH = Math.max(680, Math.min(900, availH - 80));
+    const popupLeft = Math.max(0, Math.round((availW - popupW) / 2));
+    const popupTop = Math.max(0, Math.round((availH - popupH) / 2));
+    const popupFeatures = [
+      `width=${popupW}`,
+      `height=${popupH}`,
+      `left=${popupLeft}`,
+      `top=${popupTop}`,
+      'resizable=yes',
+      'scrollbars=yes',
+    ].join(',');
+    const popup = window.open('', '_blank', popupFeatures);
 
     if (!popup) {
       // Popup bloqueado por el navegador → fallback silencioso con iframe
@@ -228,6 +242,11 @@ function printBrowser(html) {
       }, 300);
       return;
     }
+
+    try {
+      popup.moveTo(popupLeft, popupTop);
+      popup.resizeTo(popupW, popupH);
+    } catch {}
 
     // Escribir contenido en el popup
     popup.document.open();
@@ -271,10 +290,25 @@ function buildReceiptHtml({ config, mesa, mozo, items, subtotal, descuento, prop
   `).join('');
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8">
+  <title>mimenu - Ticket mesa ${mesa}</title>
   <style>
     @page { margin: 4mm; size: ${config.paperWidth}mm auto; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Courier New', monospace; font-size: 11px; width: ${config.paperWidth - 8}mm; margin: 0 auto; color: #000; }
+    html { min-height: 100%; background: #E5E7EB; }
+    body { font-family: 'Courier New', monospace; font-size: 11px; width: ${config.paperWidth - 8}mm; margin: 0 auto; color: #000; background: #FFF; }
+    @media screen {
+      body {
+        margin: 24px auto;
+        padding: 12px;
+        min-height: auto;
+        border-radius: 6px;
+        box-shadow: 0 18px 48px rgba(15, 23, 42, 0.22);
+      }
+    }
+    @media print {
+      html { background: #FFF; }
+      body { margin: 0 auto; padding: 0; border-radius: 0; box-shadow: none; }
+    }
     @media print and (min-width: 100mm) {
       body { font-size: 13px; padding-top: 10mm; }
       .nombre-local { font-size: 18px; }
@@ -339,10 +373,25 @@ function buildComandaHtml({ config, mesa, mozo, items, fecha, copia = 1, total =
   `).join('');
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8">
+  <title>mimenu - Comanda mesa ${mesa}</title>
   <style>
     @page { margin: 4mm; size: ${config.paperWidth}mm auto; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Courier New', monospace; font-size: 13px; width: ${config.paperWidth - 8}mm; margin: 0 auto; color: #000; }
+    html { min-height: 100%; background: #E5E7EB; }
+    body { font-family: 'Courier New', monospace; font-size: 13px; width: ${config.paperWidth - 8}mm; margin: 0 auto; color: #000; background: #FFF; }
+    @media screen {
+      body {
+        margin: 24px auto;
+        padding: 12px;
+        min-height: auto;
+        border-radius: 6px;
+        box-shadow: 0 18px 48px rgba(15, 23, 42, 0.22);
+      }
+    }
+    @media print {
+      html { background: #FFF; }
+      body { margin: 0 auto; padding: 0; border-radius: 0; box-shadow: none; }
+    }
     .center { text-align: center; }
     .bold { font-weight: bold; }
     .titulo { font-size: 18px; font-weight: bold; text-align: center; }

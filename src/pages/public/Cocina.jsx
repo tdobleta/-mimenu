@@ -112,8 +112,8 @@ export default function Cocina() {
   }, [branchId, deviceToken]);
 
   useEffect(() => {
-    if (!branchId || !deviceToken) return undefined;
     loadCocina();
+    if (!branchId || !deviceToken) return undefined;
     const interval = setInterval(loadCocina, 12000);
     return () => clearInterval(interval);
   }, [branchId, deviceToken, loadCocina]);

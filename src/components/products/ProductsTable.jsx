@@ -1,4 +1,4 @@
-import { formatCurrency, formatPercent } from '@/lib/utils-format';
+import { formatPercent } from '@/lib/utils-format';
 
 export default function ProductsTable({ products }) {
   return (

@@ -6,7 +6,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useStore } from '@/lib/store';
 import { subscribeToTurns } from '@/lib/realtimeManager';
-import { supabase } from '@/api/supabaseClient';
 
 // ── Sonido de alerta generado con Web Audio API ──────────────
 // No requiere archivo de audio externo

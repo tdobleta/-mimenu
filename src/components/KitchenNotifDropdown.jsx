@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { G, glassLight } from '@/lib/glass';
+import { G } from '@/lib/glass';
 
 function fmtTs(ts) {
   const ms = typeof ts === 'string' ? new Date(ts).getTime() : ts;

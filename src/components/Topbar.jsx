@@ -3,7 +3,6 @@ import { useAuth } from '@/lib/AuthContext';
 import { useStore } from '@/lib/store';
 import { dateLong } from '@/lib/fmt';
 import AlertsDropdown from './AlertsDropdown';
-import { base44 } from '@/api/base44Client';
 import { supabase } from '@/api/supabaseClient';
 import useUserRole from '@/lib/useUserRole';
 import { G, glassLight } from '@/lib/glass';

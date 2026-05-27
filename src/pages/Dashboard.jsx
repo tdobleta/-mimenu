@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useDashboardStore } from '@/lib/storeSelectors';
-import { money, dateLong, elapsedMin, fmtElapsed } from '@/lib/fmt';
+import { money, dateLong } from '@/lib/fmt';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell, PieChart, Pie } from 'recharts';
 import { useNavigate } from 'react-router-dom';
 import AnalyticsActions from '../components/analytics/AnalyticsActions';

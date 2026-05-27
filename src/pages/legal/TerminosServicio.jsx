@@ -1,5 +1,4 @@
 // src/pages/legal/TerminosServicio.jsx
-import { G } from '@/lib/glass';
 
 export default function TerminosServicio() {
   const fecha = '15 de mayo de 2026';
