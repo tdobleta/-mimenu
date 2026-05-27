@@ -31,6 +31,10 @@ function elapsed(openedAt) {
   return `${Math.floor(m / 60)}h ${m % 60}m`;
 }
 
+function deliveryCode(pedido) {
+  return pedido?.delivery_data?.pedido_codigo || pedido?.mesa_num || pedido?.id || 'Delivery';
+}
+
 function BadgeEstado({ estado }) {
   const e = ESTADOS.find(s => s.key === estado) || ESTADOS[0];
   return (
@@ -130,7 +134,7 @@ export default function Delivery() {
         rol: userRole,
         categoria: 'Delivery',
         accion: 'Pedido entregado',
-        detalle: (pedido?.mesa_num || pedidoId) + ' · ' + money(total),
+        detalle: deliveryCode(pedido) + ' · ' + money(total),
         sucursal: store.sucursales.find(s => s.id === branchId)?.nombre || '',
       });
       touchActiveStaff();
@@ -290,7 +294,7 @@ function PedidoCard({ pedido, teamMembers, onCambiarEstado, onAsignarRepartidor 
       <div style={{ padding:'12px 16px', background: estadoActual.bg, display:'flex', flexWrap:'wrap', gap:8, alignItems:'center', justifyContent:'space-between', borderBottom:'1px solid #E2E8F0' }}>
         <div style={{ display:'flex', gap:10, alignItems:'center' }}>
           <span style={{ fontSize:15, fontWeight:800, color:estadoActual.color }}>
-            {pedido.mesa_num}
+            {deliveryCode(pedido)}
           </span>
           {data.plataforma && (
             <span style={{ fontSize:11, background:'rgba(0,0,0,0.07)', borderRadius:99, padding:'2px 8px', fontWeight:600, color:G.textMid }}>
@@ -396,6 +400,10 @@ function PedidoCard({ pedido, teamMembers, onCambiarEstado, onAsignarRepartidor 
 // NuevoPedidoModal
 // ══════════════════════════════════════════════════════════════════════════════
 function NuevoPedidoModal({ branchId, store, addToast, onClose, onCreated }) {
+  const pedidoCodeRef = useRef(`DEL-${1000 + Math.floor(Math.random() * 9000)}`);
+  const operationIdRef = useRef(
+    `delivery_create_${branchId || 'branch'}_${Date.now()}_${Math.random().toString(36).slice(2)}`
+  );
   const [form, setForm] = useState({
     plataforma: 'Manual',
     telefono:   '',
@@ -428,61 +436,51 @@ function NuevoPedidoModal({ branchId, store, addToast, onClose, onCreated }) {
   async function handleCreate() {
     if (!branchId) { addToast('Seleccioná una sucursal primero', 'error'); return; }
     // Número único: 4 dígitos aleatorios — evita colisiones por timestamp truncado
-    const numPedido = (1000 + Math.floor(Math.random() * 9000)).toString();
+    const pedidoCodigo = pedidoCodeRef.current;
     const mozoNombre = getActiveStaff()?.nombre || '';
     setSaving(true);
     try {
       // 1. Crear turn de delivery
-      const { data: turn, error: turnErr } = await supabase
-        .from('turns')
-        .insert({
-          branch_id:        branchId,
-          mesa_num:         `DEL-${numPedido}`,
-          status:           'abierta',
-          tipo:             'delivery',
-          delivery_estado:  'preparando',
-          delivery_data:    {
+      const { data, error } = await supabase.rpc('create_delivery_order_operation', {
+        p_operation: {
+          operation_id: operationIdRef.current,
+          operation_type: 'CREATE_DELIVERY_ORDER',
+          operation_version: 1,
+          tenant: {
+            restaurant_id: store.restaurantId || null,
+            branch_id: branchId,
+          },
+          actor: {
+            staff_name: mozoNombre,
+          },
+          caja: {
+            caja_shift_id: store.turnoActivo?.id || null,
+          },
+          delivery: {
+            pedido_codigo: pedidoCodigo,
+          },
+          delivery_data: {
             plataforma:   form.plataforma,
             telefono:     form.telefono.trim() || null,
             direccion:    form.direccion.trim() || null,
             nota_interna: form.nota.trim() || null,
             repartidor:   null,
           },
-          opened_at:        new Date().toISOString(),
-          total_facturado:  0,
-          mozo:             mozoNombre,
-          caja_shift_id:    store.turnoActivo?.id || null,
-        })
-        .select()
-        .single();
-      if (turnErr) throw turnErr;
-
-      // 2. Crear ítems del pedido
-      if (selectedItems.length > 0) {
-        const { error: itemsErr } = await supabase.from('turn_items').insert(
-          selectedItems.map(si => ({
-            turn_id:        turn.id,
-            branch_id:      branchId,
+          items: selectedItems.map(si => ({
             menu_item_id:   si.item.id,
             menu_item_name: si.item.nombre,
             cantidad:       si.qty,
             precio:         si.item.precio,
             notas:          '',
-          }))
-        );
-        if (itemsErr) throw itemsErr;
-      }
-
-      store.logAccion({
-        usuario: mozoNombre || 'Sistema',
-        rol: '',
-        categoria: 'Delivery',
-        accion: 'Pedido creado',
-        detalle: `DEL-${numPedido} · ${form.plataforma} · ${money(subtotal)}`,
-        sucursal: store.sucursales.find(s => s.id === branchId)?.nombre || '',
+          })),
+          created_at: new Date().toISOString(),
+        },
       });
+      if (error) throw error;
+      if (data && data.ok === false) throw new Error(data.error || 'No se pudo crear el pedido');
+
       touchActiveStaff();
-      addToast(`Pedido DEL-${numPedido} creado — en cocina`, 'success');
+      addToast(`Pedido ${data?.pedido_codigo || pedidoCodigo} creado — en cocina`, 'success');
       onCreated();
     } catch (err) {
       addToast('Error al crear el pedido: ' + (err.message || 'revisar conexión'), 'error');
@@ -612,7 +610,7 @@ function NuevoPedidoModal({ branchId, store, addToast, onClose, onCreated }) {
               background: saving || selectedItems.length === 0 ? G.textFaint : '#1D9E75',
               cursor: saving || selectedItems.length === 0 ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1 }}
           >
-            {saving ? 'Creando…' : `Crear pedido DEL-${numPedido}`}
+            {saving ? 'Creando…' : `Crear pedido ${pedidoCodeRef.current}`}
           </button>
         </div>
       </div>
