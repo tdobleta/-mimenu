@@ -5,6 +5,7 @@ import { useToast } from '@/lib/toast';
 import { money } from '@/lib/fmt';
 import { useAuth } from '@/lib/AuthContext';
 import useUserRole from '@/lib/useUserRole';
+import { archiveSale, voidSale } from '@/lib/salesOperations';
 
 const PAGE_SIZE = 20;
 
@@ -51,7 +52,7 @@ export default function SalesEditorPanel({ isOpen, onClose }) {
           ? base44.entities.Turn.filter({ status: 'anulada', branch_id: targetBranch }, '-closed_at', 500).catch(() => [])
           : Promise.all(branchIds.map(bid => base44.entities.Turn.filter({ status: 'anulada', branch_id: bid }, '-closed_at', 500).catch(() => []))).then(r => r.flat()),
       ]);
-      let combined = [...(cerradas||[]), ...(anuladas||[])];
+      let combined = [...(cerradas||[]), ...(anuladas||[])].filter(t => !t.archived_at);
       if (!targetBranch) combined = combined.filter(t => branchIds.includes(t.branch_id));
       combined.sort((a,b) => (b.closed_at||0) - (a.closed_at||0));
       setTurns(combined);
@@ -77,8 +78,20 @@ export default function SalesEditorPanel({ isOpen, onClose }) {
 
   async function anularTurn(turn, motivo) {
     try {
-      await base44.entities.Turn.update(turn.id, { status: 'anulada', motivo_anulacion: motivo, anulado_at: Date.now() });
-      setTurns(prev => prev.map(t => t.id === turn.id ? { ...t, status: 'anulada', motivo_anulacion: motivo } : t));
+      await voidSale({
+        restaurantId: store.restaurantId,
+        branchId: turn.branch_id,
+        turnId: turn.id,
+        reason: motivo,
+        user,
+        role: userRole,
+      });
+      setTurns(prev => prev.map(t => t.id === turn.id ? {
+        ...t,
+        status: 'anulada',
+        motivo_anulacion: motivo,
+        anulado_at: t.anulado_at || new Date().toISOString(),
+      } : t));
       if (store.refreshCharts) store.refreshCharts();
       store.logAccion({
         usuario: user?.email || 'Sistema',
@@ -120,9 +133,14 @@ export default function SalesEditorPanel({ isOpen, onClose }) {
 
   async function deleteTurn(turn) {
     try {
-      const items = await base44.entities.TurnItem.filter({ turn_id: turn.id });
-      await Promise.all((items||[]).map(it => base44.entities.TurnItem.delete(it.id)));
-      await base44.entities.Turn.delete(turn.id);
+      await archiveSale({
+        restaurantId: store.restaurantId,
+        branchId: turn.branch_id,
+        turnId: turn.id,
+        reason: 'Archivada desde editor de ventas',
+        user,
+        role: userRole,
+      });
       setTurns(prev => prev.filter(t => t.id !== turn.id));
       setDelConfirm(null);
       if (store.refreshCharts) store.refreshCharts();
@@ -130,13 +148,13 @@ export default function SalesEditorPanel({ isOpen, onClose }) {
         usuario: user?.email || 'Sistema',
         rol: userRole,
         categoria: 'Analíticas',
-        accion: 'Venta eliminada',
+        accion: 'Venta archivada',
         detalle: 'Mesa ' + turn.mesa_num + ' · ' + money(turn.total_facturado||0),
         sucursal: store.sucursales.find(s => s.id === store.branchId)?.nombre || '',
       });
-      addToast('Venta eliminada', 'success');
+      addToast('Venta archivada', 'success');
     } catch(err) {
-      addToast('Error al eliminar venta', 'error');
+      addToast(err?.message || 'Error al archivar venta', 'error');
     }
   }
 
@@ -250,16 +268,16 @@ export default function SalesEditorPanel({ isOpen, onClose }) {
       {delConfirm && (
         <div style={{ position:'fixed', inset:0, zIndex:1100, display:'flex', alignItems:'center', justifyContent:'center', backgroundColor:'rgba(0,0,0,0.5)' }} onClick={()=>setDelConfirm(null)}>
           <div style={{ backgroundColor:'white', borderRadius:12, width:380, padding:24 }} onClick={e=>e.stopPropagation()}>
-            <div style={{ fontSize:15, fontWeight:600, color:'#111827', marginBottom:10 }}>Eliminar venta del historial</div>
+            <div style={{ fontSize:15, fontWeight:600, color:'#111827', marginBottom:10 }}>Archivar venta del historial</div>
             <div style={{ backgroundColor:'#F9FAFB', borderRadius:8, padding:12, marginBottom:10, fontSize:12, color:'#374151', display:'flex', flexDirection:'column', gap:4 }}>
               <div>Mesa <strong>{delConfirm.mesa_num}</strong></div>
               <div>{delConfirm.closed_at ? `${fmtDate(delConfirm.closed_at)} ${fmtTime(delConfirm.closed_at)}` : '-'}</div>
               <div style={{ color:'#1D9E75', fontWeight:600 }}>{money(delConfirm.total_facturado||0)}</div>
             </div>
-            <div style={{ fontSize:12, color:'#EF4444', marginBottom:14, lineHeight:'17px' }}>Esta acción elimina el registro permanentemente. No se puede deshacer.</div>
+            <div style={{ fontSize:12, color:'#EF4444', marginBottom:14, lineHeight:'17px' }}>Esta accion oculta la venta del historial visible, pero conserva el registro y la auditoria.</div>
             <div style={{ display:'flex', gap:8 }}>
               <button onClick={()=>setDelConfirm(null)} style={{ flex:1, padding:'9px 0', border:'0.5px solid rgba(0,0,0,0.12)', borderRadius:7, fontSize:13, cursor:'pointer', backgroundColor:'white' }}>Cancelar</button>
-              <button onClick={()=>deleteTurn(delConfirm)} style={{ flex:1, padding:'9px 0', border:'none', borderRadius:7, fontSize:13, color:'white', backgroundColor:'#EF4444', cursor:'pointer' }}>Eliminar venta</button>
+              <button onClick={()=>deleteTurn(delConfirm)} style={{ flex:1, padding:'9px 0', border:'none', borderRadius:7, fontSize:13, color:'white', backgroundColor:'#EF4444', cursor:'pointer' }}>Archivar venta</button>
             </div>
           </div>
         </div>
@@ -360,5 +378,3 @@ function DetailModal({ detail, onClose }) {
     </div>
   );
 }
-
-

@@ -75,6 +75,17 @@ export default function CloseTableModal({ table, total, branchId, onClose, onCon
     };
   }, []);
 
+  const discAmount = (() => {
+    if (!disc || !discVal) return 0;
+    const v = parseFloat(discVal) || 0;
+    return discType === '%' ? Math.round(total * v / 100) : Math.min(v, total);
+  })();
+  const propinaAmount = parseFloat(propina) || 0;
+  // Points discount: 1 punto = $1 de descuento
+  const descuentoPuntos = puntosARedimir;
+  const finalTotal = Math.max(0, total - discAmount - descuentoPuntos);
+  const totalConPropina = finalTotal + propinaAmount;
+
   // Handler de pago con terminal MP Point
   const handleMpPoint = useCallback(async () => {
     setMpState('pending');
@@ -163,17 +174,6 @@ export default function CloseTableModal({ table, total, branchId, onClose, onCon
     setMpIntentId(null);
     setMpError('');
   };
-
-  const discAmount = (() => {
-    if (!disc || !discVal) return 0;
-    const v = parseFloat(discVal) || 0;
-    return discType === '%' ? Math.round(total * v / 100) : Math.min(v, total);
-  })();
-  const propinaAmount = parseFloat(propina) || 0;
-  // Points discount: 1 punto = $1 de descuento
-  const descuentoPuntos = puntosARedimir;
-  const finalTotal = Math.max(0, total - discAmount - descuentoPuntos);
-  const totalConPropina = finalTotal + propinaAmount;
 
   // Búsqueda de cliente con debounce
   useEffect(() => {
