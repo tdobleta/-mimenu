@@ -46,6 +46,15 @@ Deno.serve(async (req) => {
     const allowed = await canAccessRestaurant(supabase, user, restaurantId);
     if (!allowed) return json({ error: 'Sin acceso a este restaurante' }, 403);
 
+    const { data: storedIntent, error: storedErr } = await supabase
+      .from('mp_payment_intents')
+      .select('id, mp_intent_id')
+      .eq('restaurant_id', restaurantId)
+      .eq('mp_intent_id', intentId)
+      .maybeSingle();
+    if (storedErr) throw storedErr;
+    if (!storedIntent) return json({ error: 'Intent no encontrado para este restaurante' }, 404);
+
     const { data: settings } = await supabase
       .from('restaurant_settings')
       .select('mp_access_token, mp_device_id')
@@ -71,6 +80,15 @@ Deno.serve(async (req) => {
     if (!mpRes.ok) {
       return json({ error: mpData?.message || 'Error en MP' }, mpRes.status);
     }
+
+    await supabase
+      .from('mp_payment_intents')
+      .update({
+        status: mpData?.state?.type || '',
+        last_status_payload: mpData,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', storedIntent.id);
 
     return json({
       ok: true,

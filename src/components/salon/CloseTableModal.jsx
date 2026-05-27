@@ -54,6 +54,7 @@ export default function CloseTableModal({ table, total, branchId, onClose, onCon
   const [mpError,    setMpError]         = useState('');
   const mpPollRef   = useRef(null);   // setInterval handle
   const mpStartRef  = useRef(null);   // Date.now() al inicio del pago
+  const mpIntentKeyRef = useRef(null);
 
   // Verificar si el restaurante tiene MP Point configurado
   useEffect(() => {
@@ -92,6 +93,10 @@ export default function CloseTableModal({ table, total, branchId, onClose, onCon
     setMpError('');
     setMpIntentId(null);
     mpStartRef.current = Date.now();
+    if (!mpIntentKeyRef.current) {
+      const suffix = globalThis.crypto?.randomUUID?.() || `${Date.now()}_${Math.random().toString(36).slice(2)}`;
+      mpIntentKeyRef.current = `mp_${table.turnId || 'pos'}_${suffix}`;
+    }
 
     try {
       // 1. Crear payment intent en el servidor
@@ -107,7 +112,9 @@ export default function CloseTableModal({ table, total, branchId, onClose, onCon
           amount:       Math.round(totalConPropina),
           description:  `Mesa ${table.num} — ${store.restaurante?.nombre || 'mimenú'}`,
           turnId:       table.turnId || null,
+          branchId,
           restaurantId: store.restaurantId,
+          idempotencyKey: mpIntentKeyRef.current,
         }),
       });
       const json = await res.json();
@@ -165,7 +172,7 @@ export default function CloseTableModal({ table, total, branchId, onClose, onCon
       setMpError(err.message || 'No se pudo conectar con la terminal');
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [totalConPropina, finalTotal, disc, discAmount, discMotivo, propinaAmount, table, store.restaurantId, store.restaurante, onConfirmWithDiscount]);
+  }, [totalConPropina, finalTotal, disc, discAmount, discMotivo, propinaAmount, table, branchId, store.restaurantId, store.restaurante, onConfirmWithDiscount]);
 
   // Cancelar flujo MP y volver a idle
   const handleMpCancel = () => {
@@ -173,6 +180,7 @@ export default function CloseTableModal({ table, total, branchId, onClose, onCon
     setMpState('idle');
     setMpIntentId(null);
     setMpError('');
+    mpIntentKeyRef.current = null;
   };
 
   // Búsqueda de cliente con debounce
