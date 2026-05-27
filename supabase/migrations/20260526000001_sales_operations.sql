@@ -35,6 +35,7 @@ DECLARE
   v_operation_id       TEXT;
   v_operation_type     TEXT;
   v_operation_version  INTEGER;
+  v_requested_rest     UUID;
   v_restaurant_id      UUID;
   v_branch_id          UUID;
   v_turn_id            UUID;
@@ -59,7 +60,7 @@ BEGIN
   v_operation_type := p_operation->>'operation_type';
   v_operation_version := COALESCE((p_operation->>'operation_version')::INTEGER, 1);
   v_branch_id := NULLIF(p_operation #>> '{tenant,branch_id}', '')::UUID;
-  v_restaurant_id := NULLIF(p_operation #>> '{tenant,restaurant_id}', '')::UUID;
+  v_requested_rest := NULLIF(p_operation #>> '{tenant,restaurant_id}', '')::UUID;
   v_turn_id := NULLIF(p_operation #>> '{sale,turn_id}', '')::UUID;
   v_reason := LEFT(TRIM(COALESCE(p_operation #>> '{sale,reason}', p_operation #>> '{reason}', '')), 500);
   v_actor_email := COALESCE(NULLIF(auth.jwt()->>'email', ''), NULLIF(p_operation #>> '{actor,email}', ''), 'Sistema');
@@ -95,7 +96,7 @@ BEGIN
   INTO v_restaurant_id, v_branch_name
   FROM branches b
   WHERE b.id = v_branch_id
-    AND (v_restaurant_id IS NULL OR b.restaurant_id = v_restaurant_id);
+    AND (v_requested_rest IS NULL OR b.restaurant_id = v_requested_rest);
 
   v_authorized_rest := get_user_restaurant_id();
   v_role := get_user_role();

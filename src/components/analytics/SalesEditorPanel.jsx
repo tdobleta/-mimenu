@@ -93,14 +93,6 @@ export default function SalesEditorPanel({ isOpen, onClose }) {
         anulado_at: t.anulado_at || new Date().toISOString(),
       } : t));
       if (store.refreshCharts) store.refreshCharts();
-      store.logAccion({
-        usuario: user?.email || 'Sistema',
-        rol: userRole,
-        categoria: 'Analíticas',
-        accion: 'Venta anulada',
-        detalle: 'Mesa ' + turn.mesa_num + ' · ' + money(turn.total_facturado||0) + ' · Motivo: ' + motivo,
-        sucursal: store.sucursales.find(s => s.id === store.branchId)?.nombre || '',
-      });
       addToast('Venta anulada', 'success');
       setAnulConfirm(null);
     } catch(err) {
@@ -144,14 +136,6 @@ export default function SalesEditorPanel({ isOpen, onClose }) {
       setTurns(prev => prev.filter(t => t.id !== turn.id));
       setDelConfirm(null);
       if (store.refreshCharts) store.refreshCharts();
-      store.logAccion({
-        usuario: user?.email || 'Sistema',
-        rol: userRole,
-        categoria: 'Analíticas',
-        accion: 'Venta archivada',
-        detalle: 'Mesa ' + turn.mesa_num + ' · ' + money(turn.total_facturado||0),
-        sucursal: store.sucursales.find(s => s.id === store.branchId)?.nombre || '',
-      });
       addToast('Venta archivada', 'success');
     } catch(err) {
       addToast(err?.message || 'Error al archivar venta', 'error');

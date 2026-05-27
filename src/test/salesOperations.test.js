@@ -16,6 +16,7 @@ describe('sales operations hardening', () => {
     expect(migration).toContain('SECURITY DEFINER');
     expect(migration).toContain('get_user_restaurant_id()');
     expect(migration).toContain('get_user_role()');
+    expect(migration).toContain('v_requested_rest');
     expect(migration).toContain('business_operations');
     expect(migration).toContain('audit_logs');
     expect(migration).toContain('archived_at');
@@ -37,6 +38,7 @@ describe('sales operations hardening', () => {
     expect(helper).toContain("supabase.rpc('apply_sales_operation'");
     expect(editor).toContain('voidSale');
     expect(editor).toContain('archiveSale');
+    expect(editor).not.toContain('store.logAccion');
     expect(actions).toContain('resetAnalytics');
   });
 });
