@@ -49,24 +49,6 @@ export default function FacturaModal({ mesa, items, total, descuento = 0, restau
       }
       setResultado(res);
 
-      // Persistir en tabla facturas (fire-and-forget — no bloquea el flujo)
-      if (restaurantId && res?.persist_in_browser) {
-        supabase.from('facturas').insert({
-          restaurant_id: restaurantId,
-          branch_id:     branchId   || null,
-          turn_id:       turnId     || null,
-          tipo:          tipo,
-          numero:        res.numero  || null,
-          punto_venta:   getAfipConfig().punto_venta || null,
-          cae:           res.cae    || null,
-          vto_cae:       res.cae_vto ? new Date(res.cae_vto).toISOString().slice(0,10) : null,
-          total:         res.total  || 0,
-          condicion_iva_receptor: tipo === 'B' ? 'Consumidor Final' : (razonCliente || 'Empresa'),
-          pdf_url:       res.pdf_link || null,
-        }).then(({ error: dbErr }) => {
-          if (dbErr) console.warn('[facturas] No se pudo guardar historial:', dbErr.message);
-        });
-      }
     } catch(e) {
       setError(e.message);
       // ── Cola de contingencia fiscal ────────────────────────────────────
@@ -76,19 +58,18 @@ export default function FacturaModal({ mesa, items, total, descuento = 0, restau
         const clienteData = tipo === 'A' && cuitCliente
           ? { cuit: cuitCliente, razon_social: razonCliente, email: emailCliente, domicilio: domicilioCliente }
           : null;
-        supabase.from('facturas_contingencia').insert({
+        supabase.rpc('create_factura_contingencia', { p_payload: {
           restaurant_id: restaurantId,
-          branch_id:     branchId,
-          turn_id:       turnId || null,
-          mesa:          String(mesa),
-          items:         items,
-          total:         total,
-          descuento:     descuento || 0,
-          tipo:          tipo,
-          cliente_data:  clienteData,
+          branch_id: branchId,
+          turn_id: turnId || null,
+          mesa: String(mesa),
+          items,
+          total,
+          descuento: descuento || 0,
+          tipo,
+          cliente_data: clienteData,
           error_mensaje: e.message,
-          estado:        'pendiente',
-        }).then(({ error: dbErr }) => {
+        }}).then(({ error: dbErr }) => {
           if (dbErr) console.warn('[contingencia] No se pudo guardar:', dbErr.message);
         });
       }
