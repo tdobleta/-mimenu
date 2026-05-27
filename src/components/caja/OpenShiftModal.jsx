@@ -1,11 +1,11 @@
-import { useState } from 'react';
-import { base44 } from '@/api/base44Client';
+import { useRef, useState } from 'react';
 import { useStore } from '@/lib/store';
 import { useToast } from '@/lib/toast';
 import { money } from '@/lib/fmt';
 import { useAuth } from '@/lib/AuthContext';
 import useUserRole from '@/lib/useUserRole';
 import { getActiveStaff, touchActiveStaff } from '@/lib/useActiveStaff';
+import { createOpenShiftOperationId, openCajaShiftOperation } from '@/lib/cajaShiftOperations';
 
 const TIPOS = [
   { key:'manana', label:'Mañana', horario:'7:00 — 13:00' },
@@ -22,6 +22,7 @@ export default function OpenShiftModal({ onClose }) {
   const [tipo, setTipo] = useState('manana');
   const [fondo, setFondo] = useState('');
   const [saving, setSaving] = useState(false);
+  const operationIdRef = useRef(null);
 
   // Eliminar puntos de miles (formato argentino: "10.000" = diez mil, no diez)
   const fondoNum = parseFloat((fondo || '').replace(/\./g, '').replace(',', '.')) || 0;
@@ -32,45 +33,35 @@ export default function OpenShiftModal({ onClose }) {
     if (!branchId) return;
     setSaving(true);
     try {
-      // Verificar si ya hay un turno abierto para esta sucursal
-      const existing = await base44.entities.CajaShift.filter({ branch_id: branchId, status: 'abierto' });
-      if (existing?.length > 0) {
-        addToast('Ya hay un turno abierto en esta sucursal. Cerralo antes de abrir uno nuevo.', 'warning');
-        setSaving(false);
-        return;
-      }
       const now = new Date().toISOString();
-      const created = await base44.entities.CajaShift.create({
-        branch_id: branchId,
-        tipo_turno: tipo,
-        fondo_inicial: fondoNum,
-        abierto_at: now,
-        status: 'abierto',
-        retiros: '[]',
-        total_facturado_turno: 0,
+      if (!operationIdRef.current) {
+        operationIdRef.current = createOpenShiftOperationId(branchId);
+      }
+      const result = await openCajaShiftOperation({
+        operationId: operationIdRef.current,
+        restaurantId: store.restaurantId,
+        branchId,
+        tipoTurno: tipo,
+        fondoInicial: fondoNum,
+        abiertoAt: now,
+        user,
+        role: userRole,
+        activeStaff: getActiveStaff(),
       });
       store.setTurnoActivo({
-        id: created.id,
+        id: result?.caja_shift_id,
         branchId,
-        fondoInicial: fondoNum,
-        abiertaAt: now,
-        tipoTurno: tipo,
+        fondoInicial: Number(result?.fondo_inicial ?? fondoNum),
+        abiertaAt: result?.abierto_at || now,
+        tipoTurno: result?.tipo_turno || tipo,
         retiros: [],
-      });
-      store.logAccion({
-        usuario: getActiveStaff()?.nombre || user?.email || 'Sistema',
-        rol: userRole,
-        categoria: 'Caja',
-        accion: 'Turno abierto',
-        detalle: 'Turno ' + tipoLabel + ' · Fondo $' + fondoNum,
-        sucursal: store.sucursales.find(s => s.id === branchId)?.nombre || '',
       });
       touchActiveStaff();
       addToast('Turno abierto correctamente', 'success');
       onClose();
     } catch(err) {
       console.error(err);
-      const isDuplicate = err?.code === '23505' || err?.message?.includes('duplicate') || err?.message?.includes('unique');
+      const isDuplicate = err?.code === '23505' || err?.message?.includes('ya hay un turno abierto') || err?.message?.includes('duplicate') || err?.message?.includes('unique');
       if (isDuplicate) {
         addToast('Ya existe un turno abierto. Recargá la página para verlo.', 'warning');
       } else {
@@ -125,5 +116,3 @@ export default function OpenShiftModal({ onClose }) {
     </div>
   );
 }
-
-

@@ -20,6 +20,7 @@ AS $$
 DECLARE
   v_operation_id      TEXT;
   v_operation_type    TEXT;
+  v_requested_rest     UUID;
   v_restaurant_id     UUID;
   v_branch_id         UUID;
   v_shift_id          UUID;
@@ -47,7 +48,7 @@ BEGIN
 
   v_operation_id := p_operation->>'operation_id';
   v_operation_type := p_operation->>'operation_type';
-  v_restaurant_id := NULLIF(p_operation #>> '{tenant,restaurant_id}', '')::UUID;
+  v_requested_rest := NULLIF(p_operation #>> '{tenant,restaurant_id}', '')::UUID;
   v_branch_id := NULLIF(p_operation #>> '{tenant,branch_id}', '')::UUID;
   v_shift_id := NULLIF(p_operation #>> '{caja,caja_shift_id}', '')::UUID;
   v_actor_user_id := auth.uid();
@@ -83,7 +84,7 @@ BEGIN
   INTO v_restaurant_id, v_branch_name
   FROM branches b
   WHERE b.id = v_branch_id
-    AND (v_restaurant_id IS NULL OR b.restaurant_id = v_restaurant_id);
+    AND (v_requested_rest IS NULL OR b.restaurant_id = v_requested_rest);
 
   v_authorized_rest := get_user_restaurant_id();
   v_role := get_user_role();
