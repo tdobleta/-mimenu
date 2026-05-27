@@ -5,6 +5,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsResponse, jsonResponse, serverErrorResponse } from '../_shared/http.ts';
 
 const VALID_ROLES = ['Mozo', 'Encargado', 'Cocinero'];
+const MAX_PIN_FAILURES = 5;
+const PIN_LOCK_SECONDS = 5 * 60;
 
 function isPin(value: unknown) {
   return typeof value === 'string' && /^[0-9]{4}$/.test(value);
@@ -20,6 +22,15 @@ async function sha256Hex(input: string) {
   const data = new TextEncoder().encode(input);
   const digest = await crypto.subtle.digest('SHA-256', data);
   return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function clientIpHashInput(req: Request) {
+  const forwarded = req.headers.get('x-forwarded-for') || '';
+  const firstForwarded = forwarded.split(',')[0]?.trim();
+  return firstForwarded
+    || req.headers.get('cf-connecting-ip')
+    || req.headers.get('x-real-ip')
+    || 'unknown';
 }
 
 async function hashPin(pin: string) {
@@ -77,6 +88,54 @@ function publicStaff(row: any) {
 function missingPinHash(error: any) {
   const msg = String(error?.message || error?.details || '');
   return msg.includes('pin_hash') || (msg.includes('column') && msg.includes('does not exist'));
+}
+
+async function buildPinAttemptScope(req: Request, user: any, branchId: string) {
+  const ip = clientIpHashInput(req);
+  return sha256Hex(`staff-pin:${user.id}:${branchId}:${ip}`);
+}
+
+async function checkLockout(supabase: any, branchId: string, staffId: string, userId: string, ipHash: string) {
+  const { data, error } = await supabase.rpc('check_staff_pin_lockout', {
+    p_branch_id: branchId,
+    p_staff_pin_id: staffId,
+    p_actor_user_id: userId,
+    p_ip_hash: ipHash,
+  });
+  if (error) throw error;
+  return data || { locked: false };
+}
+
+async function recordFailure(supabase: any, branchId: string, staffId: string, userId: string, ipHash: string) {
+  const { data, error } = await supabase.rpc('record_staff_pin_failure', {
+    p_branch_id: branchId,
+    p_staff_pin_id: staffId,
+    p_actor_user_id: userId,
+    p_ip_hash: ipHash,
+    p_max_attempts: MAX_PIN_FAILURES,
+    p_lock_seconds: PIN_LOCK_SECONDS,
+  });
+  if (error) throw error;
+  return data || { locked: false, remaining_attempts: MAX_PIN_FAILURES - 1 };
+}
+
+async function clearFailures(supabase: any, branchId: string, staffId: string, userId: string, ipHash: string) {
+  const { error } = await supabase.rpc('clear_staff_pin_attempts', {
+    p_branch_id: branchId,
+    p_staff_pin_id: staffId,
+    p_actor_user_id: userId,
+    p_ip_hash: ipHash,
+  });
+  if (error) throw error;
+}
+
+function pinLockedResponse(req: Request, lockout: any) {
+  const retryAfter = Number(lockout?.retry_after_seconds || PIN_LOCK_SECONDS);
+  return jsonResponse(req, {
+    error: 'PIN bloqueado temporalmente por demasiados intentos. Espera unos minutos y volve a intentar.',
+    retryAfterSeconds: retryAfter,
+    lockedUntil: lockout?.locked_until || null,
+  }, 429, { 'Retry-After': String(retryAfter) });
 }
 
 Deno.serve(async (req) => {
@@ -142,8 +201,21 @@ Deno.serve(async (req) => {
       if (error) throw error;
       if (!member) return json({ error: 'Mozo no encontrado o inactivo' }, 404);
 
+      const ipHash = await buildPinAttemptScope(req, user, branchId);
+      const lockout = await checkLockout(supabase, branchId, member.id, user.id, ipHash);
+      if (lockout?.locked) return pinLockedResponse(req, lockout);
+
       const ok = await verifyHash(pin, member.pin_hash) || (member.pin === pin);
-      if (!ok) return json({ error: 'PIN incorrecto' }, 401);
+      if (!ok) {
+        const failure = await recordFailure(supabase, branchId, member.id, user.id, ipHash);
+        if (failure?.locked) return pinLockedResponse(req, failure);
+        return json({
+          error: 'PIN incorrecto',
+          remainingAttempts: Number(failure?.remaining_attempts ?? 0),
+        }, 401);
+      }
+
+      await clearFailures(supabase, branchId, member.id, user.id, ipHash);
 
       if (hashColumnAvailable && (!member.pin_hash || member.pin)) {
         const nextHash = await hashPin(pin);
