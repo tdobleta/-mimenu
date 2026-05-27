@@ -180,7 +180,7 @@ function TabDirectorio({ restaurantId }) {
     if (!window.confirm(`¿Eliminar a ${c.nombre}? Se perderá su historial de visitas.`)) return;
     setDeleting(c.id);
     try {
-      await deleteCustomer(c.id);
+      await deleteCustomer(restaurantId, c.id, 'Archivado desde directorio CRM');
       setCustomers(p => p.filter(x => x.id !== c.id));
     } catch { /* ignore */ }
     setDeleting(null);

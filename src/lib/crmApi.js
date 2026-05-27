@@ -6,6 +6,11 @@ import { supabase } from '@/api/supabaseClient';
 
 const PESOS_POR_PUNTO = 100;   // cada $100 = 1 punto
 
+function operationId(type, scopeId) {
+  const suffix = globalThis.crypto?.randomUUID?.() || `${Date.now()}_${Math.random().toString(36).slice(2)}`;
+  return `crm_${type.toLowerCase()}_${scopeId}_${suffix}`;
+}
+
 /** Buscar clientes por nombre o teléfono (mínimo 2 chars) */
 export async function searchCustomers(restaurantId, q) {
   if (!q || q.trim().length < 2) return [];
@@ -14,6 +19,7 @@ export async function searchCustomers(restaurantId, q) {
     .from('customers')
     .select('id, nombre, telefono, email, puntos, notas, nacimiento')
     .eq('restaurant_id', restaurantId)
+    .is('deleted_at', null)
     .or(`nombre.ilike.%${term}%,telefono.ilike.%${term}%`)
     .order('nombre')
     .limit(10);
@@ -26,6 +32,7 @@ export async function getCustomer(id) {
     .from('customers')
     .select('*, customer_visits(id, fecha, total_gastado, puntos_ganados, puntos_canjeados)')
     .eq('id', id)
+    .is('deleted_at', null)
     .order('fecha', { referencedTable: 'customer_visits', ascending: false })
     .single();
   return data;
@@ -61,9 +68,20 @@ export async function updateCustomer(id, updates) {
   return data;
 }
 
-/** Eliminar cliente (y sus visitas por CASCADE) */
-export async function deleteCustomer(id) {
-  const { error } = await supabase.from('customers').delete().eq('id', id);
+/** Archivar cliente manteniendo historial y auditoria */
+export async function deleteCustomer(restaurantId, id, reason = 'Archivado desde CRM') {
+  const operation = {
+    operation_id: operationId('archive_customer', id),
+    operation_type: 'ARCHIVE_CUSTOMER',
+    operation_version: 1,
+    tenant: { restaurant_id: restaurantId },
+    customer: { customer_id: id, reason },
+    reason,
+    created_at: new Date().toISOString(),
+  };
+  const { error } = await supabase.rpc('archive_customer_operation', {
+    p_operation: operation,
+  });
   if (error) throw error;
 }
 
@@ -105,6 +123,7 @@ export async function getAllCustomers(restaurantId, { limit = 200 } = {}) {
     .from('customers')
     .select('id, nombre, telefono, email, puntos, notas, nacimiento, created_at')
     .eq('restaurant_id', restaurantId)
+    .is('deleted_at', null)
     .order('nombre')
     .limit(limit);
   return data || [];
@@ -119,6 +138,7 @@ export async function getTopCustomers(restaurantId, limit = 30) {
       customer_visits(total_gastado, fecha)
     `)
     .eq('restaurant_id', restaurantId)
+    .is('deleted_at', null)
     .limit(200);  // traemos más para calcular el ranking en JS
 
   return (data || [])
@@ -139,6 +159,7 @@ export async function getCustomersBirthdays(restaurantId, daysAhead = 7) {
     .from('customers')
     .select('id, nombre, telefono, email, puntos, nacimiento')
     .eq('restaurant_id', restaurantId)
+    .is('deleted_at', null)
     .not('nacimiento', 'is', null);
 
   if (!data) return [];
