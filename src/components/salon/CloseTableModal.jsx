@@ -1,9 +1,12 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { money } from '@/lib/fmt';
 import { useStore } from '@/lib/store';
+import { useToast } from '@/lib/toast';
 import { getPrinterConfig, printReceipt } from '@/lib/printer';
 import { supabase } from '@/api/supabaseClient';
 import { searchCustomers, addCustomerVisit } from '@/lib/crmApi';
+import { closeTableSchema } from '@/lib/schemas/closeTable';
+import FieldError from '@/components/ui/FieldError';
 
 const MP_POLL_INTERVAL_MS = 2000;   // cada 2s
 const MP_TIMEOUT_MS       = 60000;  // 60s máximo (C2 del plan)
@@ -22,6 +25,8 @@ function hexToRgba(hex, alpha) {
 
 export default function CloseTableModal({ table, total, branchId, onClose, onConfirmWithDiscount }) {
   const store = useStore();
+  const { addToast } = useToast();
+  const [validationErrors, setValidationErrors] = useState({});
   const [method1, setMethod1] = useState('Efectivo');
   const [method2, setMethod2] = useState(null);
   const [amount1, setAmount1] = useState('');
@@ -217,8 +222,31 @@ export default function CloseTableModal({ table, total, branchId, onClose, onCon
     : [{ metodo:method1, monto:totalConPropina }];
 
   async function handleConfirm() {
-    if (disc && !discMotivo.trim()) { setDiscMotivoError(true); return; }
-    if (!montosCuadran) return;
+    setValidationErrors({});
+    const result = closeTableSchema.safeParse({
+      method: method1,
+      discountEnabled: disc,
+      discountType: discType,
+      discountValue: parseFloat(discVal) || 0,
+      discountReason: discMotivo,
+      tip: propinaAmount,
+      clientEmail: clientEmail,
+      mixMode,
+      amount1: Number(amount1) || undefined,
+      amount2: Number(amount2) || undefined,
+    });
+    if (!result.success) {
+      const errs = {};
+      for (const issue of result.error.issues) {
+        const key = issue.path[0];
+        if (key && !errs[key]) errs[key] = issue.message;
+      }
+      setValidationErrors(errs);
+      setDiscMotivoError(!!errs.discountReason);
+      addToast('Revisá los datos antes de cerrar', 'error');
+      return;
+    }
+    if (!montosCuadran) { addToast('Los montos del pago mixto no cuadran', 'error'); return; }
 
     // Guardar primero, luego imprimir
     await onConfirmWithDiscount(finalMethod, finalTotal, disc ? discAmount : 0, discMotivo, propinaAmount, pagos);
@@ -290,7 +318,7 @@ export default function CloseTableModal({ table, total, branchId, onClose, onCon
         border:'1px solid #E2E8F0',
         boxShadow:'0 24px 64px rgba(60,60,160,0.16)',
         borderRadius:20,
-        width:440, maxWidth:'92vw', maxHeight:'100%', overflowY:'auto', WebkitOverflowScrolling:'touch', padding:'14px 16px',
+        width:'100%', maxWidth:'min(440px, 92vw)', maxHeight:'100%', overflowY:'auto', WebkitOverflowScrolling:'touch', padding:'clamp(10px, 2.5vw, 16px) clamp(10px, 2.5vw, 16px)',
         fontFamily:"'DM Sans', system-ui, sans-serif",
       }} onClick={e => e.stopPropagation()}>
 
@@ -335,11 +363,17 @@ export default function CloseTableModal({ table, total, branchId, onClose, onCon
                 </button>
               ))}
             </div>
-            <input type="number" placeholder="0" value={discVal} onChange={e => setDiscVal(e.target.value)}
-              style={{ width:90, padding:'6px 10px', border:'1px solid #E2E8F0', borderRadius:9, fontSize:13, outline:'none' }} />
-            <input placeholder="Motivo (obligatorio)" value={discMotivo}
-              onChange={e => { setDiscMotivo(e.target.value); setDiscMotivoError(false); }}
-              style={{ flex:1, minWidth:120, padding:'6px 10px', border:`1px solid ${discMotivoError ? '#EF4444' : '#E2E8F0'}`, borderRadius:9, fontSize:13, outline:'none' }} />
+            <div>
+              <input type="number" min="0" step="0.01" inputMode="decimal" placeholder="0" value={discVal} onChange={e => setDiscVal(e.target.value)}
+                style={{ width:90, padding:'6px 10px', border:`1px solid ${validationErrors.discountValue ? '#EF4444' : '#E2E8F0'}`, borderRadius:9, fontSize:13, outline:'none' }} />
+              <FieldError error={validationErrors.discountValue} />
+            </div>
+            <div style={{ flex:1, minWidth:120 }}>
+              <input placeholder="Motivo (obligatorio)" value={discMotivo}
+                onChange={e => { setDiscMotivo(e.target.value); setDiscMotivoError(false); setValidationErrors(p => ({ ...p, discountReason: undefined })); }}
+                style={{ width:'100%', padding:'6px 10px', border:`1px solid ${discMotivoError || validationErrors.discountReason ? '#EF4444' : '#E2E8F0'}`, borderRadius:9, fontSize:13, outline:'none', boxSizing:'border-box' }} />
+              <FieldError error={validationErrors.discountReason} />
+            </div>
           </div>
         )}
 
@@ -351,8 +385,8 @@ export default function CloseTableModal({ table, total, branchId, onClose, onCon
           </div>
           <div style={{ position:'relative', width:130 }}>
             <span style={{ position:'absolute', left:10, top:'50%', transform:'translateY(-50%)', fontSize:13, color:'#9CA3AF' }}>$</span>
-            <input type="number" placeholder="0" value={propina} onChange={e => setPropina(e.target.value)}
-              style={{ width:'100%', padding:'6px 10px 6px 22px', border:'1px solid rgba(239,159,39,0.3)', borderRadius:9, fontSize:13, boxSizing:'border-box', background:'white', outline:'none' }} />
+            <input type="number" min="0" step="1" inputMode="decimal" placeholder="0" value={propina} onChange={e => setPropina(e.target.value)}
+              style={{ width:'100%', padding:'6px 10px 6px 22px', border:`1px solid ${validationErrors.tip ? 'rgba(239,68,68,0.5)' : 'rgba(239,159,39,0.3)'}`, borderRadius:9, fontSize:13, boxSizing:'border-box', background:'white', outline:'none' }} />
           </div>
           {propinaAmount > 0 && <span style={{ fontSize:12, color:'#EF9F27', fontWeight:700, whiteSpace:'nowrap' }}>+{money(propinaAmount)}</span>}
         </div>
@@ -671,9 +705,7 @@ export default function CloseTableModal({ table, total, branchId, onClose, onCon
               </span>
             )}
           </div>
-          {clientEmail && !clientEmail.includes('@') && (
-            <div style={{ fontSize:11, color:'#EF4444', marginTop:3 }}>Email inválido</div>
-          )}
+          <FieldError error={clientEmail && !clientEmail.includes('@') ? 'Email inválido' : validationErrors.clientEmail} />
         </div>
 
         {/* Botones */}

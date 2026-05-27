@@ -154,3 +154,21 @@
   opacity: 0.75;
   transform: scale(0.97);
 }
+
+/* ── Responsive breakpoints ──────────────────────── */
+
+/* Phone / tablet portrait estrecho (<768px) */
+@media (max-width: 767px) {
+  .btn-pos {
+    min-height: 48px !important;
+    font-size: 14px !important;
+  }
+}
+
+/* Tablet portrait (768–1023px) */
+@media (min-width: 768px) and (max-width: 1023px) {
+  /* Reduce padding en contenedores para ganar espacio */
+  .btn-pos {
+    min-height: 52px !important;
+  }
+}

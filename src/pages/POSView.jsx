@@ -6,7 +6,7 @@ import { useToast } from '@/lib/toast';
 import { getPrinterConfig, printReceipt, printComanda } from '@/lib/printer';
 import { getAfipConfig } from '@/lib/afip';
 import FacturaModal from '../components/facturacion/FacturaModal';
-import { G } from '@/lib/glass';
+import { G, modalWidth } from '@/lib/glass';
 import { getCategoryColor } from '@/lib/menuCategories';
 import { enqueue } from '@/lib/offlineQueue';
 import { useBidirectionalSync } from '@/lib/useBidirectionalSync';
@@ -39,7 +39,7 @@ function ModModal({ item, onConfirm, onClose }) {
   const SUGERIDAS = ['Sin sal','Sin cebolla','Bien cocido','Jugoso','Sin gluten'];
   return (
     <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',zIndex:200,display:'flex',alignItems:'center',justifyContent:'center',backdropFilter:'blur(8px)'}}>
-      <div style={{background:'rgba(255,255,255,0.95)',backdropFilter:'blur(20px)',borderRadius:20,width:460,maxHeight:'85vh',display:'flex',flexDirection:'column',border:'1px solid rgba(255,255,255,0.8)',boxShadow:'0 32px 64px rgba(0,0,0,0.3)'}}>
+      <div style={{background:'rgba(255,255,255,0.95)',backdropFilter:'blur(20px)',borderRadius:20,...modalWidth(460),maxHeight:'85vh',display:'flex',flexDirection:'column',border:'1px solid rgba(255,255,255,0.8)',boxShadow:'0 32px 64px rgba(0,0,0,0.3)'}}>
         <div style={{padding:'20px 24px 14px',borderBottom:'1px solid rgba(0,0,0,0.08)',display:'flex',justifyContent:'space-between',alignItems:'start'}}>
           <div>
             <div style={{fontSize:17,fontWeight:700,color:G.text}}>{item.nombre}</div>
@@ -93,7 +93,7 @@ function NotaModal({ item, onConfirm, onClose }) {
   const S = ['Sin sal','Sin cebolla','Bien cocido','Jugoso','Sin gluten','Sin lactosa'];
   return (
     <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.6)',zIndex:200,display:'flex',alignItems:'center',justifyContent:'center',backdropFilter:'blur(8px)'}}>
-      <div style={{background:'rgba(255,255,255,0.95)',backdropFilter:'blur(20px)',borderRadius:18,width:380,border:'1px solid rgba(255,255,255,0.8)',padding:22,boxShadow:'0 24px 48px rgba(0,0,0,0.2)'}}>
+      <div style={{background:'rgba(255,255,255,0.95)',backdropFilter:'blur(20px)',borderRadius:18,...modalWidth(380),border:'1px solid rgba(255,255,255,0.8)',padding:'clamp(14px, 3vw, 22px)',boxShadow:'0 24px 48px rgba(0,0,0,0.2)'}}>
         <div style={{fontSize:15,fontWeight:700,color:G.text,marginBottom:3}}>{item.nombre}</div>
         <div style={{fontSize:11,color:G.textFaint,marginBottom:14}}>Nota para cocina</div>
         <div style={{display:'flex',flexWrap:'wrap',gap:6,marginBottom:12}}>
@@ -149,7 +149,7 @@ function CobroModal({ total, onConfirm, onClose }) {
 
   return (
     <div style={{position:'fixed',inset:0,background:'rgba(15,15,35,0.7)',zIndex:150,display:'flex',alignItems:'center',justifyContent:'center',backdropFilter:'blur(10px)'}}>
-      <div style={{background:'rgba(255,255,255,0.93)',backdropFilter:'blur(24px)',border:'1px solid rgba(255,255,255,0.85)',borderRadius:22,width:820,maxHeight:'92vh',display:'flex',flexDirection:'column',overflow:'hidden',boxShadow:'0 32px 80px rgba(60,60,160,0.18)',fontFamily:"'DM Sans',system-ui,sans-serif"}}>
+      <div style={{background:'rgba(255,255,255,0.93)',backdropFilter:'blur(24px)',border:'1px solid rgba(255,255,255,0.85)',borderRadius:22,...modalWidth(820),maxHeight:'92vh',display:'flex',flexDirection:'column',overflow:'hidden',boxShadow:'0 32px 80px rgba(60,60,160,0.18)',fontFamily:"'DM Sans',system-ui,sans-serif"}}>
         <div style={{padding:'20px 26px 16px',borderBottom:'1px solid rgba(0,0,0,0.07)',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
           <div>
             <div style={{fontSize:11,color:G.textFaint,letterSpacing:2,textTransform:'uppercase',marginBottom:3}}>Total a cobrar</div>
@@ -173,7 +173,7 @@ function CobroModal({ total, onConfirm, onClose }) {
         </div>
 
         <div style={{display:'flex',flex:1,overflow:'hidden'}}>
-          <div style={{width:280,borderRight:'1px solid rgba(0,0,0,0.07)',display:'flex',flexDirection:'column',overflow:'hidden'}}>
+          <div style={{width:'clamp(220px, 35%, 280px)',flexShrink:0,borderRight:'1px solid rgba(0,0,0,0.07)',display:'flex',flexDirection:'column',overflow:'hidden'}}>
             <div style={{display:'flex',gap:5,padding:'12px 14px',flexWrap:'wrap'}}>
               {pagos.map((p,i)=>(
                 <button key={i} onClick={()=>setActiveIdx(i)} style={{padding:'5px 10px',borderRadius:7,fontSize:11,fontWeight:600,cursor:'pointer',background:activeIdx===i?'rgba(29,158,117,0.12)':'rgba(0,0,0,0.04)',border:activeIdx===i?'1px solid '+G.teal:'1px solid rgba(0,0,0,0.1)',color:activeIdx===i?G.teal:G.textMuted,display:'flex',alignItems:'center',gap:4}}>
@@ -693,7 +693,7 @@ export default function POSView() {
           </div>
         </div>
 
-        <div style={{width:300,background:'rgba(255,255,255,0.55)',backdropFilter:'blur(20px)',borderLeft:'1px solid rgba(255,255,255,0.65)',display:'flex',flexDirection:'column',flexShrink:0}}>
+        <div style={{width:'clamp(240px, 30vw, 300px)',background:'rgba(255,255,255,0.55)',backdropFilter:'blur(20px)',borderLeft:'1px solid rgba(255,255,255,0.65)',display:'flex',flexDirection:'column',flexShrink:0}}>
           <div style={{padding:'12px 14px',borderBottom:'1px solid rgba(255,255,255,0.5)'}}>
             <div style={{fontSize:10,color:G.textFaint,textTransform:'uppercase',letterSpacing:2}}>Ticket</div>
             <div style={{fontSize:11,color:G.textFaint,marginTop:1}}>{order.length===0?'Sin items':order.reduce((s,i)=>s+i.qty,0)+' items'}</div>

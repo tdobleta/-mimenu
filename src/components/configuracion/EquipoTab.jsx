@@ -132,7 +132,7 @@ export default function EquipoTab() {
       </div>
       {showModal && (
         <div style={{ position:'fixed', inset:0, zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', backgroundColor:'rgba(0,0,0,0.4)' }} onClick={()=>!saving && setShowModal(false)}>
-          <div style={{ background:'#FFFFFF', border:'1px solid #E2E8F0', boxShadow:'0 8px 32px rgba(0,0,0,0.12)', borderRadius:14, width:420, maxWidth:'95vw', padding:24 }} onClick={e=>e.stopPropagation()}>
+          <div style={{ background:'#FFFFFF', border:'1px solid #E2E8F0', boxShadow:'0 8px 32px rgba(0,0,0,0.12)', borderRadius:14, width:'100%', maxWidth:'min(420px, 95vw)', padding:'clamp(16px, 3vw, 24px)' }} onClick={e=>e.stopPropagation()}>
             <div style={{ display:'flex', justifyContent:'space-between', marginBottom:16 }}>
               <span style={{ fontSize:15, fontWeight:600 }}>Invitar persona</span>
               <button onClick={()=>setShowModal(false)} style={{ color:'#9CA3AF', background:'none', border:'none', cursor:'pointer', display:'flex' }}>
@@ -168,7 +168,7 @@ export default function EquipoTab() {
       )}
       {shareInfo && (
         <div style={{ position:'fixed', inset:0, zIndex:1001, display:'flex', alignItems:'center', justifyContent:'center', backgroundColor:'rgba(0,0,0,0.4)' }}>
-          <div style={{ background:'#FFFFFF', border:'1px solid #E2E8F0', boxShadow:'0 8px 32px rgba(0,0,0,0.12)', borderRadius:14, width:440, maxWidth:'95vw', padding:28 }} onClick={e=>e.stopPropagation()}>
+          <div style={{ background:'#FFFFFF', border:'1px solid #E2E8F0', boxShadow:'0 8px 32px rgba(0,0,0,0.12)', borderRadius:14, width:'100%', maxWidth:'min(440px, 95vw)', padding:'clamp(18px, 3vw, 28px)' }} onClick={e=>e.stopPropagation()}>
             <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:16 }}>
               <div style={{ width:36, height:36, borderRadius:'50%', backgroundColor:'#E8F7F2', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1D9E75" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>

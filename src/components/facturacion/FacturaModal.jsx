@@ -89,7 +89,7 @@ export default function FacturaModal({ mesa, items, total, descuento = 0, restau
         border:'1px solid rgba(255,255,255,0.85)',
         boxShadow:'0 24px 64px rgba(60,60,160,0.18)',
         borderRadius:22,
-        width: 460, maxWidth:'95vw', maxHeight:'90vh',
+        width: '100%', maxWidth:'min(460px, 95vw)', maxHeight:'90vh',
         overflowY:'auto', padding:26,
         fontFamily:"'DM Sans', system-ui, sans-serif",
       }} onClick={e => e.stopPropagation()}>

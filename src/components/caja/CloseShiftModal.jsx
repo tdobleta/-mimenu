@@ -6,6 +6,8 @@ import { useAuth } from '@/lib/AuthContext';
 import useUserRole from '@/lib/useUserRole';
 import { getActiveStaff, touchActiveStaff } from '@/lib/useActiveStaff';
 import { closeCajaShiftOperation, createCloseShiftOperationId } from '@/lib/cajaShiftOperations';
+import { closeShiftSchema } from '@/lib/schemas/caja';
+import FieldError from '@/components/ui/FieldError';
 
 export default function CloseShiftModal({
   ventasPorMetodo,
@@ -25,6 +27,7 @@ export default function CloseShiftModal({
   const [motivo, setMotivo] = useState('');
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState(null);
+  const [errors, setErrors] = useState({});
   const operationIdRef = useRef(null);
 
   const arqueoNum = arqueo === '' ? null : parseFloat(arqueo) || 0;
@@ -32,6 +35,18 @@ export default function CloseShiftModal({
 
   async function confirm() {
     if (!store.turnoActivo) return;
+    setErrors({});
+    const validation = closeShiftSchema.safeParse({ arqueoEfectivo: arqueoNum || 0, motivoDiferencia: motivo });
+    if (!validation.success) {
+      const errs = {};
+      for (const issue of validation.error.issues) {
+        const key = issue.path[0];
+        if (key && !errs[key]) errs[key] = issue.message;
+      }
+      setErrors(errs);
+      addToast('Revisá los datos del cierre', 'error');
+      return;
+    }
     setSaving(true);
     setErrorMsg(null);
     try {
@@ -125,8 +140,9 @@ export default function CloseShiftModal({
         <div style={{ fontSize:12, color:'#6B7280', marginBottom:12 }}>Conta el dinero que tenes fisicamente en el cajon y escribi el total.</div>
         <div style={{ position:'relative', marginBottom:12 }}>
           <span style={{ position:'absolute', left:14, top:'50%', transform:'translateY(-50%)', fontSize:24, color:'#6B7280', fontWeight:500 }}>$</span>
-          <input type="number" value={arqueo} onChange={e=>setArqueo(e.target.value)} placeholder="0"
-            style={{ width:'100%', padding:'14px 14px 14px 36px', border: arqueoNum !== null ? '1.5px solid #1D9E75' : '1px solid #E2E8F0', borderRadius:8, fontSize:32, fontWeight:700, textAlign:'center', boxSizing:'border-box', outline:'none' }} />
+          <input type="number" min="0" step="1" inputMode="decimal" value={arqueo} onChange={e=>{ setArqueo(e.target.value); setErrors(p=>({...p, arqueoEfectivo:undefined})); }} placeholder="0"
+            style={{ width:'100%', padding:'14px 14px 14px 36px', border: errors.arqueoEfectivo ? '1.5px solid #EF4444' : arqueoNum !== null ? '1.5px solid #1D9E75' : '1px solid #E2E8F0', borderRadius:8, fontSize:32, fontWeight:700, textAlign:'center', boxSizing:'border-box', outline:'none' }} />
+          <FieldError error={errors.arqueoEfectivo} />
         </div>
         {arqueoBox && (
           <div style={{ backgroundColor:arqueoBox.bg, borderRadius:8, padding:'10px 14px', display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>

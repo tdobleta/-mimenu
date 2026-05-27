@@ -147,7 +147,7 @@ export default function SalesEditorPanel({ isOpen, onClose }) {
   return (
     <>
       <div style={{ position:'fixed', inset:0, backgroundColor:'rgba(0,0,0,0.4)', zIndex:199 }} onClick={onClose} />
-      <div style={{ position:'fixed', top:0, right:0, height:'100vh', width:520, maxWidth:'100vw', backgroundColor:'white', borderLeft:'0.5px solid rgba(0,0,0,0.08)', zIndex:200, display:'flex', flexDirection:'column', boxShadow:'-4px 0 16px rgba(0,0,0,0.06)' }}>
+      <div style={{ position:'fixed', top:0, right:0, height:'100vh', width:'min(520px, 85vw)', backgroundColor:'white', borderLeft:'0.5px solid rgba(0,0,0,0.08)', zIndex:200, display:'flex', flexDirection:'column', boxShadow:'-4px 0 16px rgba(0,0,0,0.06)' }}>
         {/* Header */}
         <div style={{ padding:'14px 20px', borderBottom:'0.5px solid rgba(0,0,0,0.08)', display:'flex', alignItems:'center', gap:10, flexShrink:0 }}>
           <div style={{ flex:1 }}>
@@ -303,7 +303,7 @@ function DetailModal({ detail, onClose }) {
 
   return (
     <div style={{ position:'fixed', inset:0, zIndex:1100, display:'flex', alignItems:'center', justifyContent:'center', backgroundColor:'rgba(0,0,0,0.5)' }} onClick={onClose}>
-      <div style={{ backgroundColor:'white', borderRadius:12, width:520, maxWidth:'95vw', maxHeight:'85vh', overflowY:'auto', padding:24 }} onClick={e=>e.stopPropagation()}>
+      <div style={{ backgroundColor:'white', borderRadius:12, width:'100%', maxWidth:'min(520px, 95vw)', maxHeight:'85vh', overflowY:'auto', padding:'clamp(16px, 3vw, 24px)' }} onClick={e=>e.stopPropagation()}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:14 }}>
           <div>
             <div style={{ fontSize:16, fontWeight:600, color:'#111827' }}>Detalle de venta — Mesa {turn.mesa_num}</div>

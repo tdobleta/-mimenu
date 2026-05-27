@@ -369,10 +369,12 @@ export function useOfflineSync() {
   useEffect(() => {
     refreshCount();
     window.addEventListener('online', sync);
+    window.addEventListener('mimenu-offline-retry', sync);
     if (navigator.onLine) sync();
     const interval = setInterval(() => { if (navigator.onLine) sync(); }, 30000);
     return () => {
       window.removeEventListener('online', sync);
+      window.removeEventListener('mimenu-offline-retry', sync);
       clearInterval(interval);
     };
   }, [sync, refreshCount]);

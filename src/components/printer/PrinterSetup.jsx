@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { getPrinterConfig, savePrinterConfig, connectEpson, disconnectEpson, getEpsonStatus, onEpsonStatusChange, printReceipt, printComanda } from '@/lib/printer';
 import { useStore } from '@/lib/store';
+import { useToast } from '@/lib/toast';
 import { G, glass, glassDeep, glassLight, labelStyle, fontDisplay } from '@/lib/glass';
 
 const STATUS_LABEL = { disconnected:'Sin conectar', connecting:'Conectando...', connected:'Conectada', error:'Error de conexión' };
@@ -38,6 +39,7 @@ function Toggle({ value, onChange, label }) {
 
 export default function PrinterSetup() {
   const store = useStore();
+  const { addToast } = useToast();
   const [cfg, setCfg] = useState(getPrinterConfig());
   const [epsonStatus, setEpsonStatus] = useState(getEpsonStatus());
   const [testingPrint, setTestingPrint] = useState(false);
@@ -57,7 +59,7 @@ export default function PrinterSetup() {
 
   async function handleConnect() {
     try { await connectEpson(cfg.epsonIp, cfg.epsonPort); }
-    catch(e) { alert(e.message); }
+    catch(e) { addToast(e.message, 'error'); }
   }
 
   async function handleTestReceipt() {
@@ -77,7 +79,7 @@ export default function PrinterSetup() {
         total: 57200,
         metodo: 'Tarjeta',
       }, cfg);
-    } catch(e) { alert('Error al imprimir: ' + e.message); }
+    } catch(e) { addToast('Error al imprimir: ' + e.message, 'error'); }
     setTestingPrint(false);
   }
 
@@ -92,7 +94,7 @@ export default function PrinterSetup() {
           { nombre: 'Tiramisú', qty: 1, nota: 'sin café' },
         ],
       }, cfg);
-    } catch(e) { alert('Error al imprimir: ' + e.message); }
+    } catch(e) { addToast('Error al imprimir: ' + e.message, 'error'); }
     setTestingPrint(false);
   }
 

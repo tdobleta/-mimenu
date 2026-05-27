@@ -7,6 +7,8 @@ import { useAuth } from '@/lib/AuthContext';
 import useUserRole from '@/lib/useUserRole';
 import { enqueue } from '@/lib/offlineQueue';
 import { getActiveStaff, touchActiveStaff } from '@/lib/useActiveStaff';
+import { retiroSchema } from '@/lib/schemas/caja';
+import FieldError from '@/components/ui/FieldError';
 
 const CONCEPTOS = ['Retiro recaudación','Pago proveedor','Gastos operativos','Otro'];
 
@@ -19,12 +21,25 @@ export default function AddRetiroModal({ onClose }) {
   const [otroTexto, setOtroTexto] = useState('');
   const [monto, setMonto] = useState('');
   const [saving, setSaving] = useState(false);
+  const [errors, setErrors] = useState({});
 
   const montoNum = parseFloat(monto) || 0;
   const conceptoFinal = concepto === 'Otro' ? otroTexto.trim() : concepto;
 
   async function confirm() {
-    if (montoNum <= 0 || !conceptoFinal || !store.turnoActivo) return;
+    setErrors({});
+    const result = retiroSchema.safeParse({ monto: montoNum, motivo: conceptoFinal });
+    if (!result.success) {
+      const errs = {};
+      for (const issue of result.error.issues) {
+        const key = issue.path[0];
+        if (key && !errs[key]) errs[key] = issue.message;
+      }
+      setErrors(errs);
+      addToast('Revisá los datos del retiro', 'error');
+      return;
+    }
+    if (!store.turnoActivo) return;
     setSaving(true);
     const retiro = { ts: Date.now(), concepto: conceptoFinal, monto: montoNum };
     try {
@@ -69,15 +84,19 @@ export default function AddRetiroModal({ onClose }) {
           {CONCEPTOS.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
         {concepto === 'Otro' && (
-          <input value={otroTexto} onChange={e=>setOtroTexto(e.target.value)} placeholder="Describí el concepto"
-            style={{ width:'100%', padding:'8px 10px', border:'1px solid #E2E8F0', borderRadius:8, fontSize:13, marginBottom:14, boxSizing:'border-box' }} />
+          <div style={{ marginBottom:14 }}>
+            <input value={otroTexto} onChange={e=>{ setOtroTexto(e.target.value); setErrors(p=>({...p, motivo:undefined})); }} placeholder="Describí el concepto (mín. 4 caracteres)"
+              style={{ width:'100%', padding:'8px 10px', border:`1px solid ${errors.motivo ? '#EF4444' : '#E2E8F0'}`, borderRadius:8, fontSize:13, boxSizing:'border-box' }} />
+            <FieldError error={errors.motivo} />
+          </div>
         )}
 
         <div style={{ fontSize:12, color:'#6B7280', marginBottom:6 }}>Monto</div>
         <div style={{ position:'relative', marginBottom:18 }}>
           <span style={{ position:'absolute', left:12, top:'50%', transform:'translateY(-50%)', fontSize:16, color:'#6B7280', fontWeight:500 }}>$</span>
-          <input type="number" value={monto} onChange={e=>setMonto(e.target.value)} placeholder="0"
-            style={{ width:'100%', padding:'10px 12px 10px 28px', border:'1px solid #E2E8F0', borderRadius:8, fontSize:16, fontWeight:600, boxSizing:'border-box' }} />
+          <input type="number" min="0.01" step="0.01" inputMode="decimal" value={monto} onChange={e=>{ setMonto(e.target.value); setErrors(p=>({...p, monto:undefined})); }} placeholder="0"
+            style={{ width:'100%', padding:'10px 12px 10px 28px', border:`1px solid ${errors.monto ? '#EF4444' : '#E2E8F0'}`, borderRadius:8, fontSize:16, fontWeight:600, boxSizing:'border-box' }} />
+          <FieldError error={errors.monto} />
         </div>
 
         <div style={{ display:'flex', gap:8 }}>

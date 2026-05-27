@@ -3,7 +3,7 @@ import { Outlet } from 'react-router-dom';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
-import { APP_BG } from '@/lib/glass';
+import { APP_BG, containerPad } from '@/lib/glass';
 import MimenuChatbot from './MimenuChatbot';
 
 // Banner de actualización del Service Worker.
@@ -58,7 +58,7 @@ export default function Layout() {
       {mob && (
         <div style={{ position:'fixed', inset:0, zIndex:50 }} className="md:hidden">
           <div style={{ position:'absolute', inset:0, backgroundColor:'rgba(15,15,35,0.45)', backdropFilter:'blur(4px)' }} onClick={() => setMob(false)} />
-          <div style={{ position:'absolute', left:0, top:0, height:'100%', width:220, zIndex:51 }}>
+          <div style={{ position:'absolute', left:0, top:0, height:'100%', width:'clamp(200px, 60vw, 260px)', zIndex:51 }}>
             <Sidebar onClose={() => setMob(false)} />
           </div>
         </div>
@@ -67,7 +67,7 @@ export default function Layout() {
       {/* Main content */}
       <div style={{ flex:1, display:'flex', flexDirection:'column', minWidth:0, overflow:'hidden', position:'relative', zIndex:1 }}>
         <Topbar onMobile={() => setMob(v => !v)} />
-        <main style={{ flex:1, overflowY:'auto', padding:24 }}>
+        <main style={{ flex:1, overflowY:'auto', ...containerPad }}>
           <Outlet />
         </main>
       </div>

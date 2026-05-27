@@ -181,17 +181,8 @@ export default function Reservas() {
       </div>
 
       <div style={{ backgroundColor:'white', border:'0.5px solid rgba(0,0,0,0.08)', borderRadius:10, overflowX:'auto' }}>
-        <table style={{ width:'100%', tableLayout:'fixed', borderCollapse:'collapse', fontSize:13, minWidth:795 }}>
-          <colgroup>
-            <col style={{ width:65 }} />
-            <col style={{ width:200 }} />
-            <col style={{ width:75 }} />
-            <col style={{ width:65 }} />
-            <col style={{ width:85 }} />
-            {showSucursalCol && <col style={{ width:130 }} />}
-            <col style={{ width:105 }} />
-            <col style={{ width:200 }} />
-          </colgroup>
+        <table style={{ width:'100%', tableLayout:'auto', borderCollapse:'collapse', fontSize:13, minWidth:600 }}>
+
           <thead style={{ backgroundColor:'#F9FAFB' }}>
             <tr>
               {['Hora','Cliente','Personas','Mesa','Canal',...(showSucursalCol?['Sucursal']:[]),'Estado','Acciones'].map(h=>(
@@ -377,7 +368,7 @@ function LinkModal({ onClose, sucursal }) {
   );
   return (
     <div style={{ position:'fixed', inset:0, zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', backgroundColor:'rgba(0,0,0,0.4)' }} onClick={onClose}>
-      <div style={{ backgroundColor:'white', borderRadius:12, width:460, maxWidth:'95vw', padding:24 }} onClick={e=>e.stopPropagation()}>
+      <div style={{ backgroundColor:'white', borderRadius:12, width:'100%', maxWidth:'min(460px, 95vw)', padding:'clamp(16px, 3vw, 24px)' }} onClick={e=>e.stopPropagation()}>
         <div style={{ display:'flex', justifyContent:'space-between', marginBottom:16 }}>
           <span style={{ fontSize:15, fontWeight:600 }}>Link de reservas</span>
           <button onClick={onClose} style={{ color:'#9CA3AF', background:'none', border:'none', cursor:'pointer' }}>

@@ -44,7 +44,7 @@ export default function Login() {
       fontFamily: "'DM Sans', 'Inter', sans-serif", padding: 20,
     }}>
       <div style={{
-        backgroundColor: 'white', borderRadius: 16, padding: 40,
+        backgroundColor: 'white', borderRadius: 16, padding: 'clamp(20px, 5vw, 40px)',
         width: '100%', maxWidth: 400, boxShadow: '0 4px 24px rgba(0,0,0,0.08)',
       }}>
         {/* Logo */}

@@ -8,6 +8,7 @@ import useUserRole from '@/lib/useUserRole';
 import { G, glassLight } from '@/lib/glass';
 import { useKitchenNotifications } from '@/lib/useKitchenNotifications';
 import KitchenNotifDropdown from './KitchenNotifDropdown';
+import { countFailed, retryFailed } from '@/lib/offlineQueue';
 
 const ROLE_BADGE = {
   Dueno:     { bg:'rgba(29,158,117,0.12)', c:G.teal,   label:'Dueño' },
@@ -44,6 +45,27 @@ export default function Topbar({ onMobile }) {
   const ref = useRef();
   const userRef = useRef();
   void alertsRef;
+
+  // Dead letters — operaciones offline que fallaron permanentemente
+  const [failedCount, setFailedCount] = useState(0);
+  const [retrying, setRetrying] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    const check = () => countFailed().then(n => { if (!cancelled) setFailedCount(n); }).catch(() => {});
+    check();
+    const timer = setInterval(check, 30000);
+    return () => { cancelled = true; clearInterval(timer); };
+  }, []);
+
+  const handleRetryFailed = async () => {
+    setRetrying(true);
+    try {
+      await retryFailed();
+      setFailedCount(0);
+      window.dispatchEvent(new CustomEvent('mimenu-offline-retry'));
+    } catch { /* ignore */ }
+    setRetrying(false);
+  };
 
   useEffect(() => {
     const fn = (e) => {
@@ -149,6 +171,32 @@ export default function Topbar({ onMobile }) {
           {kitchenOpen && <KitchenNotifDropdown notifs={notifs} onClose={() => setKitchenOpen(false)} onClear={clearAll} />}
           <style>{`@keyframes kitchenPing{0%,100%{transform:scale(1)}50%{transform:scale(1.2)}}`}</style>
         </div>
+
+        {/* Dead letters — operaciones fallidas */}
+        {failedCount > 0 && (
+          <button
+            onClick={handleRetryFailed}
+            disabled={retrying}
+            title={`${failedCount} operación(es) fallida(s) — click para reintentar`}
+            style={{
+              position:'relative', background:'rgba(239,68,68,0.08)', border:'1.5px solid rgba(239,68,68,0.3)',
+              width:34, height:34, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center',
+              cursor: retrying ? 'wait' : 'pointer', padding:0,
+            }}
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth="2.5">
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+            <span style={{
+              position:'absolute', top:-4, right:-4, minWidth:16, height:16, background:'#EF4444',
+              borderRadius:99, display:'flex', alignItems:'center', justifyContent:'center',
+              fontSize:9, fontWeight:700, color:'white', border:'2px solid white', padding:'0 3px',
+            }}>
+              {failedCount > 9 ? '9+' : failedCount}
+            </span>
+          </button>
+        )}
 
         {/* Alertas stock */}
         <div style={{ position:'relative', cursor:'pointer' }} onClick={() => setAlertsOpen(v=>!v)}>

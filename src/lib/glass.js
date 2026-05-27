@@ -76,6 +76,31 @@ export const bigNumStyle = {
   lineHeight: 1.1,
 };
 
+// ─── Responsive ──────────────────────────────────────────────────────────────
+
+// Breakpoints (px) — alineados con Tailwind defaults
+export const BP = { sm: 640, md: 768, lg: 1024, xl: 1280 };
+
+// Media query strings para window.matchMedia() en hooks JS
+export const MQ = {
+  sm: `(min-width: ${BP.sm}px)`,
+  md: `(min-width: ${BP.md}px)`,
+  lg: `(min-width: ${BP.lg}px)`,
+  xl: `(min-width: ${BP.xl}px)`,
+};
+
+// Ancho de modal responsive — reemplaza todos los width:XXX hardcodeados
+// Uso: <div style={{ ...modalWidth(460), ... }}>
+export const modalWidth = (maxPx) => ({
+  width: '100%',
+  maxWidth: `min(${maxPx}px, 95vw)`,
+});
+
+// Padding responsive para contenedores principales
+export const containerPad = {
+  padding: 'clamp(12px, 3vw, 24px)',
+};
+
 // Colores por estado de mesa
 export const tableStatusColor = {
   ocupada:   G.teal,

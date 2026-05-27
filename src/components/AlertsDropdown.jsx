@@ -13,7 +13,7 @@ export default function AlertsDropdown({ alerts = [], onClose }) {
 
   return (
     <div ref={ref} className="absolute right-0 top-8 bg-white z-50"
-      style={{ width: 300, border: '0.5px solid hsl(var(--border))', borderRadius: 6 }}>
+      style={{ width: 'min(300px, 90vw)', border: '0.5px solid hsl(var(--border))', borderRadius: 6 }}>
       <div className="px-3 py-2" style={{ borderBottom: '0.5px solid hsl(var(--border))', fontSize: 12, fontWeight: 500 }}>
         Notificaciones
       </div>

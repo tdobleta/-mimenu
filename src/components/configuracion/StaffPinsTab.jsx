@@ -102,7 +102,7 @@ function StaffModal({ member, branchId, onSave, onClose }) {
 
   return (
     <div style={{ position:'fixed', inset:0, zIndex:9999, background:'rgba(15,23,42,0.5)', display:'flex', alignItems:'center', justifyContent:'center', padding:16 }} onClick={onClose}>
-      <div style={{ background:'#FFF', borderRadius:16, padding:24, width:380, maxWidth:'100%', maxHeight:'90vh', overflowY:'auto', boxShadow:'0 24px 64px rgba(0,0,0,0.18)', fontFamily:"'DM Sans', system-ui, sans-serif" }} onClick={e => e.stopPropagation()}>
+      <div style={{ background:'#FFF', borderRadius:16, padding:'clamp(16px, 3vw, 24px)', width:'100%', maxWidth:'min(380px, 95vw)', maxHeight:'90vh', overflowY:'auto', boxShadow:'0 24px 64px rgba(0,0,0,0.18)', fontFamily:"'DM Sans', system-ui, sans-serif" }} onClick={e => e.stopPropagation()}>
         <div style={{ fontSize:16, fontWeight:700, color:G.text, marginBottom:18 }}>
           {isNew ? 'Nuevo mozo' : `Editar - ${member.nombre}`}
         </div>

@@ -96,6 +96,90 @@ describe('buildCloseTableOperation', () => {
     expect(payload.pagosDetalle).toEqual([{ metodo: 'Efectivo', monto: 2000 }]);
   });
 
+  it('throws when branchId is missing', () => {
+    expect(() =>
+      buildCloseTableOperation({
+        table: { id: 1, num: 1, order: [] },
+        method: 'Efectivo',
+        finalTotal: 0,
+        storage: memoryStorage(),
+      })
+    ).toThrow('branchId');
+  });
+
+  it('throws when table is missing', () => {
+    expect(() =>
+      buildCloseTableOperation({
+        branchId: 'b-1',
+        method: 'Efectivo',
+        finalTotal: 0,
+        storage: memoryStorage(),
+      })
+    ).toThrow('table');
+  });
+
+  it('throws when method is missing', () => {
+    expect(() =>
+      buildCloseTableOperation({
+        branchId: 'b-1',
+        table: { id: 1, num: 1, order: [] },
+        finalTotal: 0,
+        storage: memoryStorage(),
+      })
+    ).toThrow('method');
+  });
+
+  it('handles table with empty order', () => {
+    const op = buildCloseTableOperation({
+      branchId: 'b-1',
+      table: { id: 1, num: 1, order: [] },
+      method: 'Efectivo',
+      finalTotal: 0,
+      storage: memoryStorage(),
+      now: () => new Date('2026-01-01T00:00:00Z'),
+    });
+    expect(op.items_snapshot).toHaveLength(0);
+    expect(op.pricing.subtotal).toBe(0);
+    expect(op.pricing.total_charged).toBe(0);
+  });
+
+  it('handles mixed payment with multiple pagos', () => {
+    const op = buildCloseTableOperation({
+      branchId: 'b-1',
+      table: { id: 1, num: 1, order: [{ nombre: 'Item', precio: 2000, qty: 1 }] },
+      method: 'Mixto',
+      finalTotal: 2000,
+      pagos: [
+        { metodo: 'Efectivo', monto: 1000 },
+        { metodo: 'Tarjeta', monto: 1000 },
+      ],
+      storage: memoryStorage(),
+      now: () => new Date('2026-01-01T00:00:00Z'),
+    });
+    expect(op.payment.payments_detail).toHaveLength(2);
+    expect(op.payment.payments_detail[0].amount).toBe(1000);
+    expect(op.payment.payments_detail[1].amount).toBe(1000);
+  });
+
+  it('calculates correct subtotal from order items', () => {
+    const op = buildCloseTableOperation({
+      branchId: 'b-1',
+      table: {
+        id: 1, num: 1,
+        order: [
+          { nombre: 'Lomo', precio: 15000, qty: 2 },
+          { nombre: 'Agua', precio: 1500, qty: 3 },
+          { nombre: 'Postre', precio: 5000, qty: 1 },
+        ],
+      },
+      method: 'Efectivo',
+      finalTotal: 39500,
+      storage: memoryStorage(),
+      now: () => new Date('2026-01-01T00:00:00Z'),
+    });
+    expect(op.pricing.subtotal).toBe(15000 * 2 + 1500 * 3 + 5000);
+  });
+
   it('derives sync payload from the full operation when legacy fields are absent', () => {
     const operation = buildCloseTableOperation({
       restaurantId: 'rest-1',

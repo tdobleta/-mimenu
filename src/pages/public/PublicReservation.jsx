@@ -69,7 +69,7 @@ export default function PublicReservation() {
   if (sent) {
     return (
       <div style={{ minHeight:'100vh', backgroundColor:'#F6F8FA', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:"'DM Sans', sans-serif", padding:20 }}>
-        <div style={{ backgroundColor:'white', borderRadius:16, padding:40, maxWidth:440, width:'100%', textAlign:'center', boxShadow:'0 4px 24px rgba(0,0,0,0.08)' }}>
+        <div style={{ backgroundColor:'white', borderRadius:16, padding:'clamp(20px, 5vw, 40px)', maxWidth:440, width:'100%', textAlign:'center', boxShadow:'0 4px 24px rgba(0,0,0,0.08)' }}>
           <div style={{ width:64, height:64, borderRadius:'50%', backgroundColor:'#E8F7F2', display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 20px' }}>
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#1D9E75" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
           </div>

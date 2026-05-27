@@ -797,7 +797,7 @@ export default function Stock() {
       {/* ── MODAL AGREGAR INGREDIENTE ── */}
       {showAdd && (
         <div style={{ position:'fixed', inset:0, zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(15,15,35,0.5)', backdropFilter:'blur(4px)' }} onClick={() => setShowAdd(false)}>
-          <div style={{ background:'rgba(255,255,255,0.92)', backdropFilter:'blur(24px)', border:'1px solid rgba(255,255,255,0.85)', boxShadow:'0 24px 64px rgba(60,60,160,0.16)', borderRadius:20, width:440, maxWidth:'95vw', padding:24, fontFamily:"'DM Sans', system-ui, sans-serif" }} onClick={e=>e.stopPropagation()}>
+          <div style={{ background:'rgba(255,255,255,0.92)', backdropFilter:'blur(24px)', border:'1px solid rgba(255,255,255,0.85)', boxShadow:'0 24px 64px rgba(60,60,160,0.16)', borderRadius:20, width:'100%', maxWidth:'min(440px, 95vw)', padding:'clamp(16px, 3vw, 24px)', fontFamily:"'DM Sans', system-ui, sans-serif" }} onClick={e=>e.stopPropagation()}>
             <div style={{ fontSize:16, fontWeight:700, color:G.text, fontFamily:fontDisplay, marginBottom:18 }}>Nuevo ingrediente</div>
             <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
               <div>
@@ -843,7 +843,7 @@ export default function Stock() {
       {/* ── MODAL EGRESO ── */}
       {showEgresoModal && (
         <div style={{ position:'fixed', inset:0, zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(15,15,35,0.5)', backdropFilter:'blur(4px)' }} onClick={()=>setShowEgresoModal(false)}>
-          <div style={{ background:'rgba(255,255,255,0.92)', backdropFilter:'blur(24px)', border:'1px solid rgba(255,255,255,0.85)', boxShadow:'0 24px 64px rgba(60,60,160,0.16)', borderRadius:20, width:400, maxWidth:'95vw', padding:24, fontFamily:"'DM Sans', system-ui, sans-serif" }} onClick={e=>e.stopPropagation()}>
+          <div style={{ background:'rgba(255,255,255,0.92)', backdropFilter:'blur(24px)', border:'1px solid rgba(255,255,255,0.85)', boxShadow:'0 24px 64px rgba(60,60,160,0.16)', borderRadius:20, width:'100%', maxWidth:'min(400px, 95vw)', padding:'clamp(16px, 3vw, 24px)', fontFamily:"'DM Sans', system-ui, sans-serif" }} onClick={e=>e.stopPropagation()}>
             <div style={{ fontSize:16, fontWeight:700, color:G.text, fontFamily:fontDisplay, marginBottom:18 }}>Registrar egreso</div>
             <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
               <div>
@@ -884,7 +884,7 @@ export default function Stock() {
       {/* ── MODAL INGRESO/COMPRA ── */}
       {showIngresoModal && (
         <div style={{ position:'fixed', inset:0, zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(15,15,35,0.5)' }} onClick={()=>setShowIngresoModal(false)}>
-          <div style={{ background:'#FFFFFF', border:'1px solid #E2E8F0', boxShadow:'0 24px 64px rgba(60,60,160,0.16)', borderRadius:20, width:440, maxWidth:'95vw', padding:24, fontFamily:FONT_UI }} onClick={e=>e.stopPropagation()}>
+          <div style={{ background:'#FFFFFF', border:'1px solid #E2E8F0', boxShadow:'0 24px 64px rgba(60,60,160,0.16)', borderRadius:20, width:'100%', maxWidth:'min(440px, 95vw)', padding:'clamp(16px, 3vw, 24px)', fontFamily:FONT_UI }} onClick={e=>e.stopPropagation()}>
             <div style={{ fontSize:16, fontWeight:700, color:G.text, marginBottom:18 }}>Registrar compra / ingreso</div>
             <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
               <div>
@@ -934,7 +934,7 @@ export default function Stock() {
       {/* Confirmar eliminación */}
       {delConfirm && (
         <div style={{ position:'fixed', inset:0, zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(15,15,35,0.5)', backdropFilter:'blur(4px)' }} onClick={()=>setDelConfirm(null)}>
-          <div style={{ background:'rgba(255,255,255,0.92)', backdropFilter:'blur(24px)', border:'1px solid rgba(255,255,255,0.85)', borderRadius:18, padding:24, width:320, fontFamily:"'DM Sans', system-ui, sans-serif" }} onClick={e=>e.stopPropagation()}>
+          <div style={{ background:'rgba(255,255,255,0.92)', backdropFilter:'blur(24px)', border:'1px solid rgba(255,255,255,0.85)', borderRadius:18, padding:'clamp(16px, 3vw, 24px)', width:'100%', maxWidth:'min(320px, 90vw)', fontFamily:"'DM Sans', system-ui, sans-serif" }} onClick={e=>e.stopPropagation()}>
             <p style={{ fontSize:14, color:G.text, marginBottom:4, fontWeight:600 }}>¿Eliminar <strong>{delConfirm.nombre}</strong>?</p>
             <p style={{ fontSize:12, color:G.textFaint, marginBottom:18 }}>Esta acción no se puede deshacer.</p>
             <div style={{ display:'flex', gap:8 }}>

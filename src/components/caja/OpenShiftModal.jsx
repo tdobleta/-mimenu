@@ -6,6 +6,8 @@ import { useAuth } from '@/lib/AuthContext';
 import useUserRole from '@/lib/useUserRole';
 import { getActiveStaff, touchActiveStaff } from '@/lib/useActiveStaff';
 import { createOpenShiftOperationId, openCajaShiftOperation } from '@/lib/cajaShiftOperations';
+import { openShiftSchema } from '@/lib/schemas/caja';
+import FieldError from '@/components/ui/FieldError';
 
 const TIPOS = [
   { key:'manana', label:'Mañana', horario:'7:00 — 13:00' },
@@ -22,6 +24,7 @@ export default function OpenShiftModal({ onClose }) {
   const [tipo, setTipo] = useState('manana');
   const [fondo, setFondo] = useState('');
   const [saving, setSaving] = useState(false);
+  const [errors, setErrors] = useState({});
   const operationIdRef = useRef(null);
 
   // Eliminar puntos de miles (formato argentino: "10.000" = diez mil, no diez)
@@ -31,6 +34,18 @@ export default function OpenShiftModal({ onClose }) {
 
   async function confirm() {
     if (!branchId) return;
+    setErrors({});
+    const validation = openShiftSchema.safeParse({ fondoInicial: fondoNum, tipoTurno: tipo });
+    if (!validation.success) {
+      const errs = {};
+      for (const issue of validation.error.issues) {
+        const key = issue.path[0];
+        if (key && !errs[key]) errs[key] = issue.message;
+      }
+      setErrors(errs);
+      addToast('Revisá los datos del turno', 'error');
+      return;
+    }
     setSaving(true);
     try {
       const now = new Date().toISOString();
@@ -95,8 +110,9 @@ export default function OpenShiftModal({ onClose }) {
         <div style={{ fontSize:12, color:'#6B7280', marginBottom:6 }}>Fondo de caja inicial</div>
         <div style={{ position:'relative', marginBottom:6 }}>
           <span style={{ position:'absolute', left:12, top:'50%', transform:'translateY(-50%)', fontSize:18, color:'#6B7280', fontWeight:500 }}>$</span>
-          <input type="number" value={fondo} onChange={e=>setFondo(e.target.value)} placeholder="0"
-            style={{ width:'100%', padding:'12px 12px 12px 28px', border:'1px solid #E2E8F0', borderRadius:8, fontSize:18, fontWeight:600, boxSizing:'border-box' }} />
+          <input type="number" min="0" step="1" inputMode="decimal" value={fondo} onChange={e=>{ setFondo(e.target.value); setErrors(p=>({...p, fondoInicial:undefined})); }} placeholder="0"
+            style={{ width:'100%', padding:'12px 12px 12px 28px', border:`1px solid ${errors.fondoInicial ? '#EF4444' : '#E2E8F0'}`, borderRadius:8, fontSize:18, fontWeight:600, boxSizing:'border-box' }} />
+          <FieldError error={errors.fondoInicial} />
         </div>
         <div style={{ fontSize:11, color:'#9CA3AF', marginBottom:14, lineHeight:'15px' }}>
           El dinero en efectivo que hay en el cajón al empezar el turno (cambio, efectivo previo)

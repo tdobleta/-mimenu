@@ -107,7 +107,7 @@ const AuthenticatedApp = () => {
 
   if (isInvitedUser) return (
     <div style={{ minHeight:'100vh', backgroundColor:'#F6F8FA', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:"'DM Sans', sans-serif", padding:20 }}>
-      <div style={{ backgroundColor:'white', borderRadius:16, padding:40, maxWidth:420, width:'100%', textAlign:'center', boxShadow:'0 4px 24px rgba(0,0,0,0.08)' }}>
+      <div style={{ backgroundColor:'white', borderRadius:16, padding:'clamp(20px, 5vw, 40px)', maxWidth:420, width:'100%', textAlign:'center', boxShadow:'0 4px 24px rgba(0,0,0,0.08)' }}>
         <div style={{ width:56, height:56, borderRadius:'50%', backgroundColor:'#FEF9C3', display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 20px' }}>
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#CA8A04" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
         </div>
@@ -141,7 +141,7 @@ const RoutedApp = () => {
   if (needsOnboarding) return <OnboardingFlow />;
   if (role === null) return (
     <div style={{ minHeight:'100vh', backgroundColor:'#F6F8FA', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:"'DM Sans', sans-serif", padding:20 }}>
-      <div style={{ backgroundColor:'white', borderRadius:16, padding:40, maxWidth:400, width:'100%', textAlign:'center', boxShadow:'0 4px 24px rgba(0,0,0,0.08)' }}>
+      <div style={{ backgroundColor:'white', borderRadius:16, padding:'clamp(20px, 5vw, 40px)', maxWidth:400, width:'100%', textAlign:'center', boxShadow:'0 4px 24px rgba(0,0,0,0.08)' }}>
         <div style={{ width:52, height:52, borderRadius:'50%', backgroundColor:'#FEE2E2', display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 20px' }}>
           <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
         </div>

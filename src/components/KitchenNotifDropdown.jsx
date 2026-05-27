@@ -21,7 +21,7 @@ export default function KitchenNotifDropdown({ notifs, onClose, onClear }) {
   return (
     <div ref={ref} style={{
       position:'absolute', top:42, right:0,
-      width:300,
+      width:'min(300px, 90vw)',
       background:'rgba(255,255,255,0.96)',
       backdropFilter:'blur(24px)',
       WebkitBackdropFilter:'blur(24px)',

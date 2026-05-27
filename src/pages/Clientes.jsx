@@ -84,7 +84,7 @@ function CustomerModal({ customer, restaurantId, onSave, onClose }) {
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(15,23,42,0.40)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
       onClick={onClose}>
-      <div style={{ background: '#FFF', borderRadius: 16, padding: '20px 22px', width: 420, maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 24px 64px rgba(0,0,0,0.18)', fontFamily: FONT }}
+      <div style={{ background: '#FFF', borderRadius: 16, padding: '20px 22px', width: '100%', maxWidth: 'min(420px, 95vw)', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 24px 64px rgba(0,0,0,0.18)', fontFamily: FONT }}
         onClick={e => e.stopPropagation()}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
           <span style={{ fontSize: 15, fontWeight: 700, color: '#0F172A' }}>

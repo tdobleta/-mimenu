@@ -513,7 +513,7 @@ function NuevoPedidoModal({ branchId, store, addToast, onClose, onCreated }) {
   return (
     <div style={{ position:'fixed', inset:0, zIndex:9999, background:'rgba(15,15,35,0.45)', display:'flex', alignItems:'flex-start', justifyContent:'center', padding:'16px 8px', overflow:'auto' }}
       onClick={onClose}>
-      <div style={{ background:'#FFFFFF', border:'1px solid #E2E8F0', borderRadius:18, width:520, maxWidth:'95vw', boxShadow:'0 24px 64px rgba(0,0,0,0.18)', fontFamily:"'DM Sans', system-ui, sans-serif" }}
+      <div style={{ background:'#FFFFFF', border:'1px solid #E2E8F0', borderRadius:18, width:'100%', maxWidth:'min(520px, 95vw)', boxShadow:'0 24px 64px rgba(0,0,0,0.18)', fontFamily:"'DM Sans', system-ui, sans-serif" }}
         onClick={e => e.stopPropagation()}>
 
         {/* Header */}
