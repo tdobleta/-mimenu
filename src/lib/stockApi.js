@@ -275,40 +275,23 @@ export async function addIngreso(branchId, { stockItemId, cantidad, costoUnit, p
   const cantNum = Number(cantidad) || 0;
   if (cantNum <= 0) throw new Error('La cantidad debe ser mayor a 0');
 
-  // 1. Insertar en stock_ingresos
-  const { data: ingreso, error: ingError } = await supabase
-    .from('stock_ingresos')
-    .insert({
-      branch_id:    branchId,
-      stock_item_id: stockItemId,
-      cantidad:     cantNum,
-      costo_unit:   costoUnit ? Number(costoUnit) : null,
-      proveedor:    proveedor || null,
-      notas:        notas || null,
-      usuario:      usuario || null,
-      fecha:        new Date().toISOString(),
-    })
-    .select()
-    .single();
-  if (ingError) throw ingError;
+  const clientUid = `ingreso_${branchId}_${stockItemId}_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+  const { data, error } = await supabase.rpc('increment_stock_with_ingreso', {
+    p_branch_id:     branchId,
+    p_stock_item_id: stockItemId,
+    p_qty:           cantNum,
+    p_costo_unit:    costoUnit ? Number(costoUnit) : null,
+    p_proveedor:     proveedor || null,
+    p_notas:         notas || null,
+    p_usuario:       usuario || null,
+    p_client_uid:    clientUid,
+  });
+  if (error) throw error;
 
-  // 2. Leer stock actual y sumar la cantidad
-  const { data: item, error: readErr } = await supabase
-    .from('stock_items')
-    .select('actual')
-    .eq('id', stockItemId)
-    .single();
-  if (readErr) throw readErr;
-
-  const nuevoActual = (Number(item?.actual) || 0) + cantNum;
-
-  const { error: updError } = await supabase
-    .from('stock_items')
-    .update({ actual: nuevoActual })
-    .eq('id', stockItemId);
-  if (updError) throw updError;
-
-  return { ingreso, nuevoActual };
+  return {
+    ingreso: data?.ingreso_id ? { id: data.ingreso_id, branch_id: branchId, stock_item_id: stockItemId, cantidad: cantNum, costo_unit: costoUnit ? Number(costoUnit) : null, proveedor: proveedor || null, notas: notas || null, usuario: usuario || null, fecha: new Date().toISOString() } : null,
+    nuevoActual: Number(data?.actual || 0),
+  };
 }
 
 
@@ -350,4 +333,27 @@ export async function addEgreso(branchId, {
   // 23505 = unique_violation en client_uid → egreso ya registrado → éxito silencioso
   if (error && error.code !== '23505') throw error;
   return data || null;
+}
+
+export async function decrementStockWithEgreso(branchId, {
+  stockItemId,
+  ingredienteNombre,
+  cantidad,
+  unidad,
+  motivo,
+  origen = 'manual',
+  clientUid = null,
+}) {
+  const { data, error } = await supabase.rpc('decrement_stock_with_egreso', {
+    p_branch_id:          branchId,
+    p_stock_item_id:      stockItemId,
+    p_qty:                Number(cantidad),
+    p_ingrediente_nombre: ingredienteNombre || '',
+    p_unidad:             unidad || '',
+    p_motivo:             motivo || '',
+    p_origen:             origen,
+    p_client_uid:         clientUid || `egreso_${branchId}_${stockItemId}_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+  });
+  if (error) throw error;
+  return data || { ok: true };
 }

@@ -11,8 +11,9 @@ import MenuTab from '../components/configuracion/MenuTab';
 import {
   fetchRecetas, saveReceta,
   fetchPrecios, savePrecio,
-  fetchEgresos, addEgreso as dbAddEgreso,
+  fetchEgresos,
   fetchIngresos, addIngreso as dbAddIngreso,
+  decrementStockWithEgreso,
 } from '@/lib/stockApi';
 
 const CARD    = { background:'#FFFFFF', border:'1px solid #E2E8F0', boxShadow:'0 1px 3px rgba(0,0,0,0.06)', borderRadius:12 };
@@ -235,17 +236,29 @@ export default function Stock() {
     const bid         = it.sucursalId || activeBranch;
     const motivoFinal = egresoForm.motivo === 'Otro' ? egresoForm.motivoCustom : egresoForm.motivo;
     try {
-      await base44.entities.StockItem.update(it.id, { actual: nuevoStock });
-      store.updateStockItem(bid, it.id, { actual: nuevoStock });
-      const nuevoEgreso = await dbAddEgreso(bid, {
-        ingredienteId: it.id,
+      const result = await decrementStockWithEgreso(bid, {
+        stockItemId: it.id,
         ingredienteNombre: it.nombre,
         cantidad,
         unidad: egresoUnidad,
         motivo: motivoFinal,
         origen: 'manual',
       });
-      setEgresos(prev => [nuevoEgreso, ...prev]);
+      const nuevoStockFinal = Number(result?.actual ?? nuevoStock);
+      store.updateStockItem(bid, it.id, { actual: nuevoStockFinal });
+      if (result?.egreso_id) {
+        setEgresos(prev => [{
+          id: result.egreso_id,
+          branch_id: bid,
+          ingrediente_id: it.id,
+          ingrediente_nombre: it.nombre,
+          cantidad,
+          unidad: egresoUnidad,
+          motivo: motivoFinal,
+          origen: 'manual',
+          ts: new Date().toISOString(),
+        }, ...prev]);
+      }
       store.logAccion({ usuario:user?.email||'Sistema', rol:userRole, categoria:'Stock', accion:'Egreso registrado', detalle:`-${cantidad} ${egresoUnidad} de ${it.nombre} · ${motivoFinal}`, sucursal:store.sucursales.find(s=>s.id===bid)?.nombre||'' });
       addToast(`Egreso: -${cantidad} ${egresoUnidad} de ${it.nombre}`, 'success');
       setShowEgresoModal(false);
@@ -294,14 +307,13 @@ export default function Stock() {
       const diff = contado - Number(it.actual);
       const bid = it.sucursalId || activeBranch;
       try {
-        await base44.entities.StockItem.update(it.id, { actual: contado });
-        store.updateStockItem(bid, it.id, { actual: contado });
         // Registrar ajuste como movimiento
         if (diff > 0) {
           await dbAddIngreso(bid, { stockItemId:it.id, cantidad:diff, notas:'Ajuste inventario', usuario:user?.email }).catch(()=>{});
         } else {
-          await dbAddEgreso(bid, { ingredienteId:it.id, ingredienteNombre:it.nombre, cantidad:Math.abs(diff), unidad:it.unidad, motivo:'Ajuste inventario', origen:'recuento' });
+          await decrementStockWithEgreso(bid, { stockItemId:it.id, ingredienteNombre:it.nombre, cantidad:Math.abs(diff), unidad:it.unidad, motivo:'Ajuste inventario', origen:'recuento' });
         }
+        store.updateStockItem(bid, it.id, { actual: contado });
         ok++;
       } catch(e) {}
     }
