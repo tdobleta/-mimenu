@@ -42,6 +42,7 @@ export default function CloseTableModal({ table, total, branchId, onClose, onCon
   const [printError, setPrintError] = useState('');
   const [clientEmail, setClientEmail] = useState(() => localStorage.getItem(LAST_EMAIL_KEY) || '');
   const [sendingEmail, setSendingEmail] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // CRM — identificación de cliente y puntos
   const [clienteQ, setClienteQ] = useState('');
@@ -224,6 +225,7 @@ export default function CloseTableModal({ table, total, branchId, onClose, onCon
     : [{ metodo:method1, monto:totalConPropina }];
 
   async function handleConfirm() {
+    if (isSubmitting) return;
     setValidationErrors({});
     const result = closeTableSchema.safeParse({
       method: method1,
@@ -250,10 +252,17 @@ export default function CloseTableModal({ table, total, branchId, onClose, onCon
     }
     if (!montosCuadran) { addToast('Los montos del pago mixto no cuadran', 'error'); return; }
 
+    setIsSubmitting(true);
     // Guardar primero, luego imprimir
     const totalDescuento = (disc ? discAmount : 0) + descuentoPuntos;
     const motivoCompleto = [disc && discAmount > 0 ? discMotivo : null, descuentoPuntos > 0 ? `puntos: ${descuentoPuntos}` : null].filter(Boolean).join(' + ') || null;
+    try {
     await onConfirmWithDiscount(finalMethod, finalTotal, totalDescuento, motivoCompleto, propinaAmount, pagos);
+    } catch (err) {
+      console.error('[CloseTableModal] error en cierre:', err);
+      setIsSubmitting(false);
+      return;
+    }
 
     // Imprimir ticket si está configurado
     const cfg = getPrinterConfig();
@@ -720,16 +729,16 @@ export default function CloseTableModal({ table, total, branchId, onClose, onCon
             Cancelar
           </button>
           <button
-            disabled={!montosCuadran || printing || mpState === 'pending'}
+            disabled={!montosCuadran || printing || mpState === 'pending' || isSubmitting}
             onClick={handleConfirm}
             style={{
               flex:2, padding:'9px 0', border:'none', borderRadius:12, fontSize:13, fontWeight:700, color:'white',
-              background: mpState === 'pending' ? '#9CA3AF' : '#1D9E75',
-              cursor: (!montosCuadran || printing || mpState === 'pending') ? 'not-allowed' : 'pointer',
-              opacity: (!montosCuadran || printing || mpState === 'pending') ? 0.5 : 1,
-              boxShadow: mpState !== 'pending' ? '0 4px 14px rgba(29,158,117,0.28)' : 'none',
+              background: (mpState === 'pending' || isSubmitting) ? '#9CA3AF' : '#1D9E75',
+              cursor: (!montosCuadran || printing || mpState === 'pending' || isSubmitting) ? 'not-allowed' : 'pointer',
+              opacity: (!montosCuadran || printing || mpState === 'pending' || isSubmitting) ? 0.5 : 1,
+              boxShadow: (mpState !== 'pending' && !isSubmitting) ? '0 4px 14px rgba(29,158,117,0.28)' : 'none',
             }}>
-            {printing ? 'Imprimiendo...' : 'Confirmar y cerrar mesa'}
+            {isSubmitting ? 'Cerrando...' : printing ? 'Imprimiendo...' : 'Confirmar y cerrar mesa'}
           </button>
         </div>
 
