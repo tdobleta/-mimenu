@@ -9,6 +9,7 @@ import OpenShiftModal from '../components/caja/OpenShiftModal';
 import AddRetiroModal from '../components/caja/AddRetiroModal';
 import CloseShiftModal from '../components/caja/CloseShiftModal';
 import ShiftHistory from '../components/caja/ShiftHistory';
+import CloseDetailModal from '../components/caja/CloseDetailModal';
 import { G } from '@/lib/glass';
 
 const FONT_UI = "'DM Sans', system-ui, sans-serif";
@@ -364,6 +365,7 @@ function ReservasHoy({ reservas }) {
 }
 
 function ActividadReciente({ activity }) {
+  const [selectedTurn, setSelectedTurn] = useState(null);
   function fmtElapsedLocal(ms) {
     const m = Math.max(0, Math.floor(ms/60000));
     return m < 60 ? `hace ${m}m` : `hace ${Math.floor(m/60)}h`;
@@ -381,10 +383,25 @@ function ActividadReciente({ activity }) {
                   <div style={{ fontSize:13, color:'#374151' }}>{a.texto}</div>
                   <div style={{ fontSize:11, color:'#9CA3AF', marginTop:2 }}>{fmtElapsedLocal(Date.now() - a.ts)}</div>
                 </div>
+                {a.turn && (
+                  <button
+                    onClick={() => setSelectedTurn(a.turn)}
+                    style={{
+                      border:'none', background:'none', cursor:'pointer',
+                      fontSize:11, color:'#1D9E75', fontWeight:600,
+                      padding:'2px 6px', flexShrink:0, marginTop:1,
+                    }}
+                  >
+                    Ver detalles
+                  </button>
+                )}
               </div>
             ))}
           </div>
       }
+      {selectedTurn && (
+        <CloseDetailModal turn={selectedTurn} onClose={() => setSelectedTurn(null)} />
+      )}
     </div>
   );
 }

@@ -745,9 +745,10 @@ export function AppProvider({ children }) {
           .slice(0, 8);
         newActivity[bid] = sorted.map(t => ({
           id: t.id,
-          texto: `Mesa ${t.mesa_num} cerrada â€” $${(t.total_facturado||0).toLocaleString('es-AR')}`,
+          texto: `Mesa ${t.mesa_num} cerrada - $${(t.total_facturado||0).toLocaleString('es-AR')}`,
           ts: t._ts || Date.now(),
           color: '#1D9E75',
+          turn: t,
         }));
       }
 
