@@ -155,11 +155,13 @@ export default function CloseTableModal({ table, total, branchId, onClose, onCon
             clearInterval(mpPollRef.current);
             setMpState('success');
             // Cerrar mesa con método "Tarjeta MP Point"
+            const mpTotalDesc = (disc ? discAmount : 0) + descuentoPuntos;
+            const mpMotivo = [disc && discAmount > 0 ? discMotivo : null, descuentoPuntos > 0 ? `puntos: ${descuentoPuntos}` : null].filter(Boolean).join(' + ') || null;
             await onConfirmWithDiscount(
               'Tarjeta MP Point',
               finalTotal,
-              disc ? discAmount : 0,
-              discMotivo,
+              mpTotalDesc,
+              mpMotivo,
               propinaAmount,
               [{ metodo: 'Tarjeta MP Point', monto: totalConPropina }],
             );
@@ -249,7 +251,9 @@ export default function CloseTableModal({ table, total, branchId, onClose, onCon
     if (!montosCuadran) { addToast('Los montos del pago mixto no cuadran', 'error'); return; }
 
     // Guardar primero, luego imprimir
-    await onConfirmWithDiscount(finalMethod, finalTotal, disc ? discAmount : 0, discMotivo, propinaAmount, pagos);
+    const totalDescuento = (disc ? discAmount : 0) + descuentoPuntos;
+    const motivoCompleto = [disc && discAmount > 0 ? discMotivo : null, descuentoPuntos > 0 ? `puntos: ${descuentoPuntos}` : null].filter(Boolean).join(' + ') || null;
+    await onConfirmWithDiscount(finalMethod, finalTotal, totalDescuento, motivoCompleto, propinaAmount, pagos);
 
     // Imprimir ticket si está configurado
     const cfg = getPrinterConfig();
@@ -493,11 +497,13 @@ export default function CloseTableModal({ table, total, branchId, onClose, onCon
               <button
                 onClick={async () => {
                   setMpState('idle');
+                  const mp2TotalDesc = (disc ? discAmount : 0) + descuentoPuntos;
+                  const mp2Motivo = [disc && discAmount > 0 ? discMotivo : null, descuentoPuntos > 0 ? `puntos: ${descuentoPuntos}` : null].filter(Boolean).join(' + ') || null;
                   await onConfirmWithDiscount(
                     'Tarjeta MP Point',
                     finalTotal,
-                    disc ? discAmount : 0,
-                    discMotivo,
+                    mp2TotalDesc,
+                    mp2Motivo,
                     propinaAmount,
                     [{ metodo: 'Tarjeta MP Point', monto: totalConPropina }],
                   );

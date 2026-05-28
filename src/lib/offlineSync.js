@@ -216,14 +216,20 @@ async function processOperation(op) {
         }
       }
 
+      const opPricing = op.operation?.pricing || {};
+      const descuento = Number(opPricing.discount_amount || 0);
+      const descuentoMotivo = opPricing.discount_reason || null;
+
       const { error: rpcError } = await supabase.rpc('cerrar_mesa_atomico', {
-        p_turn_id:       turnId,
-        p_total:         total,
-        p_propina:       propina || 0,
-        p_metodo:        metodo,
-        p_mozo:          mozo || '',
-        p_caja_shift_id: cajaShiftId,
-        p_pagos_detalle: pagosDetalle,
+        p_turn_id:          turnId,
+        p_total:            total,
+        p_propina:          propina || 0,
+        p_metodo:           metodo,
+        p_mozo:             mozo || '',
+        p_caja_shift_id:    cajaShiftId,
+        p_pagos_detalle:    pagosDetalle,
+        p_descuento:        descuento,
+        p_descuento_motivo: descuentoMotivo,
       });
       if (rpcError) {
         const msgLower = rpcError.message?.toLowerCase() || '';

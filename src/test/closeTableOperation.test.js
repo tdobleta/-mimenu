@@ -54,6 +54,8 @@ describe('buildCloseTableOperation', () => {
     expect(op.items_snapshot).toHaveLength(2);
     expect(op.items_snapshot[1].is_free_item).toBe(true);
     expect(op.pricing.subtotal).toBe(2500);
+    expect(op.pricing.discount_amount).toBe(200);
+    expect(op.pricing.discount_reason).toBe('promo');
     expect(op.pricing.total_charged).toBe(2600);
     expect(op.payment.payments_detail[0].amount).toBe(2600);
     expect(op.sync.status).toBe('pending_sync');

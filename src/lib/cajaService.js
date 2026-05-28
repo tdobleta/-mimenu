@@ -89,14 +89,19 @@ export async function cerrarMesaOnline({
     }
   }
 
+  const descuento = operation?.pricing?.discount_amount || 0;
+  const descuentoMotivo = operation?.pricing?.discount_reason || null;
+
   const { error: rpcError } = useLegacyClose ? await supabase.rpc('cerrar_mesa_atomico', {
-    p_turn_id:       turnId,
-    p_total:         total,
-    p_propina:       propina,
-    p_metodo:        metodo,
-    p_mozo:          mozo,
-    p_caja_shift_id: cajaShiftId || null,
-    p_pagos_detalle: pagos?.length > 0 ? pagos : null,
+    p_turn_id:          turnId,
+    p_total:            total,
+    p_propina:          propina,
+    p_metodo:           metodo,
+    p_mozo:             mozo,
+    p_caja_shift_id:    cajaShiftId || null,
+    p_pagos_detalle:    pagos?.length > 0 ? pagos : null,
+    p_descuento:        descuento,
+    p_descuento_motivo: descuentoMotivo,
   }) : { error: null };
 
   if (rpcError) {
