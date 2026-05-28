@@ -165,6 +165,8 @@ export default function CloseTableModal({ table, total, branchId, onClose, onCon
               mpMotivo,
               propinaAmount,
               [{ metodo: 'Tarjeta MP Point', monto: totalConPropina }],
+              puntosARedimir,
+              cliente?.id || null,
             );
           } else if (stateType === 'ABANDONED' || stateType === 'ERROR' || stateType === 'CANCELED') {
             clearInterval(mpPollRef.current);
@@ -257,7 +259,7 @@ export default function CloseTableModal({ table, total, branchId, onClose, onCon
     const totalDescuento = (disc ? discAmount : 0) + descuentoPuntos;
     const motivoCompleto = [disc && discAmount > 0 ? discMotivo : null, descuentoPuntos > 0 ? `puntos: ${descuentoPuntos}` : null].filter(Boolean).join(' + ') || null;
     try {
-    await onConfirmWithDiscount(finalMethod, finalTotal, totalDescuento, motivoCompleto, propinaAmount, pagos);
+    await onConfirmWithDiscount(finalMethod, finalTotal, totalDescuento, motivoCompleto, propinaAmount, pagos, puntosARedimir, cliente?.id || null);
     } catch (err) {
       console.error('[CloseTableModal] error en cierre:', err);
       setIsSubmitting(false);
@@ -316,8 +318,8 @@ export default function CloseTableModal({ table, total, branchId, onClose, onCon
 
     // Registrar visita de cliente (fire-and-forget — no bloquea el cierre)
     if (cliente && store.restaurantId) {
-      addCustomerVisit(store.restaurantId, cliente.id, table.turnId || null, finalTotal, puntosARedimir)
-        .catch(() => {}); // non-blocking
+      addCustomerVisit(store.restaurantId, cliente.id, table.turnId || null, finalTotal, puntosARedimir, { skipRedemptionDeduction: true })
+        .catch(() => {}); // non-blocking — points already deducted server-side in cerrar_mesa_atomico
     }
 
     if (store.refreshCharts && branchId) store.refreshCharts(branchId);
@@ -515,6 +517,8 @@ export default function CloseTableModal({ table, total, branchId, onClose, onCon
                     mp2Motivo,
                     propinaAmount,
                     [{ metodo: 'Tarjeta MP Point', monto: totalConPropina }],
+                    puntosARedimir,
+                    cliente?.id || null,
                   );
                 }}
                 style={{ flex:1, padding:'8px 0', borderRadius:8, border:'none', background:'#D97706', color:'white', fontWeight:700, fontSize:12, cursor:'pointer' }}

@@ -94,7 +94,11 @@ export async function deleteCustomer(restaurantId, id, reason = 'Archivado desde
  * @param {number} puntosCanjeados — puntos redimidos en esta visita
  * @returns {number} puntosGanados
  */
-export async function addCustomerVisit(restaurantId, customerId, turnId, totalGastado, puntosCanjeados = 0) {
+// NOTE: Points earning (increment_customer_points) is still client-side.
+// This is a follow-up risk: inflated totalGastado → inflated earned points → future money leakage.
+// Defer to a separate task — server-side earning validation requires knowing the final total
+// after cerrar_mesa_atomico commits.
+export async function addCustomerVisit(restaurantId, customerId, turnId, totalGastado, puntosCanjeados = 0, options = {}) {
   const puntosGanados = Math.floor(Math.max(0, totalGastado) / PESOS_POR_PUNTO);
 
   const { error: visitError } = await supabase.from('customer_visits').insert({
@@ -110,7 +114,7 @@ export async function addCustomerVisit(restaurantId, customerId, turnId, totalGa
   if (puntosGanados > 0) {
     await supabase.rpc('increment_customer_points', { p_id: customerId, p_pts: puntosGanados });
   }
-  if (puntosCanjeados > 0) {
+  if (puntosCanjeados > 0 && !options.skipRedemptionDeduction) {
     await supabase.rpc('decrement_customer_points', { p_id: customerId, p_pts: puntosCanjeados });
   }
 

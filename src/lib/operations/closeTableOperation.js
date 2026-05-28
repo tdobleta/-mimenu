@@ -75,6 +75,8 @@ export function buildCloseTableOperation({
   discountReason = null,
   tipAmount = 0,
   pagos = null,
+  puntosCanjeados = 0,
+  clienteId = null,
   user = null,
   userRole = null,
   activeStaff = null,
@@ -145,6 +147,12 @@ export function buildCloseTableOperation({
       payments_detail: normalizePayments(pagos, method, totalCharged),
       offline_payment: true,
       provider_status: method?.includes('MercadoPago') ? 'pending_online' : 'not_required',
+    },
+
+    loyalty: {
+      customer_id: clienteId || null,
+      puntos_canjeados: Number(puntosCanjeados || 0),
+      conversion_rate: 1, // 1 punto = $1
     },
 
     stock_intent: {

@@ -469,7 +469,7 @@ export default function ComandaPanel({ table, branchId, onClose, addToast }) {
       {showClose && (
         <CloseTableModal table={table} total={total} branchId={branchId}
           onClose={() => !cerrando && setShowClose(false)}
-          onConfirmWithDiscount={async (method, finalTotal, discAmount, discMotivo, propinaAmount, pagos) => {
+          onConfirmWithDiscount={async (method, finalTotal, discAmount, discMotivo, propinaAmount, pagos, puntosCanjeados, clienteId) => {
             if (cerrando) return;
             setCerrando(true);
             if (!store.turnoActivo) { addToast('No hay turno de caja abierto. Abrí la caja antes de cerrar mesas.', 'error'); setCerrando(false); return; }
@@ -481,6 +481,8 @@ export default function ComandaPanel({ table, branchId, onClose, addToast }) {
               method,
               finalTotal,
               discountAmount:  discAmount || 0,
+              puntosCanjeados: puntosCanjeados || 0,
+              clienteId:       clienteId || null,
               discountReason:  discMotivo || null,
               tipAmount:       propinaAmount || 0,
               pagos:           pagos?.length > 0 ? pagos : null,

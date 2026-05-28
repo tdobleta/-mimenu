@@ -230,6 +230,8 @@ async function processOperation(op) {
         p_pagos_detalle:    pagosDetalle,
         p_descuento:        descuento,
         p_descuento_motivo: descuentoMotivo,
+        p_puntos_canjeados: op.operation?.loyalty?.puntos_canjeados || 0,
+        p_cliente_id:       op.operation?.loyalty?.customer_id || null,
       });
       if (rpcError) {
         const msgLower = rpcError.message?.toLowerCase() || '';

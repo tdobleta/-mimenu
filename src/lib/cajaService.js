@@ -102,6 +102,8 @@ export async function cerrarMesaOnline({
     p_pagos_detalle:    pagos?.length > 0 ? pagos : null,
     p_descuento:        descuento,
     p_descuento_motivo: descuentoMotivo,
+    p_puntos_canjeados: operation?.loyalty?.puntos_canjeados || 0,
+    p_cliente_id:       operation?.loyalty?.customer_id || null,
   }) : { error: null };
 
   if (rpcError) {
