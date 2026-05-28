@@ -11,6 +11,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/api/supabaseClient';
 import { useStore } from '@/lib/store';
+import { buildPublicKitchenUrl } from '@/lib/publicRoutes';
 
 const BASE_URL = import.meta.env.VITE_APP_URL || 'https://mimenuar.netlify.app';
 
@@ -64,7 +65,7 @@ export default function DeviceTokensTab() {
     if (err) {
       setError('Error al crear dispositivo: ' + err.message);
     } else if (data) {
-      const deviceUrl = `${BASE_URL}/public/cocina?branch=${selectedBranch}&token=${data.token}`;
+      const deviceUrl = buildPublicKitchenUrl(BASE_URL, selectedBranch, data.token);
       setNewlyCreated({ ...data, url: deviceUrl });
       setTokens(prev => [data, ...prev]);
       setNewName('');
@@ -83,7 +84,7 @@ export default function DeviceTokensTab() {
   }
 
   function buildUrl(token) {
-    return `${BASE_URL}/public/cocina?branch=${selectedBranch}&token=${token}`;
+    return buildPublicKitchenUrl(BASE_URL, selectedBranch, token);
   }
 
   async function copyToClipboard(text, id) {

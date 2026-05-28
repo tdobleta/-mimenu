@@ -46,7 +46,7 @@ test.describe('Login page responsive', () => {
 
 test.describe('Public reservation page responsive', () => {
   test('loads without horizontal scroll', async ({ page }) => {
-    await page.goto('/public/reservas/test-branch');
+    await page.goto('/reservar/test-branch');
     await expect(page.locator('body')).toContainText(/reservar|restaurante|reserva/i);
     await expectNoHorizontalScroll(page);
   });

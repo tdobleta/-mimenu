@@ -37,19 +37,19 @@ test.describe('Politica de Privacidad', () => {
 
 test.describe('Public Cocina Display', () => {
   test('cocina display carga sin error fatal', async ({ page }) => {
-    await page.goto('/public/cocina?branch=test-branch-id');
+    await page.goto('/monitor-cocina?branch=test-branch-id');
     await expect(page.locator('body')).toContainText(/token|dispositivo|cocina|monitor/i);
   });
 });
 
 test.describe('Public Reservas', () => {
   test('reservas page carga sin error fatal', async ({ page }) => {
-    await page.goto('/public/reservas/test-branch-id');
+    await page.goto('/reservar/test-branch-id');
     await expect(page.locator('body')).toContainText(/reservar|restaurante|reserva/i);
   });
 
   test('responsive layout sin overflow', async ({ page }) => {
-    await page.goto('/public/reservas/test-branch-id');
+    await page.goto('/reservar/test-branch-id');
     await expect(page.locator('body')).toBeVisible();
 
     const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);

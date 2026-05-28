@@ -7,6 +7,7 @@ import useUserRole from '@/lib/useUserRole';
 import { supabase } from '@/api/supabaseClient';
 import emailjs from '@emailjs/browser';
 import { getActiveStaff, touchActiveStaff } from '@/lib/useActiveStaff';
+import { buildPublicReservationUrl } from '@/lib/publicRoutes';
 
 const BADGE = {
   confirmada: { bg:'#E8F7F2', c:'#1D9E75' },
@@ -359,7 +360,7 @@ function LinkModal({ onClose, sucursal }) {
       setSaving(false);
     }
   }
-  const url = `${window.location.origin}/public/reservas/${sucursal?.id || 'sin-id'}`;
+  const url = buildPublicReservationUrl(window.location.origin, sucursal?.id || 'sin-id');
   function copy() { navigator.clipboard.writeText(url).catch(()=>{}); setCopied(true); setTimeout(()=>setCopied(false),2000); }
   const T = ({v, onChange, disabled}) => (
     <button onClick={() => !disabled && onChange(!v)} style={{ position:'relative', width:40, height:22, borderRadius:99, border:'none', cursor: disabled ? 'not-allowed' : 'pointer', backgroundColor:v?'#1D9E75':'#E5E7EB', padding:2, opacity: disabled ? 0.6 : 1, flexShrink:0 }}>

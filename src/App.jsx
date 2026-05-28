@@ -4,7 +4,7 @@ import { Toaster } from 'sonner'
 import { supabase } from '@/api/supabaseClient'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
-import { BrowserRouter as Router, Route, Routes, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes, Navigate, useLocation, useParams } from 'react-router-dom';
 import useUserRole from '@/lib/useUserRole';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
@@ -15,6 +15,7 @@ import OfflineBanner from '@/components/OfflineBanner';
 import Layout from './components/Layout';
 import PinGuard from './components/pin/PinGuard';
 import ObservabilityBridge from '@/components/ObservabilityBridge';
+import { PUBLIC_KITCHEN_PATH, PUBLIC_RESERVATION_PATH } from '@/lib/publicRoutes';
 
 // ── Lazy-loaded pages (code splitting por ruta) ────────────────────────────────
 // Vite genera un chunk separado por cada import() dinámico.
@@ -39,6 +40,16 @@ const PublicReservation  = lazy(() => import('./pages/public/PublicReservation')
 const Cocina             = lazy(() => import('./pages/public/Cocina'));
 const TerminosServicio   = lazy(() => import('./pages/legal/TerminosServicio'));
 const PoliticaPrivacidad = lazy(() => import('./pages/legal/PoliticaPrivacidad'));
+
+function LegacyPublicReservationRedirect() {
+  const { branchSlug } = useParams();
+  return <Navigate to={`${PUBLIC_RESERVATION_PATH}/${encodeURIComponent(branchSlug || '')}`} replace />;
+}
+
+function LegacyPublicKitchenRedirect() {
+  const location = useLocation();
+  return <Navigate to={`${PUBLIC_KITCHEN_PATH}${location.search}`} replace />;
+}
 
 // ── Spinner compartido para Suspense fallback ──────────────────────────────────
 function PageLoader() {
@@ -196,8 +207,10 @@ function App() {
                 <Suspense fallback={<PageLoader />}>
                   <Routes>
                     <Route path="/login" element={<Login />} />
-                    <Route path="/public/reservas/:branchSlug" element={<PublicReservation />} />
-                    <Route path="/public/cocina" element={<Cocina />} />
+                    <Route path={`${PUBLIC_RESERVATION_PATH}/:branchSlug`} element={<PublicReservation />} />
+                    <Route path={PUBLIC_KITCHEN_PATH} element={<Cocina />} />
+                    <Route path="/public/reservas/:branchSlug" element={<LegacyPublicReservationRedirect />} />
+                    <Route path="/public/cocina" element={<LegacyPublicKitchenRedirect />} />
                     <Route path="/terminos" element={<TerminosServicio />} />
                     <Route path="/privacidad" element={<PoliticaPrivacidad />} />
                     <Route path="*" element={<AuthenticatedApp />} />
