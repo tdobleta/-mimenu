@@ -3,6 +3,7 @@ import { useStore } from '@/lib/store';
 import useUserRole from '@/lib/useUserRole';
 import { G } from '@/lib/glass';
 import { useActiveStaff } from '@/lib/useActiveStaff';
+import { useDeviceMode, MODE_LABELS } from '@/lib/DeviceModeContext';
 
 const ROLE_PATHS = {
   Dueno:    ['/','/salon','/caja','/reservas','/stock','/clientes','/delivery','/reportes','/analiticas','/conexion','/configuracion','/control-cocina','/cocina'],
@@ -42,6 +43,7 @@ export default function Sidebar({ onClose }) {
   const { restaurante } = store;
   const role = useUserRole();
   const { activeStaff, clearActiveStaff } = useActiveStaff();
+  const { mode, clearMode } = useDeviceMode();
   const allowed = ROLE_PATHS[role] || ROLE_PATHS.Encargado;
   const navItems = NAV
     .filter(item => allowed.includes(item.path));
@@ -133,6 +135,28 @@ export default function Sidebar({ onClose }) {
             {restaurante.nombre}
           </span>
         </div>
+
+        {/* Badge modo de dispositivo */}
+        {mode && (
+          <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+            <span style={{ fontSize: 10.5, color: '#484F58' }}>
+              Modo: <span style={{ color: '#8B949E', fontWeight: 600 }}>{MODE_LABELS[mode] || mode}</span>
+            </span>
+            <button
+              onClick={clearMode}
+              title="Cambiar modo de dispositivo"
+              style={{
+                background: 'none', border: 'none', cursor: 'pointer',
+                color: '#484F58', fontSize: 10, padding: '2px 4px',
+                textDecoration: 'underline', textUnderlineOffset: 2,
+              }}
+              onMouseEnter={e => e.currentTarget.style.color = '#8B949E'}
+              onMouseLeave={e => e.currentTarget.style.color = '#484F58'}
+            >
+              Cambiar
+            </button>
+          </div>
+        )}
 
         {/* Badge mozo activo + botón de cambio rápido */}
         {activeStaff && (

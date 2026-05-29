@@ -8,6 +8,7 @@ import { BrowserRouter as Router, Route, Routes, Navigate, useLocation, useParam
 import useUserRole from '@/lib/useUserRole';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
+import { DeviceModeProvider, useDeviceMode, MODE_DEFAULT_ROUTE } from '@/lib/DeviceModeContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import { AppProvider, useStore } from '@/lib/store';
 import { ToastProvider } from '@/lib/toast';
@@ -34,6 +35,7 @@ const Configuracion      = lazy(() => import('./pages/Configuracion'));
 const CocinaDisplay      = lazy(() => import('./pages/CocinaDisplay'));
 const ControlCocina      = lazy(() => import('./pages/ControlCocina'));
 const POSView            = lazy(() => import('./pages/POSView'));
+const DeviceModeSelector = lazy(() => import('./components/DeviceModeSelector'));
 const Clientes           = lazy(() => import('./pages/Clientes'));
 const Delivery           = lazy(() => import('./pages/Delivery'));
 const PublicReservation  = lazy(() => import('./pages/public/PublicReservation'));
@@ -137,11 +139,13 @@ const AuthenticatedApp = () => {
   );
 
   return (
-    <Suspense fallback={<PageLoader />}>
-      <ErrorBoundary>
-        <RoutedApp />
-      </ErrorBoundary>
-    </Suspense>
+    <DeviceModeProvider>
+      <Suspense fallback={<PageLoader />}>
+        <ErrorBoundary>
+          <RoutedApp />
+        </ErrorBoundary>
+      </Suspense>
+    </DeviceModeProvider>
   );
 };
 
@@ -169,6 +173,21 @@ const RoutedApp = () => {
   );
   if (role === 'Cocinero' && loc.pathname !== '/cocina') {
     return <Navigate to="/cocina" replace />;
+  }
+
+  // ── Device mode gate ──────────────────────────────────────────────────
+  // Shown after auth + onboarding + role checks. Does NOT affect security.
+  // KDS mode forces /cocina, same as the Cocinero role redirect above.
+  const { mode } = useDeviceMode();
+  if (!mode) {
+    return <DeviceModeSelector />;
+  }
+  if (mode === 'kds' && loc.pathname !== '/cocina') {
+    return <Navigate to="/cocina" replace />;
+  }
+  // Redirect root to mode's default route (e.g., cashier → /caja)
+  if (loc.pathname === '/' && MODE_DEFAULT_ROUTE[mode] && MODE_DEFAULT_ROUTE[mode] !== '/') {
+    return <Navigate to={MODE_DEFAULT_ROUTE[mode]} replace />;
   }
 
   return (
