@@ -5,6 +5,7 @@ import Sidebar from './Sidebar';
 import Topbar from './Topbar';
 import { APP_BG, containerPad } from '@/lib/glass';
 import MimenuChatbot from './MimenuChatbot';
+import PWAInstallPrompt from './PWAInstallPrompt';
 
 // Banner de actualización del Service Worker.
 // Aparece cuando hay una nueva versión disponible (registerType: 'prompt').
@@ -73,6 +74,7 @@ export default function Layout() {
       </div>
       <MimenuChatbot />
       <SWUpdateBanner />
+      <PWAInstallPrompt />
     </div>
   );
 }
