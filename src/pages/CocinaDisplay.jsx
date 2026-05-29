@@ -7,6 +7,8 @@ import { fetchTurnItemsBatch } from '@/lib/pagination';
 import { subscribeToTurns, subscribeToTurnItems, registerActiveTurns } from '@/lib/realtimeManager';
 import { localRelay } from '@/lib/localRelay';
 import { useToast } from '@/lib/toast';
+import { useDeviceMode } from '@/lib/DeviceModeContext';
+import useUserRole from '@/lib/useUserRole';
 
 // ── Device token para autenticación en cocina-update ─────────────────────
 // El display de cocina usa un token de dispositivo (hex 64 chars) en lugar de la anon key.
@@ -93,10 +95,55 @@ function fmtHora(ts) {
 const COCINA_CACHE_KEY = 'mimenu_cocina_cache';
 const COCINA_CACHE_MAX_AGE = 2 * 3600 * 1000; // 2 horas
 
+// ── KDS exit button: two-tap confirmation to prevent accidental mode changes ──
+function KdsExitButton({ clearMode }) {
+  const [confirming, setConfirming] = useState(false);
+
+  useEffect(() => {
+    if (!confirming) return;
+    const t = setTimeout(() => setConfirming(false), 3000);
+    return () => clearTimeout(t);
+  }, [confirming]);
+
+  if (confirming) {
+    return (
+      <button
+        data-testid="kds-exit-confirm"
+        onClick={() => clearMode()}
+        style={{
+          padding: '6px 12px', border: '1px solid rgba(251,191,36,0.6)',
+          borderRadius: 7, fontSize: 12, color: '#FBB824',
+          backgroundColor: 'rgba(251,191,36,0.12)', cursor: 'pointer', fontWeight: 600,
+        }}
+      >
+        Confirmar cambio
+      </button>
+    );
+  }
+
+  return (
+    <button
+      data-testid="kds-exit-btn"
+      onClick={() => setConfirming(true)}
+      title="Cambiar modo de dispositivo"
+      style={{
+        padding: '6px 12px', border: '0.5px solid rgba(255,255,255,0.15)',
+        borderRadius: 7, fontSize: 12, color: 'rgba(255,255,255,0.5)',
+        backgroundColor: 'transparent', cursor: 'pointer',
+      }}
+    >
+      Cambiar modo
+    </button>
+  );
+}
+
 export default function CocinaDisplay() {
   const { user } = useAuth();
   const { restaurante, branchId, sucursales, loading: storeLoading } = useStore();
   const { addToast } = useToast();
+  const { mode, clearMode } = useDeviceMode();
+  const role = useUserRole();
+  const isKdsMode = mode === 'kds';
   const activeBranchId = branchId !== 'todas' ? branchId : sucursales[0]?.id;
   const [comandas, setComandas] = useState([]);
   const [itemsListos, setItemsListos] = useState({});
@@ -313,6 +360,15 @@ export default function CocinaDisplay() {
             mi<span style={{ color:'#1D9E75' }}>menú</span>
           </span>
           <span style={{ fontSize:14, color:'rgba(255,255,255,0.5)', fontWeight:500 }}>{restaurante?.nombre||''}</span>
+          {isKdsMode && (
+            <span data-testid="kds-badge" style={{
+              fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.4)',
+              backgroundColor: 'rgba(255,255,255,0.08)',
+              padding: '2px 8px', borderRadius: 99, letterSpacing: '0.5px',
+            }}>
+              MODO KDS
+            </span>
+          )}
         </div>
         <div style={{ display:'flex', alignItems:'center', gap:8, backgroundColor:'rgba(29,158,117,0.15)', color:'#1D9E75', padding:'5px 12px', borderRadius:99, fontSize:12, fontWeight:600 }}>
           <span style={{ width:7, height:7, borderRadius:'50%', backgroundColor:'#1D9E75', animation:'cocpulse 1.5s ease-in-out infinite' }} />
@@ -321,7 +377,13 @@ export default function CocinaDisplay() {
         </div>
         <div style={{ display:'flex', alignItems:'center', gap:10 }}>
           <span style={{ fontSize:12, color:'rgba(255,255,255,0.5)' }}>{user?.email ? '● Sesión activa' : ''}</span>
-          <button onClick={() => supabase.auth.signOut().then(() => window.location.href='/login')}
+          {isKdsMode && role !== 'Cocinero' && (
+            <KdsExitButton clearMode={clearMode} />
+          )}
+          <button onClick={() => {
+            if (isKdsMode) clearMode();
+            supabase.auth.signOut().then(() => window.location.href='/login');
+          }}
             style={{ padding:'6px 12px', border:'0.5px solid rgba(255,255,255,0.15)', borderRadius:7, fontSize:12, color:'rgba(255,255,255,0.7)', backgroundColor:'transparent', cursor:'pointer' }}>
             Cerrar sesión
           </button>
