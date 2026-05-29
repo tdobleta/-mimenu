@@ -55,7 +55,7 @@ export default function Sidebar({ onClose }) {
   const role = useUserRole();
   const { activeStaff, clearActiveStaff } = useActiveStaff();
   const { mode, clearMode } = useDeviceMode();
-  const allowed = ROLE_PATHS[role] || ROLE_PATHS.Encargado;
+  const allowed = ROLE_PATHS[role] || [];
   const modePaths = (mode && MODE_PATHS.hasOwnProperty(mode)) ? MODE_PATHS[mode] : null;
   const navItems = NAV
     .filter(item => allowed.includes(item.path))

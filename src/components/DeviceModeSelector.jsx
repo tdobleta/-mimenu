@@ -1,8 +1,21 @@
 // components/DeviceModeSelector.jsx
 // Full-screen selector shown when no device mode is set.
 // Pure UI — no Supabase calls, no side effects beyond calling setMode.
+// Filters available modes by user role — device mode is UX only,
+// never grants permissions.
 
+import { useEffect, useRef } from 'react';
 import { useDeviceMode, VALID_MODES, MODE_LABELS } from '@/lib/DeviceModeContext';
+import useUserRole from '@/lib/useUserRole';
+
+// Which device modes each role may choose.
+// This is UX convenience — RoleGuard + RLS remain the real security layer.
+export const MODES_BY_ROLE = {
+  Dueno:     ['admin', 'cashier', 'pos', 'kds', 'stock'],
+  Encargado: ['admin', 'cashier', 'pos', 'kds', 'stock'],
+  Mozo:      ['pos'],
+  Cocinero:  ['kds'],
+};
 
 const MODE_CARDS = [
   {
@@ -63,11 +76,27 @@ const MODE_CARDS = [
 
 export default function DeviceModeSelector({ onSelect }) {
   const { setMode } = useDeviceMode();
+  const role = useUserRole();
+  const allowedModes = MODES_BY_ROLE[role] || [];
+  const cards = MODE_CARDS.filter(c => allowedModes.includes(c.mode));
+  const autoSelected = useRef(false);
 
   const handleSelect = (mode) => {
     setMode(mode);
     onSelect?.(mode);
   };
+
+  // Auto-select when only one mode is available (e.g. Mozo → pos).
+  // Uses useEffect to avoid side effects during render.
+  useEffect(() => {
+    if (cards.length === 1 && !autoSelected.current) {
+      autoSelected.current = true;
+      handleSelect(cards[0].mode);
+    }
+  }, [cards.length]);
+
+  // Nothing to show — role guards handle access upstream
+  if (cards.length <= 1) return null;
 
   return (
     <div style={{
@@ -93,10 +122,10 @@ export default function DeviceModeSelector({ onSelect }) {
             fontSize: 20, fontWeight: 700, color: '#0F172A',
             margin: '0 0 6px',
           }}>
-            Configurar este dispositivo
+            Modo de dispositivo
           </h1>
           <p style={{ fontSize: 14, color: '#6B7280', margin: 0, lineHeight: 1.5 }}>
-            Selecciona cómo se usará este dispositivo. Podés cambiarlo después.
+            Seleccioná el modo de uso para este dispositivo. No cambia tus permisos.
           </p>
         </div>
 
@@ -107,7 +136,7 @@ export default function DeviceModeSelector({ onSelect }) {
           gap: 12,
           marginBottom: 24,
         }}>
-          {MODE_CARDS.map(({ mode, desc, icon }) => (
+          {cards.map(({ mode, desc, icon }) => (
             <button
               key={mode}
               data-testid={`mode-card-${mode}`}

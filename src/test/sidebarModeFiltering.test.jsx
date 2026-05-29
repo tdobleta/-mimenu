@@ -27,7 +27,7 @@ const ROLE_PATHS = {
 
 // ── Replicate the exact filtering logic from Sidebar.jsx ─────────────
 function getVisiblePaths(role, mode) {
-  const allowed = ROLE_PATHS[role] || ROLE_PATHS.Encargado;
+  const allowed = ROLE_PATHS[role] || [];
   const modePaths = (mode && MODE_PATHS.hasOwnProperty(mode)) ? MODE_PATHS[mode] : null;
   return NAV_PATHS
     .filter(p => allowed.includes(p))
@@ -144,6 +144,20 @@ describe('Sidebar mode filtering — null/missing mode', () => {
   it('undefined mode + Dueno = all Dueno paths (no filtering)', () => {
     const result = getVisiblePaths('Dueno', undefined);
     expect(result).toEqual(ROLE_PATHS.Dueno);
+  });
+});
+
+describe('Sidebar mode filtering — unknown/null role gets no nav', () => {
+  it('unknown role "Cajero" + admin mode → empty', () => {
+    expect(getVisiblePaths('Cajero', 'admin')).toEqual([]);
+  });
+
+  it('null role + admin mode → empty', () => {
+    expect(getVisiblePaths(null, 'admin')).toEqual([]);
+  });
+
+  it('undefined role + cashier mode → empty', () => {
+    expect(getVisiblePaths(undefined, 'cashier')).toEqual([]);
   });
 });
 
