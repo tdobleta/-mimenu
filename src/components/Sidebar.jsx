@@ -5,6 +5,17 @@ import { G } from '@/lib/glass';
 import { useActiveStaff } from '@/lib/useActiveStaff';
 import { useDeviceMode, MODE_LABELS } from '@/lib/DeviceModeContext';
 
+// UX-only filter: which paths each device mode prefers to show.
+// null = no filtering (show everything the role allows).
+// This NEVER expands access — role remains the security layer.
+export const MODE_PATHS = {
+  admin:   null,
+  cashier: ['/caja', '/salon'],
+  pos:     ['/salon', '/reservas', '/delivery'],
+  kds:     [],
+  stock:   ['/stock'],
+};
+
 const ROLE_PATHS = {
   Dueno:    ['/','/salon','/caja','/reservas','/stock','/clientes','/delivery','/reportes','/analiticas','/conexion','/configuracion','/control-cocina','/cocina'],
   Encargado:['/','/salon','/caja','/reservas','/stock','/clientes','/delivery','/reportes','/analiticas','/conexion','/control-cocina','/cocina'],
@@ -45,8 +56,10 @@ export default function Sidebar({ onClose }) {
   const { activeStaff, clearActiveStaff } = useActiveStaff();
   const { mode, clearMode } = useDeviceMode();
   const allowed = ROLE_PATHS[role] || ROLE_PATHS.Encargado;
+  const modePaths = (mode && MODE_PATHS.hasOwnProperty(mode)) ? MODE_PATHS[mode] : null;
   const navItems = NAV
-    .filter(item => allowed.includes(item.path));
+    .filter(item => allowed.includes(item.path))
+    .filter(item => modePaths === null || modePaths.includes(item.path));
 
   return (
     <div style={{
