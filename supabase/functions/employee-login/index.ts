@@ -1,5 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import * as bcrypt from 'https://deno.land/x/bcrypt@v0.4.1/mod.ts';
+import bcrypt from 'npm:bcryptjs@3.0.3';
 import { corsResponse, jsonResponse, serverErrorResponse } from '../_shared/http.ts';
 
 const TOKEN_LIFETIME_SECONDS = 8 * 60 * 60;
