@@ -1,8 +1,8 @@
 # MIMENU MASTER PLAN — SECURITY, ARCHITECTURE & RELEASE READINESS
 
-**Version:** 1.3 — 2026-05-30
+**Version:** 1.4 — 2026-05-30
 **Status:** ACTIVE — Employee UI blocked on P0 closure
-**Gate:** 0-C COMPLETE (production corroborated). E1C-A1 SQL remediation DESIGN is UNBLOCKED. Migration writing/applying requires separate review.
+**Gate:** Patch A APPLIED AND VERIFIED IN PRODUCTION (2026-05-30). Patch B internal authorization: DESIGN IN PROGRESS — NOT AUTHORIZED FOR MIGRATION WRITING. Patch C points financial integrity: REQUIRED — DESIGN NOT FINALIZED. Employee Login/C2 remain blocked.
 
 ---
 
@@ -35,7 +35,7 @@ Financial *calculation* integrity fixes (discount validation, duplicate close pr
 
 The employee login Edge Function works end-to-end for credential verification, but the custom JWT it issues cannot operate the Supabase data layer. The chosen architecture (Variant C2: passwordless Supabase Auth session bridge) is sound but **blocked** until all P0 authorization holes are closed.
 
-**Current deployment:** Branch `main` at commit `706737ca`. Working tree clean. All employee login migrations applied in production. No employee Login UI exists in the frontend.
+**Current deployment:** Branch `main` at commit `c1152947`. Working tree clean. All employee login migrations applied in production. Patch A privilege containment migration applied and verified in production (2026-05-30). No employee Login UI exists in the frontend.
 
 ---
 
@@ -45,10 +45,10 @@ The employee login Edge Function works end-to-end for credential verification, b
 
 | Commit | Capability | Calculation Status | Authorization Status |
 |--------|-----------|-------------------|---------------------|
-| `b1ebbb5c` | Server-side discount validation in `cerrar_mesa_atomico` | CLOSED | OPEN — `cerrar_mesa_atomico` callable cross-tenant (P0-6) |
-| `994e6d30` | Duplicate close-table prevention (FOR UPDATE + status check) | CLOSED | OPEN — same as above |
+| `b1ebbb5c` | Server-side discount validation in `cerrar_mesa_atomico` | CLOSED | PARTIALLY CONTAINED — Patch A blocks anon/PUBLIC; cross-tenant by authenticated remains open until Patch B |
+| `994e6d30` | Duplicate close-table prevention (FOR UPDATE + status check) | CLOSED | PARTIALLY CONTAINED — same as above |
 | `d03515d3` | Close-table details shown in caja activity | CLOSED | N/A (read-only UI) |
-| `6ac17dc2` | Server-side points redemption validation | CLOSED | OPEN — `decrement_customer_points` callable cross-tenant (P0-4) |
+| `6ac17dc2` | Server-side points redemption validation | CLOSED | PARTIALLY CONTAINED — Patch A blocks anon/PUBLIC; cross-tenant + client-trust earning remain open until Patch B/C |
 
 **Remaining financial risk:** Points *earning* is still client-trusted. The client computes `puntosGanados` and calls `increment_customer_points` directly. This is tracked as deferred financial hardening (FIN-1).
 
@@ -134,7 +134,9 @@ All three are SECURITY DEFINER and intentionally PUBLIC — they are used inside
 | **Post-fix test** | Same query returns 0 rows; INSERT to foreign branch returns 42501 |
 | **Production corroboration** | **Confirmed** — 2026-05-30 |
 | **Production evidence** | Three permissive policies active: `stock_ingresos_branch` (FOR ALL, tenant-scoped via `user_owns_branch`), `stock_ingresos_read` (SELECT, `auth.role() = 'authenticated'`), `stock_ingresos_insert` (INSERT, `auth.role() = 'authenticated'`). The permissive read/insert policies bypass tenant isolation — any authenticated user can read all tenants' data and insert into any branch. |
-| **Closure** | Migration applied + production verification + no regression |
+| **Patch A status** | **APPLIED AND VERIFIED 2026-05-30.** Insecure `stock_ingresos_read` and `stock_ingresos_insert` policies dropped. Only `stock_ingresos_branch` (FOR ALL, tenant-scoped) remains. Cross-tenant access for authenticated users is now blocked by tenant-scoped policy. |
+| **Remaining** | Same-tenant role hardening (UPDATE/DELETE restriction by role) is a product decision outside Patch A. |
+| **Closure** | Patch A containment CLOSED for cross-tenant. Full role-hardening deferred to product review. |
 
 ---
 
@@ -151,7 +153,9 @@ All three are SECURITY DEFINER and intentionally PUBLIC — they are used inside
 | **Post-fix test** | Cross-tenant call returns empty result |
 | **Production corroboration** | **Confirmed** — 2026-05-30 |
 | **Production evidence** | SECURITY DEFINER active; function body accepts arbitrary `p_branch_id` with no tenant check. `has_function_privilege` confirms anon=true, authenticated=true. NULL ACL (PUBLIC default). |
-| **Closure** | Migration applied + production verification |
+| **Patch A status** | **APPLIED AND VERIFIED 2026-05-30.** REVOKE from PUBLIC/anon. GRANT to authenticated + service_role. `has_function_privilege('anon', ...) = false` confirmed. |
+| **Remaining** | Function body still lacks tenant guard — authenticated cross-tenant call succeeds. Requires Patch B. |
+| **Closure** | Anon containment CLOSED. Cross-tenant closure requires Patch B (tenant guard in function body). |
 
 ---
 
@@ -167,7 +171,9 @@ All three are SECURITY DEFINER and intentionally PUBLIC — they are used inside
 | **Fix direction** | Same as P0-2 |
 | **Production corroboration** | **Confirmed** — 2026-05-30 |
 | **Production evidence** | SECURITY DEFINER active; function body accepts arbitrary `p_branch_id` with no tenant check. `has_function_privilege` confirms anon=true, authenticated=true. NULL ACL (PUBLIC default). |
-| **Closure** | Migration applied + production verification |
+| **Patch A status** | **APPLIED AND VERIFIED 2026-05-30.** REVOKE from PUBLIC/anon. GRANT to authenticated + service_role. `has_function_privilege('anon', ...) = false` confirmed. Zero callers in application code. |
+| **Remaining** | Function body still lacks tenant guard. Requires Patch B. |
+| **Closure** | Anon containment CLOSED. Cross-tenant closure requires Patch B. |
 
 ---
 
@@ -184,7 +190,9 @@ All three are SECURITY DEFINER and intentionally PUBLIC — they are used inside
 | **Deferred** | Points earning client-trust is separate (FIN-1). Tenant isolation is the immediate P0 fix; full financial closure also requires points earning to become server-trusted rather than client-computed. |
 | **Production corroboration** | **Confirmed** — 2026-05-30 |
 | **Production evidence** | Both functions SECURITY DEFINER active; update `customers.puntos` from caller-supplied `p_id`/`p_pts` without tenant or role validation. `has_function_privilege` confirms anon=true, authenticated=true for both. NULL ACL (PUBLIC default). |
-| **Closure** | Migration applied + production verification |
+| **Patch A status** | **APPLIED AND VERIFIED 2026-05-30.** REVOKE from PUBLIC/anon. GRANT to authenticated + service_role (temporary compatibility allowance). `has_function_privilege('anon', ...) = false` confirmed for both. |
+| **Remaining** | Function bodies lack tenant/role/input guards (Patch B). Points earning remains client-trusted — financial integrity NOT closed (Patch C). |
+| **Closure** | Anon containment CLOSED. Cross-tenant + financial integrity closure requires Patch B + C. |
 
 ---
 
@@ -201,7 +209,9 @@ All three are SECURITY DEFINER and intentionally PUBLIC — they are used inside
 | **Constraints** | Encargado cannot self-promote to Dueño. Cannot promote/create Dueño. Cannot modify/delete Dueño. `invite-member` uses service_role (no break). |
 | **Production corroboration** | **Confirmed** — 2026-05-30 |
 | **Production evidence** | Permissive `team_members_restaurant` FOR ALL policy active, scoped only by `restaurant_id = get_user_restaurant_id()`. Coexists with a stricter `team_members_write` policy, but permissive policies combine via OR — the broad FOR ALL policy defeats the write restriction. Any team member can UPDATE their own `rol`, DELETE other members. |
-| **Closure** | Migration applied + production verification + invite-member verified |
+| **Patch A status** | **APPLIED AND VERIFIED 2026-05-30.** REVOKE ALL from anon. REVOKE INSERT/UPDATE/DELETE from authenticated (SELECT retained). Dropped `team_members_restaurant` FOR ALL policy. Created `team_members_select` (SELECT only, tenant-scoped). Verified: anon SELECT/INSERT/UPDATE/DELETE = false. authenticated SELECT = true, INSERT/UPDATE/DELETE = false. service_role full CRUD retained. |
+| **Remaining** | Audit of `invite-member` Edge Function hierarchy checks as sole mutation boundary (Patch B). Encargado->Dueno escalation prevention verified in Edge Function but not yet formally audited. |
+| **Closure** | Browser-side mutation containment CLOSED. Full P0-5 closure requires invite-member hierarchy audit (Patch B). |
 
 ---
 
@@ -219,7 +229,9 @@ All three are SECURITY DEFINER and intentionally PUBLIC — they are used inside
 | **Post-fix test** | Direct RPC call returns permission denied; close-table via sync wrapper still works; legacy overloads no longer exist |
 | **Production corroboration** | **Confirmed** — 2026-05-30 |
 | **Production evidence** | Three SECURITY DEFINER overloads active (7, 9, 11 args). All lack tenant check. `has_function_privilege` confirms anon=true, authenticated=true for all three. NULL ACL (PUBLIC default). |
-| **Closure** | Migration applied + production verification + close-table flow unbroken |
+| **Patch A status** | **APPLIED AND VERIFIED 2026-05-30.** REVOKE from PUBLIC/anon on all three overloads. 11-arg: GRANT to authenticated + service_role. 7-arg and 9-arg: NOT granted to any role (no verified caller). Verified: anon = false for all. authenticated 7-arg = false, 9-arg = false, 11-arg = true. |
+| **Remaining** | Function body lacks tenant guard and p_caja_shift_id branch validation (Patch B). Effective caja_shift_id must validate COALESCE(p_caja_shift_id, v_turn.caja_shift_id). Legacy 7/9-arg overloads still exist but are unreachable. DROP in Patch B. |
+| **Closure** | Anon + legacy-overload containment CLOSED. Cross-tenant + p_caja_shift_id closure requires Patch B. |
 
 ---
 
@@ -235,8 +247,10 @@ All three are SECURITY DEFINER and intentionally PUBLIC — they are used inside
 | **Fix direction** | Add tenant check via `get_user_restaurant_id()` against shift's branch. Add role check (Dueño/Encargado). REVOKE from PUBLIC. |
 | **Post-fix test** | Cross-tenant call raises error; own-tenant Encargado call succeeds |
 | **Production corroboration** | **Confirmed** — 2026-05-30 |
-| **Production evidence** | SECURITY DEFINER active; updates `caja_shifts.retiros` from caller-supplied `p_shift_id`/`p_retiro_json` with no tenant or role validation. `has_function_privilege` confirms anon=true, authenticated=true. NULL ACL (PUBLIC default). |
-| **Closure** | Migration applied + production verification |
+| **Production evidence** | SECURITY DEFINER active; updates `caja_shifts.retiros` from caller-supplied `p_shift_id`/`p_retiro_json` with no tenant or role validation. `has_function_privilege` confirms anon=true, authenticated=true. NULL ACL (PUBLIC default). Production column type confirmed: `caja_shifts.retiros` is TEXT with default `'[]'::text`. |
+| **Patch A status** | **APPLIED AND VERIFIED 2026-05-30.** REVOKE from PUBLIC/anon. GRANT to authenticated + service_role. `has_function_privilege('anon', ...) = false` confirmed. |
+| **Remaining** | Function body lacks tenant guard and role enforcement (Dueno/Encargado only). Requires Patch B. TEXT storage preserved — safe jsonb round-trip pattern unchanged. |
+| **Closure** | Anon containment CLOSED. Cross-tenant + role-gate closure requires Patch B. |
 
 ---
 
@@ -254,7 +268,9 @@ All three are SECURITY DEFINER and intentionally PUBLIC — they are used inside
 | **Post-fix test** | Function no longer exists; `decrement_stock_with_egreso` works normally |
 | **Production corroboration** | **Confirmed** — 2026-05-30 |
 | **Production evidence** | Legacy `decrement_stock(p_id uuid, p_qty numeric)` SECURITY DEFINER active with no tenant check. `has_function_privilege` confirms anon=true, authenticated=true. NULL ACL (PUBLIC default). Safe replacement `decrement_stock_with_egreso` coexists with proper tenant validation. |
-| **Closure** | Migration applied + production verification + no callers broken |
+| **Patch A status** | **APPLIED AND VERIFIED 2026-05-30.** REVOKE from PUBLIC/anon. GRANT to authenticated + service_role. `has_function_privilege('anon', ...) = false` confirmed. |
+| **Remaining** | Function body lacks tenant guard, role enforcement (Dueno/Encargado only), and non-positive value rejection. Requires Patch B. |
+| **Closure** | Anon containment CLOSED. Cross-tenant + role-gate closure requires Patch B. |
 
 ---
 
@@ -265,7 +281,7 @@ All three are SECURITY DEFINER and intentionally PUBLIC — they are used inside
 | **SAFE — has tenant/role validation** | 13 | `get_user_restaurant_id`, `get_user_role`, `user_owns_branch`, `sync_close_table_operation`, `apply_sales_operation`, `close_caja_shift_operation`, `open_caja_shift_operation`, `archive_customer_operation`, `create_factura_contingencia`, `create_delivery_order_operation`, `update_delivery_order_operation`, `decrement_stock_with_egreso`, `increment_stock_with_ingreso` | Part C supplemental query confirmed tenant/role guards in function bodies |
 | **SAFE — service_role only** | 3 | `check_employee_login_lockout`, `record_employee_login_failure`, `clear_employee_login_attempts` | `has_function_privilege` confirmed anon=false, authenticated=false, service_role=true. Earlier Block 8 `execute_access_summary` was misleading for explicit ACLs; corrected via effective privilege checks. |
 | **SAFE — utility (event trigger)** | 1 | `rls_auto_enable` | Event trigger function that enables RLS on new public tables. Does not disable RLS, modify policies, or touch user data. Track as HARD-1 for unnecessary PUBLIC execute privilege. |
-| **VULNERABLE (P0)** | 7 functions (10 overloads) | `cerrar_mesa_atomico` (3 overloads: 7/9/11 args), `append_caja_retiro`, `decrement_stock`, `increment_customer_points`, `decrement_customer_points`, `get_top_products`, `get_facturacion_range` | `has_function_privilege` confirmed anon=true, authenticated=true for all. NULL ACL (PUBLIC default). |
+| **PATCH A CONTAINED (P0)** | 7 functions (10 overloads) | `cerrar_mesa_atomico` (3 overloads: 7/9/11 args), `append_caja_retiro`, `decrement_stock`, `increment_customer_points`, `decrement_customer_points`, `get_top_products`, `get_facturacion_range` | Patch A applied 2026-05-30: anon EXECUTE revoked on all. 7/9-arg cerrar_mesa_atomico denied to all roles. Remaining: function bodies lack internal tenant/role guards (Patch B/C required). |
 
 ### Deferred Risks (not P0, tracked separately)
 
@@ -314,27 +330,59 @@ GATE 0-C — Production read-only corroboration ✅ COMPLETE (v1.3)
     Delivery order role scope tracked (AUTHZ-1)
     → E1C-A1 DESIGN is UNBLOCKED
 
-GATE 1 — P0 Remediation
-├─ E1C-A1: Final SQL remediation strategy
-│   ├─ Exact migration SQL for all 8 P0s
-│   ├─ team_members hierarchy rules
-│   ├─ cerrar_mesa_atomico: REVOKE + defense-in-depth
-│   ├─ decrement_stock: DROP legacy function
-│   ├─ Break-risk analysis per fix
-│   └─ Rollback strategy per fix
+E1C-A1 — Remediation design
+    Patch A containment strategy: ✅ COMPLETE (R3 FINAL approved, applied in production)
+    Patch B internal authorization: DESIGN IN PROGRESS — NOT AUTHORIZED FOR MIGRATION WRITING
+    Patch C points financial integrity: DESIGN NOT FINALIZED
+    Three-patch strategy identified: Patch A (containment) → B (internal auth) → C (points earning)
+    team_members write architecture confirmed (no browser writes, Edge Function only)
+    cerrar_mesa_atomico p_caja_shift_id subvector identified
+    Helper function compatibility verified (get_user_role returns 'Dueno' for owner)
+
+PATCH A — Emergency privilege containment ✅ APPLIED AND VERIFIED (v1.4)
+    Commit: c1152947 — applied to production 2026-05-30
+    Verification: docs/security/PATCH_A_VERIFICATION.sql — all blocks passed
+    Results:
+      anon EXECUTE = false for all 9 P0 RPC signatures
+      cerrar_mesa_atomico 7/9-arg: authenticated = false, service_role = false
+      cerrar_mesa_atomico 11-arg: authenticated = true, service_role = true
+      stock_ingresos: insecure policies removed, only tenant-scoped remains
+      team_members: anon all false, authenticated SELECT-only, service_role CRUD
+      team_members: only tenant-scoped SELECT policy remains
+    → Patch B/C design work IN PROGRESS. Migration writing NOT authorized.
+
+GATE 1 — P0 Full Remediation (Patch B + C)
+├─ Patch B: Internal tenant/role authorization (DESIGN IN PROGRESS — NOT AUTHORIZED FOR MIGRATION WRITING)
+│   │
+│   │  BLOCKERS (all must be resolved before migration writing is authorized):
+│   ├─ cerrar_mesa_atomico: validate COALESCE(p_caja_shift_id, v_turn.caja_shift_id) — effective shift must belong to same branch/tenant
+│   ├─ FIN-2: determine whether closed caja shifts may ever be mutated by late offline table closes
+│   ├─ append_caja_retiro: tenant guard via branch→restaurant + role enforcement (Dueno/Encargado only)
+│   ├─ decrement_stock: tenant guard + role enforcement (Dueno/Encargado) + non-positive value rejection + trusted-origin evaluation
+│   ├─ get_top_products / get_facturacion_range: tenant guards (user_owns_branch) inside function bodies
+│   ├─ increment/decrement_customer_points: tenant guard + role check + non-positive value rejection
+│   ├─ invite-member Edge Function: formal hierarchy audit (Encargado→Dueno escalation, self-promotion, Dueno modification/deletion vectors)
+│   ├─ cerrar_mesa_atomico: p_caja_shift_id branch validation for supplied value
+│   ├─ DROP legacy 7/9-arg cerrar_mesa_atomico overloads (no verified callers)
+│   └─ REVOKE INSERT/UPDATE/DELETE grants from authenticated on team_members (defense-in-depth)
 │
-├─ E1C-A2: Implement P0 migration(s)
-│   ├─ Write migration file(s) — reviewed before apply
-│   ├─ Manually apply via Supabase SQL Editor
-│   └─ One migration preferred; split only if risk requires
+├─ Patch C: Server-side points earning (REQUIRED BEFORE EMPLOYEE ACCESS — DESIGN NOT FINALIZED)
+│   │
+│   │  BLOCKERS (all must be resolved before design is finalized):
+│   ├─ Server-truth earned points: compute inside cerrar_mesa_atomico from server-verified final total
+│   ├─ p_cliente_id payload path: determine how customer identity reaches cerrar_mesa_atomico for earning
+│   ├─ Double-earning prevention: ensure re-close or offline replay cannot award points twice
+│   ├─ Standalone RPC restriction/removal: restrict increment_customer_points to service_role or DROP
+│   ├─ crmApi.js deployment coordination: frontend must stop calling increment_customer_points before/with migration
+│   └─ Validate customer existence even without redemption (prevent orphan points)
 │
-├─ E1C-A3: Validate P0 fixes
+├─ E1C-A3: Validate Patch B + C fixes
 │   ├─ Each exploit path re-tested → must fail
 │   ├─ Owner/Encargado operational flows verified
 │   ├─ invite-member Edge Function verified
 │   ├─ Close-table via sync wrapper verified
 │   ├─ Stock/caja/CRM/analytics smoke-tested
-│   └─ No callers broken by decrement_stock DROP
+│   └─ Points earning via table close verified (no client RPC)
 │
 │   ▼ GATE 1 PASSES → unlock Gate 2
 
@@ -382,54 +430,68 @@ GATE 5 — Employee Management
 
 ## 7. IMMEDIATE NEXT TASK
 
-### E1C-A1: Final SQL Remediation Strategy for All 8 Production-Confirmed P0 Vulnerabilities
+### Patch B Migration Writing — Internal Tenant/Role Authorization
 
-**Status:** UNBLOCKED for DESIGN. Migration writing/applying requires separate review approval.
+**Status:** DESIGN IN PROGRESS. Patch A containment strategy from R3 is applied. Patch B internal authorization design is NOT finalized. Migration writing NOT authorized — requires explicit approval after design completion.
 
-**Objective:** Produce exact, reviewed migration SQL covering all 8 production-confirmed P0s. Strategy document only — no code application.
+**Prerequisite completed:** Patch A applied and verified in production (2026-05-30).
 
-**Scope:**
-1. P0-1: `stock_ingresos` — drop insecure permissive read/insert policies; ensure tenant-scoped policy covers all commands
-2. P0-2: `get_top_products` — convert to PL/pgSQL with `user_owns_branch` guard; REVOKE from PUBLIC
-3. P0-3: `get_facturacion_range` — same treatment as P0-2
-4. P0-4: `increment/decrement_customer_points` — add tenant guard via `get_user_restaurant_id()`; convert to PL/pgSQL
-5. P0-5: `team_members` — drop permissive FOR ALL policy; split into SELECT (all) + write (role-restricted hierarchy)
-6. P0-6: `cerrar_mesa_atomico` — DROP legacy 7-arg and 9-arg overloads; REVOKE 11-arg from PUBLIC/anon/authenticated; add defense-in-depth tenant check
-7. P0-7: `append_caja_retiro` — add tenant + role guard; REVOKE from PUBLIC
-8. P0-8: `decrement_stock` — DROP legacy 2-param function; verify no remaining callers
-9. Break-risk analysis per fix
-10. Rollback SQL per fix
-11. Single vs multiple migration decision
+**Objective:** Write migration file `20260530000002_patch_b_internal_authorization.sql` implementing tenant guards, role enforcement, input validation, and legacy overload cleanup inside all P0 function bodies.
 
-**Not in scope:** Applying migrations, Mozo RPC gates (Gate 2), C2 session bridge (Gate 3), frontend changes, AUDIT-1/AUTHZ-1/HARD-1 (Gate 2).
+**Scope (from E1C-A1-R3 design — Patch B items, design in progress):**
+1. P0-2: `get_top_products` — convert to plpgsql, add `user_owns_branch(p_branch_id)` guard
+2. P0-3: `get_facturacion_range` — same treatment as P0-2
+3. P0-4: `increment/decrement_customer_points` — tenant guard, role check (Dueno/Encargado/Mozo), non-positive value rejection
+4. P0-5: `team_members` — REVOKE INSERT/UPDATE/DELETE grants from authenticated (defense-in-depth); audit invite-member hierarchy
+5. P0-6: `cerrar_mesa_atomico` — rewrite 11-arg with tenant guard from locked turn, p_caja_shift_id branch validation, COALESCE handling; DROP 7/9-arg overloads
+6. P0-7: `append_caja_retiro` — tenant guard, role enforcement (Dueno/Encargado only), TEXT-safe handling
+7. P0-8: `decrement_stock` — tenant guard, role enforcement (Dueno/Encargado only), non-positive value rejection
+
+**Separately tracked:** Patch C (server-side points earning) — design NOT finalized. Requires both migration and frontend code change (crmApi.js deployment coordination).
+
+**Not in scope:** Applying migrations, Mozo RPC gates (Gate 2), C2 session bridge (Gate 3), frontend changes beyond Patch C, AUDIT-1/AUTHZ-1/HARD-1 (Gate 2).
 
 ---
 
-## 8. VERIFICATION CHECKLIST FOR E1C-A1
+## 8. VERIFICATION CHECKLISTS
 
-- [ ] P0-1: stock_ingresos policies use `user_owns_branch(branch_id)` for SELECT and INSERT
-- [ ] P0-1: Assess whether UPDATE/DELETE policies needed
-- [ ] P0-2: get_top_products converted to PL/pgSQL with `user_owns_branch` guard, signature unchanged
-- [ ] P0-3: get_facturacion_range same treatment, signature unchanged
-- [ ] P0-4: Both points functions add `WHERE restaurant_id = get_user_restaurant_id()`
-- [ ] P0-5: team_members FOR ALL dropped; SELECT for all in restaurant
-- [ ] P0-5: INSERT restricted to Dueño/Encargado
-- [ ] P0-5: UPDATE — Dueño can update any; Encargado can update Mozo/Cocinero only; nobody sets rol to value implying Dueño; nobody UPDATEs owner's row
-- [ ] P0-5: DELETE — same hierarchy; cannot delete Dueño-linked row
-- [ ] P0-5: invite-member uses service_role — no break
-- [ ] P0-6: DROP legacy 7-arg and 9-arg cerrar_mesa_atomico overloads
-- [ ] P0-6: REVOKE ALL on 11-arg cerrar_mesa_atomico from PUBLIC/anon/authenticated
-- [ ] P0-6: Defense-in-depth tenant check added inside 11-arg function body
-- [ ] P0-6: sync_close_table_operation still calls it (internal, same definer context)
-- [ ] P0-7: append_caja_retiro gets tenant + role check; REVOKE from PUBLIC
-- [ ] P0-8: decrement_stock DROPped; verify no remaining callers in frontend or other RPCs
-- [ ] Break-risk: close-table via sync wrapper unaffected
-- [ ] Break-risk: owner analytics dashboards unaffected
-- [ ] Break-risk: CRM points redemption unaffected
-- [ ] Break-risk: stock flows via _with_egreso/_with_ingreso unaffected
-- [ ] Break-risk: caja retiro via proper flow unaffected
-- [ ] Rollback: reverse SQL documented per fix
-- [ ] No scope creep: no Mozo gates, no C2 code, no frontend
+### Patch A — Emergency Privilege Containment ✅ ALL PASSED (2026-05-30)
+
+- [x] anon EXECUTE = false for all 9 P0 RPC signatures
+- [x] cerrar_mesa_atomico 7/9-arg: authenticated = false, service_role = false
+- [x] cerrar_mesa_atomico 11-arg: authenticated = true, service_role = true
+- [x] Operational RPCs (get_top_products, get_facturacion_range, points, retiro, stock): authenticated + service_role = true
+- [x] stock_ingresos: insecure `stock_ingresos_read` and `stock_ingresos_insert` policies removed
+- [x] stock_ingresos: only `stock_ingresos_branch` (FOR ALL, tenant-scoped) remains
+- [x] team_members: anon SELECT/INSERT/UPDATE/DELETE = false
+- [x] team_members: authenticated SELECT = true, INSERT/UPDATE/DELETE = false
+- [x] team_members: service_role full CRUD retained
+- [x] team_members: only `team_members_select` policy (tenant-scoped SELECT) remains
+- [x] No accidental GRANT to PUBLIC or anon in migration
+- [x] All tests pass (485/485), build succeeds
+- [x] Verification script: docs/security/PATCH_A_VERIFICATION.sql — all blocks passed
+
+### Patch B — Internal Authorization (PENDING)
+
+- [ ] P0-2: get_top_products tenant guard in function body
+- [ ] P0-3: get_facturacion_range tenant guard in function body
+- [ ] P0-4: increment/decrement_customer_points tenant + role + input guards
+- [ ] P0-5: REVOKE INSERT/UPDATE/DELETE grants from authenticated (defense-in-depth)
+- [ ] P0-5: invite-member hierarchy formally audited
+- [ ] P0-6: cerrar_mesa_atomico 11-arg rewrite with tenant + p_caja_shift_id validation
+- [ ] P0-6: DROP legacy 7/9-arg overloads
+- [ ] P0-7: append_caja_retiro tenant + role guard
+- [ ] P0-8: decrement_stock tenant + role + input guard
+- [ ] Break-risk: all operational flows verified post-apply
+- [ ] Rollback SQL documented
+
+### Patch C — Server-Side Points Earning (PENDING)
+
+- [ ] Points earning computed inside cerrar_mesa_atomico from server-truth total
+- [ ] increment_customer_points restricted to service_role only
+- [ ] crmApi.js no longer calls increment_customer_points
+- [ ] No double-earning on table close
+- [ ] Close table without customer: no points logic triggered
 
 ---
 
@@ -447,7 +509,7 @@ GATE 5 — Employee Management
 | Device mode code | Deployed, UI-only, correct |
 | PWA configuration | Deployed, working |
 | Any employee Login UI | Do not create until Gate 4 |
-| Applied migrations (20260529000001, 20260529000002, 20260524000099, etc.) | Never modify applied migrations — fixes go in NEW files |
+| Applied migrations (20260529000001, 20260529000002, 20260524000099, 20260530000001, etc.) | Never modify applied migrations — fixes go in NEW files |
 
 **Critical rules:**
 - All fixes must be NEW migration files
@@ -480,3 +542,4 @@ Every future implementation task report must include:
 | 1.1 | 2026-05-30 | Phase 0 status corrected (calculation ≠ authorization closure). P1 count corrected (4 not 3). 3 P1s promoted to P0 after Gate 0-B verification (cerrar_mesa_atomico, append_caja_retiro, decrement_stock). Total P0: 8. Full SECURITY DEFINER inventory added (23 functions: 16 safe, 7 vulnerable). Gate structure updated (0-A/0-B prerequisite). E1C-A1 unblocked. Document persisted to `docs/security/`. |
 | 1.2 | 2026-05-30 | Critical accuracy correction: repository inspection alone does not prove production state. All P0s changed from "confirmed active" to "confirmed in repository; production corroboration pending." Added `Production corroboration` and `Production evidence` fields to each P0 entry. Added Gate 0-C (production read-only verification) as prerequisite before E1C-A1. E1C-A1 re-blocked until Gate 0-C completes. Read-only SQL verification script produced. Confirmed no sensitive values in document. |
 | 1.3 | 2026-05-30 | Gate 0-C COMPLETE. All 8 P0s production-corroborated via read-only catalog queries + `has_function_privilege` effective privilege checks. P0-6 updated: three production overloads (7/9/11 args) confirmed; 7-arg bypasses discount/points validation; fix direction updated to DROP legacy overloads. P0-5 evidence updated: permissive FOR ALL policy defeats stricter write policy via OR combination. SECURITY DEFINER inventory updated with production verification status. Added tracked items: AUDIT-1 (sync_close_table actor_user_id client-asserted), AUTHZ-1 (delivery order role scope), HARD-1 (rls_auto_enable unnecessary PUBLIC execute). Employee login RPCs confirmed correctly restricted. E1C-A1 DESIGN unblocked; migration writing/applying requires separate review. |
+| 1.4 | 2026-05-30 | **Patch A APPLIED AND VERIFIED IN PRODUCTION.** Commit `c1152947`. Patch A containment strategy from E1C-A1-R3 applied. Three-patch strategy (A→B→C) identified. Patch A emergency containment applied: REVOKE PUBLIC/anon on all 9 P0 RPC signatures; cerrar_mesa_atomico 7/9-arg denied to all roles; stock_ingresos insecure policies removed; team_members browser-write access removed (SELECT-only for authenticated, service_role retains CRUD via invite-member Edge Function). Production verification passed all blocks in PATCH_A_VERIFICATION.sql. P0s remain open for authenticated cross-tenant exploitation (Patch B) and client-trusted points earning (Patch C). Patch B design IN PROGRESS — not authorized for migration writing. Patch C design NOT FINALIZED. Employee Login/C2 remain blocked. |
