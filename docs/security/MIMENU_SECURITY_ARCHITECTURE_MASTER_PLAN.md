@@ -1,8 +1,8 @@
 # MIMENU MASTER PLAN — SECURITY, ARCHITECTURE & RELEASE READINESS
 
-**Version:** 1.5 — 2026-05-31
+**Version:** 1.6 — 2026-06-01
 **Status:** ACTIVE — Employee UI blocked on P0 closure
-**Gate:** Patch A APPLIED AND VERIFIED IN PRODUCTION (2026-05-30). Patch B internal authorization: DESIGN IN PROGRESS — NOT AUTHORIZED FOR MIGRATION WRITING. Production corroboration of direct `turns` table financial bypass confirmed (2026-05-31, P0-6B). Patch C points financial integrity: REQUIRED — DESIGN NOT FINALIZED. Employee Login/C2 remain blocked.
+**Gate:** Patch A APPLIED AND VERIFIED IN PRODUCTION (2026-05-30). Patch B internal authorization: DESIGN IN PROGRESS — NOT AUTHORIZED FOR CODE OR MIGRATION WRITING. Production corroboration of direct table financial bypasses confirmed: `turns` (P0-6B, 2026-05-31), `turn_items` (P0-6C, 2026-06-01), `caja_shifts` (P0-6D, 2026-06-01). Patch C points financial integrity: REQUIRED — DESIGN NOT FINALIZED. Employee Login/C2 remain blocked.
 
 ---
 
@@ -18,9 +18,13 @@ UI visibility is not authorization. Server-side enforcement is required for ever
 
 MiMenu is a cloud-first restaurant POS SaaS (browser/PWA). The product has a working owner/team-member authentication layer, financial calculation hardening for close-table operations, device mode separation, and a deployed-and-tested employee login Edge Function.
 
-**8 P0 authorization vulnerabilities confirmed active in production, plus P0-6B subvector (direct `turns` table financial mutation bypass).** The original 5 P0s from the initial audit were expanded to 8 after Gate 0-B repository verification. All 8 have been corroborated against the live Supabase production database via read-only SQL catalog queries (Gate 0-C, completed 2026-05-30). Effective `has_function_privilege` checks confirmed that vulnerable SECURITY DEFINER functions are callable by `anon` and `authenticated` roles in production. RLS policy queries confirmed that permissive policies defeat intended restrictions on `stock_ingresos` and `team_members`.
+**8 P0 authorization vulnerabilities confirmed active in production, plus subvectors P0-6B (direct `turns` table financial mutation bypass), P0-6C (direct `turn_items` financial-source bypass), and P0-6D (direct `caja_shifts` ledger/reconciliation bypass).** The original 5 P0s from the initial audit were expanded to 8 after Gate 0-B repository verification. All 8 have been corroborated against the live Supabase production database via read-only SQL catalog queries (Gate 0-C, completed 2026-05-30). Effective `has_function_privilege` checks confirmed that vulnerable SECURITY DEFINER functions are callable by `anon` and `authenticated` roles in production. RLS policy queries confirmed that permissive policies defeat intended restrictions on `stock_ingresos` and `team_members`.
 
 P0-6B production corroboration (2026-05-31) confirmed that the `turns_authenticated` FOR ALL RLS policy grants any authenticated user full INSERT/UPDATE/DELETE on `turns` within their branch, bypassing all RPCs, `business_operations` audit trail, and financial validation. This enables direct creation of closed turns, direct mutation of financial fields (`total_facturado`, `propina`, `metodo_pago`, `status`), and turn annulment — all without any RPC guard. Additionally, `close_operation_id` does not exist in production `turns` schema, meaning strict idempotency for close operations requires a new durable link column.
+
+P0-6C production corroboration (2026-06-01) confirmed that `turn_items` has `GRANT ALL` to `authenticated` (and excessive CRUD grants to `anon`), with permissive RLS policies `turn_items_all` (FOR ALL TO public) and `turn_items_authenticated` (FOR ALL TO authenticated, `user_owns_branch(branch_id)`) — no role restriction. Production-confirmed columns include financially sensitive `precio` and `cantidad`. Repository inspection shows all item-creation paths supply `precio` from client-derived values, `offlineSync.js UPDATE_TURN_ITEM` exposes a free-form IndexedDB-sourced update object, and `cerrar_mesa_atomico` reads `SUM(cantidad * precio)` as server truth — making the financial item source untrusted until contained.
+
+P0-6D production corroboration (2026-06-01) confirmed that `caja_shifts` has `GRANT ALL` to `authenticated` (and excessive CRUD grants to `anon`), with permissive RLS policy `caja_shifts_branch` (FOR ALL TO authenticated, `user_owns_branch(branch_id)`) defeating the intended Dueño/Encargado restriction in `caja_shifts_write` through OR semantics — identical to the P0-5 `team_members` pattern. No direct browser mutation caller was found in current repository inspection, but the PostgREST data API permits direct authenticated same-branch mutation of all columns including financially sensitive fields.
 
 Production corroboration also verified:
 - Employee login rate-limiting RPCs are correctly restricted to `service_role` only.
@@ -39,7 +43,7 @@ Financial *calculation* integrity fixes (discount validation, duplicate close pr
 
 The employee login Edge Function works end-to-end for credential verification, but the custom JWT it issues cannot operate the Supabase data layer. The chosen architecture (Variant C2: passwordless Supabase Auth session bridge) is sound but **blocked** until all P0 authorization holes are closed.
 
-**Current deployment:** Branch `main` at commit `c1152947`. Working tree clean. All employee login migrations applied in production. Patch A privilege containment migration applied and verified in production (2026-05-30). No employee Login UI exists in the frontend.
+**Current deployment:** Branch `main` at commit `a4b33c2b`. Working tree clean. All employee login migrations applied in production. Patch A privilege containment migration applied and verified in production (2026-05-30). No employee Login UI exists in the frontend.
 
 ---
 
@@ -262,6 +266,124 @@ All three are SECURITY DEFINER and intentionally PUBLIC — they are used inside
 
 ---
 
+**P0-6C: Direct `turn_items` Financial-Source Bypass (subvector of P0-6)**
+
+| Field | Detail |
+|-------|--------|
+| **Severity** | P0 — financial mutation bypass of server-truth pricing |
+| **Location** | `turn_items` table — RLS policies, table-level grants, and browser/offline caller paths |
+| **Classification** | Production-confirmed P0 for authenticated same-branch mutation. |
+
+**Production-confirmed evidence:**
+
+| Evidence item | Detail |
+|---------------|--------|
+| **Effective table privileges** | authenticated: SELECT/INSERT/UPDATE/DELETE=true. anon: SELECT/INSERT/UPDATE/DELETE=true. service_role: SELECT/INSERT/UPDATE/DELETE=true. |
+| **Anon exposure** | Excessive CRUD grants confirmed. Row-level access or mutation success through RLS under anon was not directly corroborated by execution or equivalent effective policy evaluation in the supplied evidence. Classified as a confirmed defense-in-depth / minimum-privilege defect, not as the validated P0 mutation exploit path. |
+| **RLS policies** | `turn_items_all` — PERMISSIVE FOR ALL TO public. `turn_items_authenticated` — PERMISSIVE FOR ALL TO authenticated, USING/WITH CHECK: `user_owns_branch(branch_id)`. No role restriction on either policy. |
+| **Confirmed columns** | `branch_id`, `cantidad`, `created_at`, `menu_item_id`, `menu_item_name`, `notas`, `precio`, `turn_id` |
+| **Constraints** | No CHECK constraints were returned by the supplied production query. |
+| **Mutation surface** | Any authenticated user whose JWT satisfies `user_owns_branch(branch_id)` can INSERT, UPDATE, or DELETE any column on any matching `turn_items` row via the PostgREST data API. `turn_items_all` (TO public) further broadens access via permissive OR semantics. |
+| **Production trigger status** | No production trigger query was included in the supplied evidence. Absence of a protective `BEFORE INSERT` or `BEFORE UPDATE` trigger is not confirmed from production evidence alone. Post-remediation verification must confirm effective production protections. |
+
+**Repository-inspection findings:**
+
+| Finding | Detail |
+|---------|--------|
+| **Item-creation paths** | All browser item-creation paths that write `precio` use client-derived price values: `posApi.js dbAddTurnItem()`, `POSView.jsx` line 471 and 559, `ComandaPanel.jsx` line 551-552 via `TurnItem.create()`. |
+| **Other mutation paths** | Other paths directly alter `cantidad` (`posApi.js dbUpdateTurnItem()`), delete item rows (`posApi.js` when qty ≤ 0, `offlineSync.js DELETE_TURN_ITEM`), or save non-financial notes (`posApi.js dbSaveNota()`, `offlineSync.js NOTA_SAVE`). |
+| **Free-form update risk** | `offlineSync.js UPDATE_TURN_ITEM` (line 110-113) passes `op.updates` as a free-form object sourced from IndexedDB — no field whitelist. IndexedDB is directly writable from browser DevTools. This is the most accessible manipulation vector identified. |
+| **cerrar_mesa_atomico SUM** | Repository definition (migration `20260528000002`, line 48-50) reads `SUM(cantidad * precio) FROM turn_items` as `v_subtotal`, treating it as server truth. The total consistency check (line 119) compares client-supplied `p_total` against `v_subtotal` (derived from client-sourced `precio`) minus `p_descuento` — both sides are manipulable. |
+| **delivery_order_operation** | Repository definition (migration `20260527000008`, line 158-175): RPC-internal INSERT into `turn_items` with `precio` originating from client operation payload, not resolved from `menu_items`. |
+| **`modificadores` note** | `modificadores` appears in repository caller payloads but its presence as a production column was not corroborated by the supplied SQL. Classified as repository-inspection finding only. |
+
+**Caller map — `turn_items` mutations by category:**
+
+Direct browser mutation implementations:
+
+| File | Function/Line | Operation | Fields | Financial | Evidence |
+|------|--------------|-----------|--------|-----------|----------|
+| `src/lib/posApi.js` | `dbAddTurnItem()` ~line 33-61 | INSERT | `turn_id`, `branch_id`, `menu_item_id`, `menu_item_name`, `cantidad`, `precio`, `notas`, `client_uid` | Yes — `precio`, `cantidad` client-sourced | Repository |
+| `src/lib/posApi.js` | `dbUpdateTurnItem()` ~line 76-99 | UPDATE `cantidad` or DELETE | `cantidad`; or full row deletion | Yes — `cantidad` is SUM multiplier | Repository |
+| `src/lib/posApi.js` | `dbSaveNota()` ~line 63-74 | UPDATE `notas` only | `notas` | No (non-financial) | Repository |
+| `src/pages/POSView.jsx` | ~line 471 | INSERT | `precio` = client-sourced | Yes | Repository |
+| `src/pages/POSView.jsx` | ~line 559 | INSERT (direct-sale) | `precio` = client-sourced | Yes | Repository |
+| `src/components/salon/ComandaPanel.jsx` | ~line 551-552 | INSERT via `TurnItem.create()` | `precio` = client-sourced | Yes — independent of posApi | Repository |
+| `src/components/configuracion/ManualTurnForm.jsx` | ~line 56 | INSERT via `TurnItem.bulkCreate()` | Without `precio` field (defaults 0) | Low | Repository |
+
+Offline replay mutation implementations:
+
+| File | Handler | Operation | Fields | Financial | Evidence |
+|------|---------|-----------|--------|-----------|----------|
+| `src/lib/offlineSync.js` | INSERT_TURN_ITEM ~line 57-84 | INSERT | `precio` from IndexedDB | Yes | Repository |
+| `src/lib/offlineSync.js` | UPDATE_TURN_ITEM ~line 110-113 | UPDATE | Free-form `op.updates` — no whitelist | Critical | Repository |
+| `src/lib/offlineSync.js` | DELETE_TURN_ITEM ~line 103-106 | DELETE by id | Full row deletion | Moderate | Repository |
+| `src/lib/offlineSync.js` | NOTA_SAVE ~line 117-127 | UPDATE `notas` only | `notas` | No | Repository |
+
+Wrapper invocation sites (not independent implementations):
+
+| File | Line | Invokes | Notes |
+|------|------|---------|-------|
+| `src/components/salon/ComandaPanel.jsx` | ~150 | `dbAddTurnItem()` | Usage site of posApi helper |
+| `src/components/salon/ComandaPanel.jsx` | ~183 | `dbUpdateTurnItem()` | Usage site of posApi helper |
+| `src/components/salon/ComandaPanel.jsx` | ~453 | `dbSaveNota()` | Usage site of posApi helper |
+
+RPC-internal (server-side, not direct browser mutation):
+
+| Migration | RPC | Operation | Notes |
+|-----------|-----|-----------|-------|
+| `20260527000008` | `delivery_order_operation` | INSERT into `turn_items` | `precio` from client operation payload, not resolved from `menu_items` |
+
+| Field | Detail |
+|-------|--------|
+| **Combined P0-6C conclusion** | Production confirms the writable financial item-source boundary. Repository inspection demonstrates current client/offline paths interacting with that boundary. Together with the production-confirmed writable `precio` and `cantidad` columns, these paths make the financial item source untrusted until contained. `turn_items` cannot be described as trustworthy financial server-truth until contained. |
+| **Production corroboration** | **Confirmed** — 2026-06-01 |
+| **Patch A status** | NOT ADDRESSED by Patch A. Patch A targeted RPC privilege containment, not table-level RLS/grant policies. |
+| **Remaining** | Full resolution requires Patch B: remove effective broad direct browser-authenticated financial mutation capability, server-validated control of `precio` and `cantidad`, caller migration, offline replay containment, and custom item pricing policy. |
+| **Closure criteria** | ALL of the following must be satisfied: (1) Effective broad direct browser-authenticated financial INSERT/UPDATE/DELETE capability on `turn_items` removed. (2) `precio` and `cantidad` controlled through server-validated mechanisms. (3) Legitimate comanda/order-item/offline workflows preserved through reviewed paths. (4) Custom item pricing policy explicitly decided (items where `menu_item_id IS NULL`). (5) Offline replay no longer permits arbitrary financial mutation (free-form `op.updates` vector eliminated). (6) Excessive anon CRUD grants removed (defense-in-depth). (7) Security/regression tests prove subtotal source containment. |
+
+---
+
+**P0-6D: Direct `caja_shifts` Ledger/Reconciliation Bypass (subvector of P0-6)**
+
+| Field | Detail |
+|-------|--------|
+| **Severity** | P0 — financial ledger/reconciliation bypass |
+| **Location** | `caja_shifts` table — RLS policies, table-level grants |
+| **Classification** | Production-confirmed P0 for authenticated same-branch mutation. Permitted/exploitable through PostgREST/data API even though no current direct frontend mutation caller was found. |
+
+**Production-confirmed evidence:**
+
+| Evidence item | Detail |
+|---------------|--------|
+| **Effective table privileges** | authenticated: SELECT/INSERT/UPDATE/DELETE=true. anon: SELECT/INSERT/UPDATE/DELETE=true. service_role: SELECT/INSERT/UPDATE/DELETE=true. |
+| **Anon exposure** | Excessive CRUD grants confirmed. Row-level access or mutation success through RLS under anon was not directly corroborated by execution or equivalent effective policy evaluation in the supplied evidence. Classified as a confirmed defense-in-depth / minimum-privilege defect, not as the validated P0 mutation exploit path. |
+| **RLS policies** | `caja_shifts_branch` — PERMISSIVE FOR ALL TO `{authenticated}`, USING: `user_owns_branch(branch_id)`, WITH CHECK: `user_owns_branch(branch_id)`. `caja_shifts_select` — PERMISSIVE SELECT TO `{public}`, USING: branch belongs to `get_user_restaurant_id()`. `caja_shifts_write` — PERMISSIVE FOR ALL TO `{public}`, USING/WITH CHECK: branch belongs to `get_user_restaurant_id()` AND `get_user_role() = ANY (ARRAY['Dueno'::text, 'Encargado'::text])`. |
+| **Vulnerability pattern** | Permissive OR semantics: `caja_shifts_branch` (FOR ALL TO authenticated, no role restriction) alone is sufficient for any authenticated same-branch user to perform any operation. The intended Dueño/Encargado restriction in `caja_shifts_write` is defeated. Identical to the confirmed P0-5 `team_members` pattern. |
+| **Confirmed columns** | `id`, `branch_id`, `tipo_turno`, `nombre_turno`, `fondo_inicial`, `abierto_at`, `cerrado_at`, `status`, `retiros`, `arqueo_efectivo`, `diferencia_caja`, `motivo_diferencia`, `total_facturado_turno`, `closed_by`, `close_operation_id`, `close_payload`, `opened_by`, `open_operation_id`, `open_payload` |
+| **Confirmed constraints** | status IN `('abierto','cerrado')`. tipo_turno IN `('manana','tarde','noche','general')`. |
+| **Financially sensitive columns** | `fondo_inicial`, `retiros`, `total_facturado_turno`, `arqueo_efectivo`, `diferencia_caja`, `status`, `cerrado_at` |
+| **Mutation surface** | All confirmed columns, including financially sensitive ones, are directly mutable by any authenticated mozo in the branch via the PostgREST data API. |
+
+**Repository-inspection findings:**
+
+| Finding | Detail |
+|---------|--------|
+| **No direct browser mutation callers found** | All browser-initiated `caja_shifts` writes go through SECURITY DEFINER RPCs. |
+| **RPC-mediated writes** | `open_caja_shift_operation` (INSERT, tenant+role guards), `close_caja_shift_operation` (UPDATE, tenant+role guards, idempotency), `cerrar_mesa_atomico` (UPDATE `total_facturado_turno`, recalculated from turns — inherits P0-6C tainted data), `append_caja_retiro` (UPDATE `retiros`, JSONB append). |
+| **SECURITY DEFINER note** | All RPCs execute as function owner (`postgres`), bypassing RLS entirely. Removing table grants from `authenticated` will not break these RPCs. |
+| **Latent direct-write surface** | Despite no current browser callers, the PostgREST data API permits direct authenticated same-branch mutation of all columns. Exploitable via any HTTP client, browser extension, or future code path. |
+
+| Field | Detail |
+|-------|--------|
+| **Combined P0-6D conclusion** | Permissive OR semantics mean `caja_shifts_branch FOR ALL TO authenticated` permits same-branch mutation irrespective of the intended Dueño/Encargado restriction in `caja_shifts_write`. P0-6D exists because the direct mutation API surface is permitted, not because current UI already uses it. Direct `caja_shifts` manipulation (altering shift totals, fondo_inicial, retiros) defeats end-of-shift reconciliation. |
+| **Production corroboration** | **Confirmed** — 2026-06-01 |
+| **Patch A status** | NOT ADDRESSED by Patch A. Patch A targeted RPC privilege containment, not table-level RLS/grant policies. |
+| **Remaining** | Full resolution requires Patch B: remove effective broad direct browser-authenticated mutation capability, preserve legitimate caja writes behind guarded server-side operations, role and audit integrity verified. |
+| **Closure criteria** | ALL of the following must be satisfied: (1) Effective broad direct browser-authenticated INSERT/UPDATE/DELETE capability on `caja_shifts` removed. (2) Legitimate caja writes remain behind guarded server-side operations only. (3) Server-side role checks protect financially restricted caja actions. (4) Financial/ledger/audit fields cannot be directly mutated from browser-authenticated data API calls. (5) Excessive anon CRUD grants removed (defense-in-depth). (6) Security/regression tests prove containment. |
+
+---
+
 **P0-7: `append_caja_retiro` — Cross-Tenant Cash Ledger Injection (PROMOTED FROM P1-B)**
 
 | Field | Detail |
@@ -313,6 +435,8 @@ All three are SECURITY DEFINER and intentionally PUBLIC — they are used inside
 | **SAFE — utility (event trigger)** | 1 | `rls_auto_enable` | Event trigger function that enables RLS on new public tables. Does not disable RLS, modify policies, or touch user data. Track as HARD-1 for unnecessary PUBLIC execute privilege. |
 | **PATCH A CONTAINED (P0)** | 7 functions (10 overloads) | `cerrar_mesa_atomico` (3 overloads: 7/9/11 args), `append_caja_retiro`, `decrement_stock`, `increment_customer_points`, `decrement_customer_points`, `get_top_products`, `get_facturacion_range` | Patch A applied 2026-05-30: anon EXECUTE revoked on all. 7/9-arg cerrar_mesa_atomico denied to all roles. Remaining: function bodies lack internal tenant/role guards (Patch B/C required). |
 | **NOT ADDRESSED BY PATCH A (P0-6B)** | N/A (table-level RLS) | `turns_authenticated` FOR ALL policy | Direct `turns` table mutation bypass. Not a SECURITY DEFINER issue — this is an overly permissive RLS policy granting full CRUD to any authenticated user within their branch, bypassing all RPCs and audit trail. See P0-6B entry. |
+| **NOT ADDRESSED BY PATCH A (P0-6C)** | N/A (table-level RLS + grants) | `turn_items_all` FOR ALL TO public, `turn_items_authenticated` FOR ALL TO authenticated | Direct `turn_items` financial-source bypass. No role restriction. All `precio` values client-sourced. See P0-6C entry. |
+| **NOT ADDRESSED BY PATCH A (P0-6D)** | N/A (table-level RLS + grants) | `caja_shifts_branch` FOR ALL TO authenticated | Direct `caja_shifts` ledger bypass. `caja_shifts_branch` defeats Dueño/Encargado restriction in `caja_shifts_write` via permissive OR semantics (identical to P0-5 pattern). See P0-6D entry. |
 
 ### Deferred Risks (not P0, tracked separately)
 
@@ -366,7 +490,7 @@ GATE 0-C — Production read-only corroboration ✅ COMPLETE (v1.3)
 
 E1C-A1 — Remediation design
     Patch A containment strategy: ✅ COMPLETE (R3 FINAL approved, applied in production)
-    Patch B internal authorization: DESIGN IN PROGRESS — NOT AUTHORIZED FOR MIGRATION WRITING
+    Patch B internal authorization: DESIGN IN PROGRESS — NOT AUTHORIZED FOR CODE OR MIGRATION WRITING
     Patch C points financial integrity: DESIGN NOT FINALIZED
     Three-patch strategy identified: Patch A (containment) → B (internal auth) → C (points earning)
     team_members write architecture confirmed (no browser writes, Edge Function only)
@@ -386,7 +510,7 @@ PATCH A — Emergency privilege containment ✅ APPLIED AND VERIFIED (v1.4)
     → Patch B/C design work IN PROGRESS. Migration writing NOT authorized.
 
 GATE 1 — P0 Full Remediation (Patch B + C)
-├─ Patch B: Internal tenant/role authorization (DESIGN IN PROGRESS — NOT AUTHORIZED FOR MIGRATION WRITING)
+├─ Patch B: Financial boundary authorization (DESIGN IN PROGRESS — NOT AUTHORIZED FOR CODE OR MIGRATION WRITING)
 │   │
 │   │  BLOCKERS (all must be resolved before migration writing is authorized):
 │   │  Prerequisites (P-1 through P-12):
@@ -412,7 +536,7 @@ GATE 1 — P0 Full Remediation (Patch B + C)
 │   │   ├─ Extend business_operations.status CHECK to include 'pending_reconciliation'; final resolution statuses to be defined through financially safe reconciliation design
 │   │   ├─ PL/pgSQL nested BEGIN...EXCEPTION...END subtransaction pattern (not manual SAVEPOINT)
 │   │   ├─ Rejected CLOSE_TABLE stored durably in business_operations, NOT only in IndexedDB
-│   │   └─ Minimum resolution RPC with constrained actions (attribute_to_shift, confirm_void)
+│   │   └─ Define a minimum authorized reconciliation resolution boundary. Durable pending_reconciliation preservation is required; specific final resolution actions and statuses are not pre-approved and must preserve cash, revenue, original operation data, actor/timestamps, and audit integrity.
 │   │
 │   ├─ P-4: REV-LOSS — paid offline CLOSE_TABLE after turn annulled
 │   │   ├─ Pre-read turn state before close attempt; classify annulled/conflicting
@@ -435,8 +559,22 @@ GATE 1 — P0 Full Remediation (Patch B + C)
 │   │   ├─ Shift status and existence validation
 │   │   └─ REJECT policy for closed/missing shift with specific error codes
 │   │
-│   ├─ P-8: turn_items audit — verify no direct financial mutation bypass via turn_items RLS
-│   ├─ P-9: caja_shifts audit — verify no direct financial mutation bypass via caja_shifts RLS
+│   ├─ P-8: P0-6C — `turn_items` financial-source bypass (PRODUCTION-CONFIRMED 2026-06-01)
+│   │   ├─ Remove effective broad direct browser-authenticated financial INSERT/UPDATE/DELETE capability on `turn_items`
+│   │   ├─ Server-validated control of `precio` and `cantidad`
+│   │   ├─ Custom item pricing policy explicitly decided (items where menu_item_id IS NULL)
+│   │   ├─ Migrate all browser/offline callers to reviewed paths
+│   │   ├─ Eliminate free-form `op.updates` vector in offlineSync UPDATE_TURN_ITEM
+│   │   ├─ Remove excessive anon CRUD grants on `turn_items` (defense-in-depth)
+│   │   └─ CONFIRMED DEPENDENCY: P0-6C containment required before P-7 (cerrar_mesa_atomico rewrite) can treat subtotal as server-controlled financial truth
+│   │
+│   ├─ P-9: P0-6D — `caja_shifts` ledger/reconciliation bypass (PRODUCTION-CONFIRMED 2026-06-01)
+│   │   ├─ Remove effective broad direct browser-authenticated INSERT/UPDATE/DELETE capability on `caja_shifts`
+│   │   ├─ Preserve legitimate caja writes behind guarded server-side operations only
+│   │   ├─ Server-side role checks for financially restricted caja actions
+│   │   ├─ Remove excessive anon CRUD grants on `caja_shifts` (defense-in-depth)
+│   │   └─ No current direct browser mutation caller found — but PostgREST API surface is permitted and exploitable
+│   │
 │   ├─ P-10: DROP legacy 7/9-arg cerrar_mesa_atomico overloads (no verified callers)
 │   ├─ P-11: REVOKE anon EXECUTE on sync_close_table_operation (has_function_privilege confirms anon=true)
 │   ├─ P-12: Remaining P0 function body guards
@@ -445,6 +583,22 @@ GATE 1 — P0 Full Remediation (Patch B + C)
 │   │   ├─ get_top_products / get_facturacion_range: tenant guards (user_owns_branch) inside function bodies
 │   │   ├─ increment/decrement_customer_points: tenant guard + role check + non-positive value rejection
 │   │   └─ invite-member Edge Function: formal hierarchy audit (Encargado→Dueno escalation, self-promotion, Dueno modification/deletion vectors)
+│   │
+│   │  CONFIRMED DEPENDENCY:
+│   │  P0-6C containment is required before a future cerrar_mesa_atomico rewrite (P-7) can treat
+│   │  its subtotal input as server-controlled financial truth. P0-6D, P-7, and FIN-3 are all
+│   │  required Patch B boundary items, but their exact implementation ordering remains a design
+│   │  decision and is not pre-approved by this evidence review.
+│   │
+│   │  OPEN DESIGN DECISIONS (block code/migration writing):
+│   │  1. Price resolution mechanism for turn_items precio/cantidad
+│   │  2. Custom item pricing policy (items where menu_item_id IS NULL)
+│   │  3. Caja write containment approach for caja_shifts
+│   │  4. Offline replay validation strategy for IndexedDB-sourced operations
+│   │
+│   │  CANDIDATE MECHANISMS (none selected):
+│   │  Corrected RLS/policy design; revocation of broad grants; narrow column-level privileges
+│   │  after broad grants are removed; guarded RPCs; protective triggers; reviewed hybrid.
 │
 ├─ Patch C: Server-side points earning (REQUIRED BEFORE EMPLOYEE ACCESS — DESIGN NOT FINALIZED)
 │   │
@@ -510,39 +664,44 @@ GATE 5 — Employee Management
 
 ## 7. IMMEDIATE NEXT TASK
 
-### Read-Only Production Boundary Verification — `turn_items` and `caja_shifts`
+### Review v1.6 Documentation and Define Patch B Design Plan
 
-**Status:** REQUIRED BEFORE CONTINUING PATCH B DESIGN. Patch B internal authorization design cannot proceed to migration writing until the direct mutation exposure on `turn_items` and `caja_shifts` is known.
+**Status:** `turn_items` and `caja_shifts` production boundary verification COMPLETE (2026-06-01). P0-6C and P0-6D production-confirmed and documented. Evidence package reviewed and corrected through multi-agent review process.
 
-**Rationale:**
-- Server-side subtotal validation in `cerrar_mesa_atomico` is not trustworthy until direct mutation exposure on `turn_items` prices/quantities is known. If authenticated users can directly UPDATE `turn_items.precio` or `turn_items.cantidad`, the server-side SUM used for validation reads attacker-controlled data.
-- Caja integrity (shift totals, reconciliation fields, shift state) is not complete until direct mutation exposure on `caja_shifts` is known. If authenticated users can directly UPDATE `caja_shifts.total_facturado_turno` or `caja_shifts.status`, the shift-level financial boundary is bypassed.
+**Immediate next step:** Review and approve the v1.6 documentation-only update, then define the ordered Patch B design plan from the complete production evidence and caller maps. No code or migration writing is authorized by this documentation update.
 
-**Scope:** Read-only SQL catalog queries only. Produce for each table:
-1. Effective RLS policies (policy name, command, roles, USING/WITH CHECK expressions)
-2. Effective column-level and table-level privileges for `anon`, `authenticated`, `service_role`
-3. Sensitive columns that must not be directly mutable by authenticated users
-4. Repository caller map of direct INSERT/UPDATE/DELETE paths
+**Complete production evidence now available for:**
+- `turns` — P0-6B (2026-05-31): direct financial mutation bypass
+- `turn_items` — P0-6C (2026-06-01): financial-source bypass, client-sourced precio/cantidad
+- `caja_shifts` — P0-6D (2026-06-01): ledger/reconciliation bypass, permissive policy defeats role restriction
 
-**Prerequisite completed:** Patch A applied and verified in production (2026-05-30). P0-6B `turns` bypass confirmed (2026-05-31).
+**Four open design decisions block migration writing:**
+1. Price resolution mechanism for `turn_items` `precio`/`cantidad`
+2. Custom item pricing policy (items where `menu_item_id IS NULL`)
+3. Caja write containment approach for `caja_shifts`
+4. Offline replay validation strategy for IndexedDB-sourced operations
 
-### Patch B Migration Writing — Internal Tenant/Role Authorization (BLOCKED on above verification)
+**Candidate implementation mechanisms (none selected):** corrected RLS/policy design; revocation of broad grants; narrow column-level privileges after broad grants are removed; guarded RPCs; protective triggers; reviewed hybrid.
 
-**Objective:** Write migration file `20260530000002_patch_b_internal_authorization.sql` implementing tenant guards, role enforcement, input validation, and legacy overload cleanup inside all P0 function bodies. BLOCKED until `turn_items`/`caja_shifts` boundary verification completes.
+### Patch B Migration Writing — Financial Boundary Authorization (BLOCKED on open design decisions)
 
-**Scope (from E1C-A1 design — Patch B items, design in progress, expanded with P0-6B findings 2026-05-31):**
+**Objective:** Write migration file implementing financial boundary authorization: tenant guards, role enforcement, input validation, table/column grant containment, caller migration, and legacy overload cleanup. BLOCKED on the four open design decisions documented above; production verification and caller-map evidence for P0-6C/P0-6D are complete, but no code or migration writing is authorized.
+
+**Scope (from E1C-A1 design — Patch B items, design in progress, expanded with P0-6B/6C/6D findings 2026-05-31/2026-06-01):**
 1. P0-2: `get_top_products` — convert to plpgsql, add `user_owns_branch(p_branch_id)` guard
 2. P0-3: `get_facturacion_range` — same treatment as P0-2
 3. P0-4: `increment/decrement_customer_points` — tenant guard, role check (Dueno/Encargado/Mozo), non-positive value rejection
 4. P0-5: `team_members` — REVOKE INSERT/UPDATE/DELETE grants from authenticated (defense-in-depth); audit invite-member hierarchy
-5. P0-6: `cerrar_mesa_atomico` — rewrite 11-arg with tenant guard from locked turn, p_caja_shift_id branch validation, COALESCE handling, lock order `turns FOR UPDATE → caja_shifts FOR UPDATE → customers FOR UPDATE`; DROP 7/9-arg overloads
-6. P0-6B: Direct `turns` financial mutation bypass — add `close_operation_id` column, block direct financial INSERT/UPDATE/DELETE, constrain retained empty-turn INSERT, caller migration (12+ callers across 7 files), column-level containment or protective trigger for financial fields, retain kitchen/workflow via reviewed mechanisms, REV-LOSS handling, `business_operations.status` extension, durable reconciliation architecture
-7. P0-7: `append_caja_retiro` — tenant guard, role enforcement (Dueno/Encargado only), TEXT-safe handling
-8. P0-8: `decrement_stock` — tenant guard, role enforcement (Dueno/Encargado only), non-positive value rejection
-9. REVOKE anon EXECUTE on `sync_close_table_operation` (P-11)
-10. FIN-3: `turns.caja_shift_id` immutability enforcement
-11. FIN-4: Delivery payment method explicit storage (no default to 'Efectivo')
-12. Audit: `turn_items` and `caja_shifts` RLS for direct financial mutation bypass (P-8, P-9)
+5. P0-6: `cerrar_mesa_atomico` — rewrite 11-arg with tenant guard from locked turn, p_caja_shift_id branch validation, COALESCE handling, lock order `turns FOR UPDATE → caja_shifts FOR UPDATE → customers FOR UPDATE`; DROP 7/9-arg overloads. **DEPENDENCY:** P0-6C containment required before rewrite can treat subtotal as server-controlled truth.
+6. P0-6B: Direct `turns` financial mutation bypass — add `close_operation_id` column, block direct financial INSERT/UPDATE/DELETE, constrain retained empty-turn INSERT, caller migration (12+ callers across 7 files), retain kitchen/workflow via reviewed mechanisms, REV-LOSS handling, `business_operations.status` extension, durable reconciliation architecture
+7. P0-6C: Direct `turn_items` financial-source bypass — remove effective broad direct browser-authenticated financial mutation capability, server-validated control of `precio` and `cantidad`, custom item pricing policy, caller migration, offline replay containment (eliminate free-form `op.updates` vector), remove excessive anon CRUD grants
+8. P0-6D: Direct `caja_shifts` ledger/reconciliation bypass — remove effective broad direct browser-authenticated mutation capability, preserve legitimate caja writes behind guarded server-side operations, server-side role checks for financially restricted actions, remove excessive anon CRUD grants
+9. P0-7: `append_caja_retiro` — tenant guard, role enforcement (Dueno/Encargado only), TEXT-safe handling
+10. P0-8: `decrement_stock` — tenant guard, role enforcement (Dueno/Encargado only), non-positive value rejection
+11. REVOKE anon EXECUTE on `sync_close_table_operation` (P-11)
+12. FIN-3: `turns.caja_shift_id` immutability enforcement
+13. FIN-4: Delivery payment method explicit storage (no default to 'Efectivo')
+14. `business_operations` durable `pending_reconciliation` and sensitive visibility boundary
 
 **Separately tracked:** Patch C (server-side points earning) — design NOT finalized. Requires both migration and frontend code change (crmApi.js deployment coordination).
 
@@ -593,8 +752,19 @@ GATE 5 — Employee Management
 - [ ] P-11: REVOKE anon EXECUTE on `sync_close_table_operation`
 - [ ] FIN-3: `turns.caja_shift_id` immutability enforcement
 - [ ] FIN-4: Delivery payment method explicit storage
-- [ ] P-8: `turn_items` RLS audit for direct financial mutation bypass
-- [ ] P-9: `caja_shifts` RLS audit for direct financial mutation bypass
+- [ ] P0-6C: Effective broad direct browser-authenticated financial INSERT/UPDATE/DELETE on `turn_items` removed
+- [ ] P0-6C: `precio` and `cantidad` controlled through server-validated mechanisms
+- [ ] P0-6C: Custom item pricing policy decided and implemented (menu_item_id IS NULL)
+- [ ] P0-6C: Legitimate comanda/order-item/offline workflows preserved through reviewed paths
+- [ ] P0-6C: offlineSync UPDATE_TURN_ITEM free-form `op.updates` vector eliminated
+- [ ] P0-6C: Excessive anon CRUD grants on `turn_items` removed (defense-in-depth)
+- [ ] P0-6C: Security/regression tests prove subtotal source containment
+- [ ] P0-6D: Effective broad direct browser-authenticated INSERT/UPDATE/DELETE on `caja_shifts` removed
+- [ ] P0-6D: Legitimate caja writes remain behind guarded server-side operations only
+- [ ] P0-6D: Server-side role checks protect financially restricted caja actions
+- [ ] P0-6D: Financial/ledger/audit fields not directly mutable from browser-authenticated data API
+- [ ] P0-6D: Excessive anon CRUD grants on `caja_shifts` removed (defense-in-depth)
+- [ ] P0-6D: Security/regression tests prove containment
 - [ ] Break-risk: all operational flows verified post-apply
 - [ ] Rollback SQL documented
 
@@ -657,3 +827,4 @@ Every future implementation task report must include:
 | 1.3 | 2026-05-30 | Gate 0-C COMPLETE. All 8 P0s production-corroborated via read-only catalog queries + `has_function_privilege` effective privilege checks. P0-6 updated: three production overloads (7/9/11 args) confirmed; 7-arg bypasses discount/points validation; fix direction updated to DROP legacy overloads. P0-5 evidence updated: permissive FOR ALL policy defeats stricter write policy via OR combination. SECURITY DEFINER inventory updated with production verification status. Added tracked items: AUDIT-1 (sync_close_table actor_user_id client-asserted), AUTHZ-1 (delivery order role scope), HARD-1 (rls_auto_enable unnecessary PUBLIC execute). Employee login RPCs confirmed correctly restricted. E1C-A1 DESIGN unblocked; migration writing/applying requires separate review. |
 | 1.4 | 2026-05-30 | **Patch A APPLIED AND VERIFIED IN PRODUCTION.** Commit `c1152947`. Patch A containment strategy from E1C-A1-R3 applied. Three-patch strategy (A→B→C) identified. Patch A emergency containment applied: REVOKE PUBLIC/anon on all 9 P0 RPC signatures; cerrar_mesa_atomico 7/9-arg denied to all roles; stock_ingresos insecure policies removed; team_members browser-write access removed (SELECT-only for authenticated, service_role retains CRUD via invite-member Edge Function). Production verification passed all blocks in PATCH_A_VERIFICATION.sql. P0s remain open for authenticated cross-tenant exploitation (Patch B) and client-trusted points earning (Patch C). Patch B design IN PROGRESS — not authorized for migration writing. Patch C design NOT FINALIZED. Employee Login/C2 remain blocked. |
 | 1.5 | 2026-05-31 | **P0-6B: Direct `turns` table financial mutation bypass confirmed in production.** `turns_authenticated` FOR ALL RLS policy grants any authenticated user full INSERT/UPDATE/DELETE on `turns` within branch, bypassing all RPCs, `business_operations` audit trail, and financial validation. 12+ direct mutation callers identified across 7 source files. `close_operation_id` absent from production `turns` schema — strict idempotency requires new column. SECURITY DEFINER ownership corrected: all functions owned by `postgres`, not `service_role`. `sync_close_table_operation` confirmed anon=true (needs REVOKE, P-11). `business_operations.status` CHECK confirmed limited to `('processing','applied','failed')` — must extend for reconciliation. RLS limitation documented: controls rows not columns — financial mutation containment requires column-level grants, guarded RPCs, protective triggers, or caller migration. Patch B blocker list expanded from 10 to 12 prerequisites (P-1 through P-12). New deferred risks added: FIN-3 (shift immutability), FIN-4 (delivery payment default), REV-LOSS (paid offline close after annulment), BIZOPS-1 (business_operations visibility). Patch B design IN PROGRESS — NOT authorized for migration writing. |
+| 1.6 | 2026-06-01 | **P0-6C and P0-6D production-confirmed.** P0-6C (`turn_items`): `GRANT ALL` to authenticated + anon, permissive `turn_items_all` (FOR ALL TO public) and `turn_items_authenticated` (FOR ALL TO authenticated, no role restriction). Production-confirmed columns: `branch_id`, `cantidad`, `created_at`, `menu_item_id`, `menu_item_name`, `notas`, `precio`, `turn_id`. Repository inspection: all item-creation paths supply client-derived `precio`; `offlineSync.js UPDATE_TURN_ITEM` exposes free-form IndexedDB-sourced `op.updates`; `cerrar_mesa_atomico` reads `SUM(cantidad * precio)` as server truth from attacker-controlled data. P0-6D (`caja_shifts`): `GRANT ALL` to authenticated + anon, permissive `caja_shifts_branch` (FOR ALL TO authenticated, `user_owns_branch`) defeats Dueño/Encargado restriction in `caja_shifts_write` via OR semantics (identical to P0-5 pattern). 19 confirmed columns including financially sensitive `fondo_inicial`, `retiros`, `total_facturado_turno`, `diferencia_caja`. No direct browser mutation caller found — latent PostgREST API surface. Anon CRUD grants confirmed excessive on both tables; row-level anon exploitation not separately corroborated (defense-in-depth defect). Evidence separated into production-confirmed and repository-inspection classes. Caller map added by category without aggregate counts. Patch B scope expanded to 14 items (added P0-6C, P0-6D, `business_operations` boundary). Confirmed dependency: P0-6C containment required before P-7 (cerrar_mesa_atomico rewrite). Four open design decisions identified as blocking migration writing. Candidate implementation mechanisms listed but none selected. Patch B design IN PROGRESS — NOT authorized for code or migration writing. |
