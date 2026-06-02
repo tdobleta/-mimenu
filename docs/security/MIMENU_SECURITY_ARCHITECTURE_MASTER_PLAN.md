@@ -1,8 +1,8 @@
 # MIMENU MASTER PLAN — SECURITY, ARCHITECTURE & RELEASE READINESS
 
-**Version:** 1.6 — 2026-06-01
+**Version:** 1.7 — 2026-06-02
 **Status:** ACTIVE — Employee UI blocked on P0 closure
-**Gate:** Patch A APPLIED AND VERIFIED IN PRODUCTION (2026-05-30). Patch B internal authorization: DESIGN IN PROGRESS — NOT AUTHORIZED FOR CODE OR MIGRATION WRITING. Production corroboration of direct table financial bypasses confirmed: `turns` (P0-6B, 2026-05-31), `turn_items` (P0-6C, 2026-06-01), `caja_shifts` (P0-6D, 2026-06-01). Patch C points financial integrity: REQUIRED — DESIGN NOT FINALIZED. Employee Login/C2 remain blocked.
+**Gate:** Patch A APPLIED AND VERIFIED IN PRODUCTION (2026-05-30). Patch B internal authorization: DESIGN IN PROGRESS — NOT AUTHORIZED FOR CODE OR MIGRATION WRITING. P0-6C bounded design direction approved for documentation (2026-06-02): immutable server-stored price snapshots. Production corroboration of direct table financial bypasses confirmed: `turns` (P0-6B, 2026-05-31), `turn_items` (P0-6C, 2026-06-01), `caja_shifts` (P0-6D, 2026-06-01). Patch C points financial integrity: REQUIRED — DESIGN NOT FINALIZED. Employee Login/C2 remain blocked.
 
 ---
 
@@ -342,6 +342,90 @@ RPC-internal (server-side, not direct browser mutation):
 | **Remaining** | Full resolution requires Patch B: remove effective broad direct browser-authenticated financial mutation capability, server-validated control of `precio` and `cantidad`, caller migration, offline replay containment, and custom item pricing policy. |
 | **Closure criteria** | ALL of the following must be satisfied: (1) Effective broad direct browser-authenticated financial INSERT/UPDATE/DELETE capability on `turn_items` removed. (2) `precio` and `cantidad` controlled through server-validated mechanisms. (3) Legitimate comanda/order-item/offline workflows preserved through reviewed paths. (4) Custom item pricing policy explicitly decided (items where `menu_item_id IS NULL`). (5) Offline replay no longer permits arbitrary financial mutation (free-form `op.updates` vector eliminated). (6) Excessive anon CRUD grants removed (defense-in-depth). (7) Security/regression tests prove subtotal source containment. |
 
+**P0-6C Approved Bounded Design Direction**
+
+`DESIGN DIRECTION APPROVED FOR DOCUMENTATION — IMPLEMENTATION NOT AUTHORIZED`
+
+The following design direction was approved (2026-06-02) as the first-release offline-price provenance foundation for P0-6C containment within Patch B. No SQL, migration, code, exact RPC signature, exact table/column name, or implementation order is authorized by this documentation.
+
+**1. Primary mechanism: Immutable server-stored authorized price snapshots**
+
+- The first-release offline-price provenance foundation is immutable server-stored authorized price snapshots.
+- While online and with an active caja shift, the server issues an immutable authorized price snapshot for the restaurant/branch/device/caja-shift context through a guarded server-side operation (SECURITY DEFINER RPC or equivalent).
+- The snapshot includes authorized menu-item base prices and authorized modifier/extra prices needed for offline operation. Both product base prices and modifier/extra prices are covered.
+- The snapshot is durably stored server-side and referenced by a snapshot identifier.
+- The device caches the snapshot reference and display data for offline use.
+- Offline queued sales submit the snapshot identifier plus selected item/modifier identifiers and quantities.
+- At synchronization, the server loads the immutable stored snapshot and derives the financial product/modifier monetary totals from its stored authorization records.
+- Client/IndexedDB monetary values may be retained for display, debug, and audit comparison, but they are never financial truth.
+- If the current catalog price has changed since the snapshot was issued, a sale backed by a valid snapshot must honor the price shown and charged to the customer per the approved product policy.
+- HMAC/hash/token is optional future defense-in-depth, not the primary required first-release mechanism. Immutable server-stored rows with INSERT-only protection and row-level immutability enforcement are the primary mechanism.
+
+**2. Server-only issuance and immutable snapshot invariant**
+
+Required design outcomes (not SQL implementation):
+
+- Browser-authenticated clients must have no direct INSERT, UPDATE, or DELETE authority over snapshot records. All snapshot writes occur through guarded SECURITY DEFINER operations.
+- Snapshot issuance must validate: tenant (restaurant), branch, active caja shift (`status = 'abierto'`), device/session binding, and authorized actor role.
+- Snapshot item and modifier monetary rows are immutable after issuance. Server-side enforcement (row-level immutability triggers or equivalent) must prevent post-issuance modification, even by SECURITY DEFINER functions not explicitly designed for snapshot management.
+- Snapshots preserve historical authorized data independently of future live menu-item or modifier edits, deletion, or archival. Foreign key design must not cascade live catalog changes into snapshot records. Snapshot rows retain historical identifiers, names, and prices as denormalized values captured at issuance time.
+- Product base prices and modifier/extra prices are both covered by the snapshot. Modifier options must be normalized at issuance time from the current polymorphic `modifier_groups.opciones` JSONB structure (which stores options as either plain strings or `{label, precio}` objects).
+
+**3. Offline finalization invariant**
+
+First-release rule, no exceptions:
+
+- An offline paid-sale / `CLOSE_TABLE` operation may auto-finalize as trusted revenue only when it first reaches the server while the snapshot-bound caja shift is still open (`caja_shifts.status = 'abierto'`), and only after snapshot validation, item/modifier verification, operation-identity uniqueness, and turn lifecycle checks all pass.
+- If that operation first reaches the server after the snapshot-bound caja shift is already closed (`caja_shifts.status = 'cerrado'`), it must not auto-finalize as trusted revenue. It must enter durable `pending_reconciliation` / explicit financial-exception handling.
+- There is no first-release exception based only on a previously existing server turn, `turns.opened_at`, or client timestamps. A server-existing open turn proves that an order existed during the shift; it does not prove that the offline payment/close event occurred before the shift was closed. These are distinct claims requiring distinct evidence.
+- A future exception would require separate server-verifiable evidence that the payment/close event itself occurred before caja closure, not merely proof that the turn existed.
+
+**4. Authoritative caja-shift binding**
+
+- `price_snapshots.caja_shift_id` (or equivalent), created by the guarded server-side snapshot issuance operation, is the sole authoritative caja-shift binding for offline price provenance and finalization decisions.
+- The client submits the snapshot identifier as part of the offline `CLOSE_TABLE` operation.
+- The server loads the snapshot record and derives the authorized `caja_shift_id` from that server-created, immutable, trusted record.
+- Any `caja_shift_id` present in client-originated payload (operation envelope or `turns.caja_shift_id`) is non-authoritative. It may be compared against the snapshot-derived value for mismatch detection and audit logging only.
+- FIN-3 (`turns.caja_shift_id` immutability enforcement) remains a required Patch B boundary because direct mutation/reassignment of `turns.caja_shift_id` threatens broader financial integrity (shift-level totals, caja reconciliation, reporting), even though snapshot-based offline validation derives the authoritative shift binding from the snapshot record rather than from the client-mutable turn field.
+
+**5. Pending reconciliation invariants**
+
+Required for Patch B closure:
+
+- Durable `pending_reconciliation` preservation is required for any offline paid-sale operation that fails financial validation: invalid/missing snapshot, post-shift-closure arrival, REV-LOSS conflict (different operation closed/annulled the turn), items not found in snapshot, or other financial validation failure.
+- The reconciliation record must preserve: original operation context (snapshot reference, item/modifier identifiers, quantities, payment method, tip), claimed paid amount, actor/device context, failure/conflict reason, and server-side turn state at detection time.
+- Client-asserted monetary values in the preserved payload are evidence of what was claimed/collected from the customer. They are not trusted financial truth. If a valid snapshot exists, any eventual accepted price must be derived from that snapshot's authorized prices.
+- No final reconciliation resolution action or status is approved. The following remain open design items: what status values follow `pending_reconciliation`; whether resolution at client-asserted amounts is ever permitted or all resolution must use snapshot-derived prices; how accounting adjustments, refunds, or voids are recorded; what caja/reporting effects resolution produces.
+- Sensitive reconciliation visibility must be restricted server-side to Dueño/Encargado roles. The current `business_operations` RLS policy (`restaurant_id = get_user_restaurant_id()` FOR SELECT TO authenticated) grants all authenticated users including Mozo read access to all their restaurant's operations. Before Patch B may be declared closed, reconciliation records with unresolved paid-sale exceptions must be restricted so that Mozo cannot view, discard, hide, or resolve them.
+- A minimum manager-visible, server-guarded exception surface is required before Patch B may be declared closed. A fully polished reconciliation resolution UI may follow, but SQL/support-only resolution with broad authenticated raw-table SELECT is not an acceptable closed state.
+- A potentially paid offline financial operation must never be silently dismissed, deleted, or lost without durable server-side trace.
+
+**6. Coordinated Patch B governance**
+
+- P0-6B (`turns`), P0-6C (`turn_items`), P0-6D (`caja_shifts`), `business_operations` durability/visibility, canonical/wrapper RPC authorization, FIN-3, and REV-LOSS interactions are coordinated closure requirements within Patch B.
+- They are not separate "before/after Patch B" stages.
+- Patch B cannot be declared closed while any required boundary still permits bypass of trusted financial outcomes.
+- The exact internal implementation, commit, migration, and deployment order remains open and requires separate approval.
+- FIN-4 (delivery payment method / caja attribution) remains a separate open concern tracked independently.
+
+**7. Confirmed existing-path implications (design implications, not authorized fixes)**
+
+- `buildCloseTableSyncPayload` (closeTableOperation.js): must eventually carry snapshot/item/modifier references to the server because the current payload stripping prevents server-side per-item price verification. The current function strips the `items_snapshot` array entirely, sending only `{turnId, cajaShiftId, total, propina, metodo, mozo}`.
+- `ComandaPanel` direct-sale bypass (ComandaPanel.jsx ~line 549-553): must eventually route through a controlled server-side financial operation while preserving the business functionality of direct sale from salon. The current path creates `status:'cerrada'` turns with all client-supplied financials via direct INSERT, bypassing all RPCs, caja updates, stock deduction, and audit trail.
+- Quantity changes and item removals affect financial totals and require guarded lifecycle-aware server-side operations. A client-side field whitelist alone is not security containment. Post-kitchen item voids require auditable records with reason, actor, and Dueño/Encargado authorization per approved Decision H.
+- Closed-turn item mutations (INSERT, UPDATE, DELETE on `turn_items` for `cerrada` or `anulada` turns) must ultimately be prevented through server-side enforcement.
+- Custom/free items (`menu_item_id IS NULL`): blocked from trusted offline finalization in the first secure design. If a restaurant needs a special item sellable offline, it must be pre-authorized into the applicable price snapshot as an authorized item/price. Online manual-price overrides require guarded Dueño/Encargado authorization server-side.
+- Existing online delivery item creation (`create_delivery_order_operation`): must ultimately derive catalog prices server-side from `menu_items` rather than trusting client-supplied `precio` in the operation payload. The current RPC inserts `turn_items.precio` directly from client payload (confirmed in migration `20260527000008` line 173). Snapshot support for delivery is needed only if offline delivery is introduced; FIN-4 remains separate.
+- `ManualTurnForm` (ManualTurnForm.jsx): remains P0-6B / report-integrity server-side containment work, separate from P0-6C snapshot mechanics. Security closure requires server-side containment of the direct financial writes it produces, not merely a frontend disable.
+- `offlineSync.js UPDATE_TURN_ITEM` (lines 110-113): free-form `op.updates` must be eliminated; `precio` must never be client-updatable through any path.
+
+**8. Implementation status**
+
+- P0-6C bounded design direction is approved for documentation only.
+- No SQL, migration, code, exact RPC signature, exact schema, reconciliation-resolution action, or implementation order is authorized.
+- Patch B remains DESIGN IN PROGRESS — NOT AUTHORIZED FOR CODE OR MIGRATION WRITING.
+- Next authorized work is to define the next bounded Patch B design decision or specification step, not to implement.
+
 ---
 
 **P0-6D: Direct `caja_shifts` Ledger/Reconciliation Bypass (subvector of P0-6)**
@@ -591,12 +675,19 @@ GATE 1 — P0 Full Remediation (Patch B + C)
 │   │  decision and is not pre-approved by this evidence review.
 │   │
 │   │  OPEN DESIGN DECISIONS (block code/migration writing):
-│   │  1. Price resolution mechanism for turn_items precio/cantidad
-│   │  2. Custom item pricing policy (items where menu_item_id IS NULL)
-│   │  3. Caja write containment approach for caja_shifts
-│   │  4. Offline replay validation strategy for IndexedDB-sourced operations
+│   │  1. Price resolution mechanism for turn_items precio/cantidad — P0-6C DESIGN DIRECTION RESOLVED (2026-06-02):
+│   │     immutable server-stored price snapshots. See P0-6C Approved Bounded Design Direction section.
+│   │     Exact table/column names, RPC signatures, and implementation order remain open.
+│   │  2. Custom item pricing policy (items where menu_item_id IS NULL) — RESOLVED (2026-06-02):
+│   │     custom/free items blocked from trusted offline finalization in first secure design;
+│   │     online manual-price overrides require guarded Dueño/Encargado authorization server-side;
+│   │     pre-authorized special items must be included in the applicable price snapshot.
+│   │  3. Caja write containment approach for caja_shifts — OPEN
+│   │  4. Offline replay validation strategy for IndexedDB-sourced operations — PARTIALLY RESOLVED (2026-06-02):
+│   │     snapshot-based finalization, post-shift-closure reconciliation rule, and REV-LOSS detection
+│   │     via operation-identity matching are defined. Exact offline queue handler redesign remains open.
 │   │
-│   │  CANDIDATE MECHANISMS (none selected):
+│   │  CANDIDATE MECHANISMS (for remaining open decisions):
 │   │  Corrected RLS/policy design; revocation of broad grants; narrow column-level privileges
 │   │  after broad grants are removed; guarded RPCs; protective triggers; reviewed hybrid.
 │
@@ -664,28 +755,29 @@ GATE 5 — Employee Management
 
 ## 7. IMMEDIATE NEXT TASK
 
-### Review v1.6 Documentation and Define Patch B Design Plan
+### Define Next Bounded Patch B Design Decision
 
-**Status:** `turn_items` and `caja_shifts` production boundary verification COMPLETE (2026-06-01). P0-6C and P0-6D production-confirmed and documented. Evidence package reviewed and corrected through multi-agent review process.
+**Status:** P0-6C bounded design direction (immutable server-stored price snapshots) approved for documentation (2026-06-02). P0-6C and P0-6D production-confirmed (2026-06-01). P0-6B production-confirmed (2026-05-31). Complete production evidence and caller maps available for all three financial table boundaries.
 
-**Immediate next step:** Review and approve the v1.6 documentation-only update, then define the ordered Patch B design plan from the complete production evidence and caller maps. No code or migration writing is authorized by this documentation update.
+**Resolved design decisions (2026-06-02):**
+1. Price resolution mechanism for `turn_items` `precio`/`cantidad` — immutable server-stored price snapshots (see P0-6C Approved Bounded Design Direction)
+2. Custom item pricing policy (items where `menu_item_id IS NULL`) — blocked from trusted offline finalization; online requires Dueño/Encargado guarded authorization; pre-authorized items via snapshot
+3. Offline replay validation strategy — partially resolved: snapshot-based finalization, post-shift-closure reconciliation, REV-LOSS operation-identity detection
 
-**Complete production evidence now available for:**
-- `turns` — P0-6B (2026-05-31): direct financial mutation bypass
-- `turn_items` — P0-6C (2026-06-01): financial-source bypass, client-sourced precio/cantidad
-- `caja_shifts` — P0-6D (2026-06-01): ledger/reconciliation bypass, permissive policy defeats role restriction
+**Remaining open design decisions (block code/migration writing):**
+1. Caja write containment approach for `caja_shifts` (P0-6D)
+2. Exact snapshot table/column/RPC specification (P0-6C implementation detail)
+3. Exact offline queue handler redesign (offlineSync.js, buildCloseTableSyncPayload)
+4. Reconciliation resolution actions/statuses (not pre-approved)
+5. Reconciliation visibility restriction mechanism (role-filtered RLS, separate table, or restricted view)
 
-**Four open design decisions block migration writing:**
-1. Price resolution mechanism for `turn_items` `precio`/`cantidad`
-2. Custom item pricing policy (items where `menu_item_id IS NULL`)
-3. Caja write containment approach for `caja_shifts`
-4. Offline replay validation strategy for IndexedDB-sourced operations
+**Immediate next step:** Define the next bounded Patch B design decision or specification step. No code or migration writing is authorized.
 
-**Candidate implementation mechanisms (none selected):** corrected RLS/policy design; revocation of broad grants; narrow column-level privileges after broad grants are removed; guarded RPCs; protective triggers; reviewed hybrid.
+**Candidate implementation mechanisms (for remaining open decisions):** corrected RLS/policy design; revocation of broad grants; narrow column-level privileges after broad grants are removed; guarded RPCs; protective triggers; reviewed hybrid.
 
-### Patch B Migration Writing — Financial Boundary Authorization (BLOCKED on open design decisions)
+### Patch B Migration Writing — Financial Boundary Authorization (BLOCKED on remaining open design decisions)
 
-**Objective:** Write migration file implementing financial boundary authorization: tenant guards, role enforcement, input validation, table/column grant containment, caller migration, and legacy overload cleanup. BLOCKED on the four open design decisions documented above; production verification and caller-map evidence for P0-6C/P0-6D are complete, but no code or migration writing is authorized.
+**Objective:** Write migration file implementing financial boundary authorization: tenant guards, role enforcement, input validation, table/column grant containment, caller migration, and legacy overload cleanup. BLOCKED on remaining open design decisions documented above; P0-6C snapshot design direction is approved for documentation but exact implementation specification is not authorized. No code or migration writing is authorized.
 
 **Scope (from E1C-A1 design — Patch B items, design in progress, expanded with P0-6B/6C/6D findings 2026-05-31/2026-06-01):**
 1. P0-2: `get_top_products` — convert to plpgsql, add `user_owns_branch(p_branch_id)` guard
@@ -759,6 +851,21 @@ GATE 5 — Employee Management
 - [ ] P0-6C: offlineSync UPDATE_TURN_ITEM free-form `op.updates` vector eliminated
 - [ ] P0-6C: Excessive anon CRUD grants on `turn_items` removed (defense-in-depth)
 - [ ] P0-6C: Security/regression tests prove subtotal source containment
+- [ ] P0-6C SNAPSHOT: Immutable price snapshot tables exist with server-only write access (no direct INSERT/UPDATE/DELETE for authenticated)
+- [ ] P0-6C SNAPSHOT: Snapshot issuance via guarded server-side operation with tenant/branch/active-shift/device/role validation
+- [ ] P0-6C SNAPSHOT: Snapshot item and modifier rows are immutable after issuance (server-enforced)
+- [ ] P0-6C SNAPSHOT: Snapshot preserves historical prices independently of live catalog changes (no cascade from menu_items/modifier_groups)
+- [ ] P0-6C SNAPSHOT: Server-side close/sync RPC derives prices from stored snapshot, not from client-supplied values
+- [ ] P0-6C SNAPSHOT: buildCloseTableSyncPayload sends snapshot reference and item/modifier identifiers to server
+- [ ] P0-6C SNAPSHOT: Offline CLOSE_TABLE arriving after snapshot-bound caja shift is closed enters reconciliation, NOT auto-finalized
+- [ ] P0-6C SNAPSHOT: Authoritative caja-shift binding derived from server-stored snapshot record, not from client payload
+- [ ] P0-6C SNAPSHOT: ComandaPanel direct-sale rerouted through controlled server-side financial operation
+- [ ] P0-6C SNAPSHOT: Custom/free items blocked from trusted offline finalization; online requires Dueño/Encargado authorization
+- [ ] P0-6C SNAPSHOT: Online delivery item creation resolves catalog prices server-side (create_delivery_order_operation)
+- [ ] P0-6C SNAPSHOT: Closed-turn item mutations prevented through server-side enforcement
+- [ ] P0-6C SNAPSHOT: Durable pending_reconciliation for invalid/missing snapshot, post-shift arrival, REV-LOSS conflict
+- [ ] P0-6C SNAPSHOT: Reconciliation records restricted to Dueño/Encargado visibility (Mozo excluded)
+- [ ] P0-6C SNAPSHOT: Minimum manager-visible server-guarded exception surface exists before Patch B closure
 - [ ] P0-6D: Effective broad direct browser-authenticated INSERT/UPDATE/DELETE on `caja_shifts` removed
 - [ ] P0-6D: Legitimate caja writes remain behind guarded server-side operations only
 - [ ] P0-6D: Server-side role checks protect financially restricted caja actions
@@ -827,4 +934,5 @@ Every future implementation task report must include:
 | 1.3 | 2026-05-30 | Gate 0-C COMPLETE. All 8 P0s production-corroborated via read-only catalog queries + `has_function_privilege` effective privilege checks. P0-6 updated: three production overloads (7/9/11 args) confirmed; 7-arg bypasses discount/points validation; fix direction updated to DROP legacy overloads. P0-5 evidence updated: permissive FOR ALL policy defeats stricter write policy via OR combination. SECURITY DEFINER inventory updated with production verification status. Added tracked items: AUDIT-1 (sync_close_table actor_user_id client-asserted), AUTHZ-1 (delivery order role scope), HARD-1 (rls_auto_enable unnecessary PUBLIC execute). Employee login RPCs confirmed correctly restricted. E1C-A1 DESIGN unblocked; migration writing/applying requires separate review. |
 | 1.4 | 2026-05-30 | **Patch A APPLIED AND VERIFIED IN PRODUCTION.** Commit `c1152947`. Patch A containment strategy from E1C-A1-R3 applied. Three-patch strategy (A→B→C) identified. Patch A emergency containment applied: REVOKE PUBLIC/anon on all 9 P0 RPC signatures; cerrar_mesa_atomico 7/9-arg denied to all roles; stock_ingresos insecure policies removed; team_members browser-write access removed (SELECT-only for authenticated, service_role retains CRUD via invite-member Edge Function). Production verification passed all blocks in PATCH_A_VERIFICATION.sql. P0s remain open for authenticated cross-tenant exploitation (Patch B) and client-trusted points earning (Patch C). Patch B design IN PROGRESS — not authorized for migration writing. Patch C design NOT FINALIZED. Employee Login/C2 remain blocked. |
 | 1.5 | 2026-05-31 | **P0-6B: Direct `turns` table financial mutation bypass confirmed in production.** `turns_authenticated` FOR ALL RLS policy grants any authenticated user full INSERT/UPDATE/DELETE on `turns` within branch, bypassing all RPCs, `business_operations` audit trail, and financial validation. 12+ direct mutation callers identified across 7 source files. `close_operation_id` absent from production `turns` schema — strict idempotency requires new column. SECURITY DEFINER ownership corrected: all functions owned by `postgres`, not `service_role`. `sync_close_table_operation` confirmed anon=true (needs REVOKE, P-11). `business_operations.status` CHECK confirmed limited to `('processing','applied','failed')` — must extend for reconciliation. RLS limitation documented: controls rows not columns — financial mutation containment requires column-level grants, guarded RPCs, protective triggers, or caller migration. Patch B blocker list expanded from 10 to 12 prerequisites (P-1 through P-12). New deferred risks added: FIN-3 (shift immutability), FIN-4 (delivery payment default), REV-LOSS (paid offline close after annulment), BIZOPS-1 (business_operations visibility). Patch B design IN PROGRESS — NOT authorized for migration writing. |
+| 1.7 | 2026-06-02 | **P0-6C bounded design direction approved for documentation.** First-release offline-price provenance foundation: immutable server-stored authorized price snapshots. Snapshots issued only through guarded server-side operations during active caja shift; browser-authenticated clients have no direct write access to snapshot records; snapshot rows are immutable after issuance; client/IndexedDB monetary values are never financial truth; server derives prices from stored snapshot at sync time. Offline finalization invariant: auto-finalization only while snapshot-bound caja shift is still open; post-closure syncs enter reconciliation with no exception for pre-existing turns. Authoritative caja-shift binding derived from server-stored snapshot record, not client payload. FIN-3 remains required within Patch B for broader financial integrity. Custom/free items blocked from trusted offline finalization; online requires Dueño/Encargado authorization. Durable `pending_reconciliation` preservation required; final resolution actions/statuses not pre-approved. Sensitive reconciliation visibility restricted to Dueño/Encargado; minimum manager-visible exception surface required for Patch B closure. Confirmed existing-path implications documented: buildCloseTableSyncPayload stripping, ComandaPanel bypass, delivery server-side price resolution, ManualTurnForm as P0-6B containment. P0-6B/P0-6C/P0-6D/FIN-3/REV-LOSS are coordinated Patch B closure requirements; Patch B cannot be declared closed while any required boundary still permits bypass; exact internal implementation, commit, migration, and deployment order remains open and requires separate approval. Open design decisions updated (2 resolved, 1 partially resolved, 5 remaining). Patch B checklist expanded with 14 snapshot-specific verification items. HMAC/token is optional future defense-in-depth, not primary mechanism. No code, migration, or implementation authorized. Patch B remains DESIGN IN PROGRESS. |
 | 1.6 | 2026-06-01 | **P0-6C and P0-6D production-confirmed.** P0-6C (`turn_items`): `GRANT ALL` to authenticated + anon, permissive `turn_items_all` (FOR ALL TO public) and `turn_items_authenticated` (FOR ALL TO authenticated, no role restriction). Production-confirmed columns: `branch_id`, `cantidad`, `created_at`, `menu_item_id`, `menu_item_name`, `notas`, `precio`, `turn_id`. Repository inspection: all item-creation paths supply client-derived `precio`; `offlineSync.js UPDATE_TURN_ITEM` exposes free-form IndexedDB-sourced `op.updates`; `cerrar_mesa_atomico` reads `SUM(cantidad * precio)` as server truth from attacker-controlled data. P0-6D (`caja_shifts`): `GRANT ALL` to authenticated + anon, permissive `caja_shifts_branch` (FOR ALL TO authenticated, `user_owns_branch`) defeats Dueño/Encargado restriction in `caja_shifts_write` via OR semantics (identical to P0-5 pattern). 19 confirmed columns including financially sensitive `fondo_inicial`, `retiros`, `total_facturado_turno`, `diferencia_caja`. No direct browser mutation caller found — latent PostgREST API surface. Anon CRUD grants confirmed excessive on both tables; row-level anon exploitation not separately corroborated (defense-in-depth defect). Evidence separated into production-confirmed and repository-inspection classes. Caller map added by category without aggregate counts. Patch B scope expanded to 14 items (added P0-6C, P0-6D, `business_operations` boundary). Confirmed dependency: P0-6C containment required before P-7 (cerrar_mesa_atomico rewrite). Four open design decisions identified as blocking migration writing. Candidate implementation mechanisms listed but none selected. Patch B design IN PROGRESS — NOT authorized for code or migration writing. |
